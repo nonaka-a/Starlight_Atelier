@@ -127,41 +127,79 @@
         }
 
         #sidebar {
-            width: 180px;
+            width: 400px; /* 横幅を拡張 */
             display: flex;
             flex-direction: column;
-            gap: 5px;
+            gap: 10px;
+            min-width: 320px; /* 最小幅も拡張 */
         }
 
-        #palette {
+        /* --- タイルプロパティエリア --- */
+        #tile-properties {
+            background: #333;
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .prop-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .prop-item label {
+            font-size: 0.75rem;
+            color: #aaa;
+        }
+        .prop-item select, .prop-item input[type="text"] {
+            background: #222;
+            color: #fff;
+            border: 1px solid #555;
+            padding: 4px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .prop-checkbox {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+        }
+        .prop-checkbox input {
+            cursor: pointer;
+        }
+
+        /* --- パレット（タイルセット画像）エリア --- */
+        #palette-container {
             flex: 1;
             background: #333;
             border: 1px solid #555;
             border-radius: 4px;
-            overflow-y: auto;
+            overflow: auto;
+            position: relative;
             padding: 5px;
+            /* 必要であればここにも min-width を設定 */
         }
 
-        .palette-item {
-            display: flex;
-            align-items: center;
-            padding: 4px;
-            margin-bottom: 2px;
+        #palette-canvas {
+            display: block;
+            background-image: 
+                linear-gradient(45deg, #222 25%, transparent 25%), 
+                linear-gradient(-45deg, #222 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #222 75%), 
+                linear-gradient(-45deg, transparent 75%, #222 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            background-color: #333;
             cursor: pointer;
-            border: 2px solid transparent;
+            margin: 0 auto; /* 中央寄せ */
+            width: 100%; /* 親コンテナ幅に合わせる */
+            height: auto; /* アスペクト比を維持 */
         }
-        .palette-item:hover { background-color: #3a3a3a; }
-        .palette-item.selected { background-color: #444; border-color: #fff; }
 
-        .palette-icon {
-            width: 32px; height: 32px;
-            border: 1px solid #555;
-            margin-right: 8px;
-            background-repeat: no-repeat;
-            background-size: cover;
-            image-rendering: pixelated;
-        }
-        
         #brush-status {
             font-size: 0.8rem;
             color: #aaa;
@@ -372,7 +410,29 @@
 
         <div id="main-area">
             <div id="sidebar">
-                <div id="palette"></div>
+                <!-- タイル設定エリア -->
+                <div id="tile-properties">
+                    <div class="prop-item">
+                        <label>ID</label>
+                        <input type="text" id="tile-id-display" readonly value="1">
+                    </div>
+                    <div class="prop-item">
+                        <label>属性 (Type)</label>
+                        <select id="tile-type-select">
+                            <!-- JSで生成 -->
+                        </select>
+                    </div>
+                    <label class="prop-checkbox">
+                        <input type="checkbox" id="tile-collision-check">
+                        <span>当たり判定 (Solid)</span>
+                    </label>
+                </div>
+
+                <!-- タイルセット画像パレット -->
+                <div id="palette-container">
+                    <canvas id="palette-canvas"></canvas>
+                </div>
+
                 <div id="brush-status">ブラシ回転: 0°</div>
             </div>
 

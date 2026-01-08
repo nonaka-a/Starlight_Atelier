@@ -1,116 +1,14 @@
 /**
- * --- 音響システム ---
- */
-const AudioSys = {
-    ctx: null,
-    init: function() {
-        if (!this.ctx) {
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            this.ctx = new AudioContext();
-            this.startBGM();
-        } else if (this.ctx.state === 'suspended') {
-            this.ctx.resume();
-        }
-    },
-    playTone: function(freq, type, duration, vol = 0.1) {
-        if (!this.ctx) return;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = type;
-        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-        gain.gain.setValueAtTime(vol, this.ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start();
-        osc.stop(this.ctx.currentTime + duration);
-    },
-    playNoise: function(duration, vol = 0.2) {
-        if (!this.ctx) return;
-        const bufferSize = this.ctx.sampleRate * duration;
-        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-            data[i] = Math.random() * 2 - 1;
-        }
-        const noise = this.ctx.createBufferSource();
-        noise.buffer = buffer;
-        const gain = this.ctx.createGain();
-        gain.gain.setValueAtTime(vol, this.ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
-        noise.connect(gain);
-        gain.connect(this.ctx.destination);
-        noise.start();
-    },
-    startBGM: function() {
-        const loop = () => {
-            if (!this.ctx) return;
-            const t = this.ctx.currentTime;
-            if(Math.floor(t*4)%8==0) this.playTone(200, 'triangle', 0.1, 0.05);
-            setTimeout(loop, 250);
-        };
-        loop();
-    },
-    seJump: function() { this.playTone(300, 'square', 0.1, 0.1); },
-    seShoot: function() { this.playNoise(0.1, 0.1); },
-    seExplosion: function() { this.playNoise(0.3, 0.2); },
-    seClear: function() { 
-        this.playTone(523, 'sine', 0.2); 
-        setTimeout(()=>this.playTone(659, 'sine', 0.2), 200);
-        setTimeout(()=>this.playTone(783, 'sine', 0.4), 400);
-    },
-    seGameOver: function() { this.playTone(100, 'sawtooth', 0.5, 0.2); }
-};
-
-/**
- * --- 定数・設定 ---
- */
-const TILE_SIZE = 64;
-const GRAVITY = 0.6;
-const JUMP_POWER = -14;
-const SPEED = 6;
-const TILESET_SRC = 'tileset.png';
-const CHAR_SRC = 'char.png';
-const MAP_FILE_SRC = 'stage_data.json';
-const ANIM_FILE_SRC = 'animations.json';
-const BULLET_SPEED = 12;
-
-const TILE_ID = {
-    AIR: 0,
-    WALL: 1,
-    GROUND: 2,
-    SPIKE: 3,
-    COIN: 4,
-    ENEMY: 5,
-    START: 6,
-    GOAL: 7
-};
-
-// カメラ設定 (動的に変更するためletに変更)
-let CANVAS_WIDTH = 900;
-let CANVAS_HEIGHT = 500;
-let ZOOM_LEVEL = 1.0;
-
-/**
  * --- ゲームの状態 ---
  */
-let canvas, ctx;
 let mapData = [];
 let mapCols = 0;
 let mapRows = 0;
+let tileDefs = {};
+
 let tilesetImage = new Image();
 let charImage = new Image();
 let animData = {};
-let isGameRunning = false;
-let camera = { x: 0, y: 0 };
-
-const keys = {
-    ArrowLeft: false,
-    ArrowRight: false,
-    ArrowDown: false,
-    Space: false,
-    KeyB: false
-};
 
 const player = {
     x: 0, y: 0,
@@ -128,6 +26,7 @@ const player = {
 
 let enemies = [];
 let bullets = [];
+let score = 0; // ★追加
 
 /**
  * --- 初期化処理 ---
@@ -141,25 +40,7 @@ window.onload = () => {
 
     document.getElementById('file-input').addEventListener('change', manualLoadMap);
     
-    window.addEventListener('keydown', (e) => {
-        // キーボード操作時は音を有効化
-        AudioSys.init();
-        if (e.code === 'Space') keys.Space = true;
-        if (e.code === 'ArrowLeft') keys.ArrowLeft = true;
-        if (e.code === 'ArrowRight') keys.ArrowRight = true;
-        if (e.code === 'ArrowDown') keys.ArrowDown = true;
-        if (e.code === 'KeyB' || e.code === 'KeyZ') keys.KeyB = true;
-    });
-    
-    window.addEventListener('keyup', (e) => {
-        if (e.code === 'Space') keys.Space = false;
-        if (e.code === 'ArrowLeft') keys.ArrowLeft = false;
-        if (e.code === 'ArrowRight') keys.ArrowRight = false;
-        if (e.code === 'ArrowDown') keys.ArrowDown = false;
-        if (e.code === 'KeyB' || e.code === 'KeyZ') keys.KeyB = false;
-    });
-
-    setupTouchControls();
+    setupControls(); // engine.js
     window.addEventListener('resize', fitWindow);
 
     // アニメーションデータ読み込み
@@ -174,80 +55,6 @@ window.onload = () => {
             tryAutoLoad();
         });
 };
-
-function setupTouchControls() {
-    const bindTouch = (id, code) => {
-        const btn = document.getElementById(id);
-        if (!btn) return;
-        
-        const down = (e) => {
-            if(e.cancelable) e.preventDefault();
-            AudioSys.init();
-            keys[code] = true;
-            btn.classList.add('active');
-        };
-        const up = (e) => {
-            if(e.cancelable) e.preventDefault();
-            keys[code] = false;
-            btn.classList.remove('active');
-        };
-
-        btn.addEventListener('touchstart', down, {passive: false});
-        btn.addEventListener('touchend', up);
-        btn.addEventListener('mousedown', down);
-        btn.addEventListener('mouseup', up);
-        btn.addEventListener('mouseleave', up);
-    };
-
-    bindTouch('btn-left', 'ArrowLeft');
-    bindTouch('btn-right', 'ArrowRight');
-    bindTouch('btn-down', 'ArrowDown');
-    bindTouch('btn-jump', 'Space');
-    bindTouch('btn-attack', 'KeyB');
-
-    document.getElementById('btn-zoom-in')?.addEventListener('click', () => changeZoom(0.1));
-    document.getElementById('btn-zoom-out')?.addEventListener('click', () => changeZoom(-0.1));
-    document.getElementById('btn-fullscreen')?.addEventListener('click', toggleFullScreen);
-    document.getElementById('btn-mute')?.addEventListener('click', toggleMute);
-}
-
-function changeZoom(delta) {
-    ZOOM_LEVEL = Math.max(0.5, Math.min(3.0, ZOOM_LEVEL + delta));
-    updateCamera();
-}
-
-function toggleFullScreen() {
-    if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen();
-    } else {
-        if (document.exitFullscreen) document.exitFullscreen();
-    }
-}
-
-let isMuted = false;
-function toggleMute() {
-    isMuted = !isMuted;
-    if(AudioSys.ctx) {
-        if(isMuted) AudioSys.ctx.suspend();
-        else AudioSys.ctx.resume();
-    }
-    const btn = document.getElementById('btn-mute');
-    btn.textContent = isMuted ? "🔇" : "🔊";
-}
-
-function fitWindow() {
-    const wrapper = document.getElementById('main-wrapper');
-    // UIコンテナ(160px)も含めた全体の高さを考慮
-    // ゲーム画面(500) + UI(160) = 660
-    const totalHeight = CANVAS_HEIGHT + 160; 
-    const totalWidth = CANVAS_WIDTH; // 900
-
-    const scaleX = (window.innerWidth - 20) / totalWidth;
-    const scaleY = (window.innerHeight - 20) / totalHeight;
-    const scale = Math.min(scaleX, scaleY, 1);
-    
-    wrapper.style.transform = `scale(${scale})`;
-}
 
 function tryAutoLoad() {
     fetch(MAP_FILE_SRC)
@@ -281,6 +88,14 @@ function initGameWithData(json) {
     mapCols = json.width;
     mapRows = json.height;
 
+    // タイル定義の読み込み
+    tileDefs = {};
+    if (json.tileDefs && Array.isArray(json.tileDefs)) {
+        json.tileDefs.forEach(def => {
+            tileDefs[def.id] = def;
+        });
+    }
+
     mapData = [];
     for(let y=0; y<mapRows; y++) {
         const row = [];
@@ -298,20 +113,28 @@ function initGameWithData(json) {
     setupGame();
 }
 
+function getTileProp(id) {
+    if (tileDefs[id]) return tileDefs[id];
+    const type = DEFAULT_ID_TYPE[id] || 'air';
+    const solid = (type === 'wall' || type === 'ground');
+    return { id, type, solid };
+}
+
 function setupGame() {
     canvas.width = CANVAS_WIDTH;
     canvas.height = CANVAS_HEIGHT;
     
-    // コンテナサイズも更新
     const container = document.getElementById('game-container');
     container.style.width = CANVAS_WIDTH + "px";
     container.style.height = CANVAS_HEIGHT + "px";
     
-    // UIコンテナも連動
     const ui = document.getElementById('ui-container');
     if(ui) ui.style.width = CANVAS_WIDTH + "px";
 
     fitWindow();
+
+    score = 0; // ★リセット
+    document.getElementById('score-text').textContent = score; // ★表示リセット
 
     enemies = [];
     bullets = [];
@@ -325,23 +148,28 @@ function scanMapAndSetupObjects() {
     for (let y = 0; y < mapRows; y++) {
         for (let x = 0; x < mapCols; x++) {
             const cell = mapData[y][x];
-            const id = cell.id;
+            const prop = getTileProp(cell.id);
 
-            if (id === TILE_ID.START) {
+            if (prop.type === 'start') {
                 player.x = x * TILE_SIZE + (TILE_SIZE - player.width) / 2;
                 player.y = y * TILE_SIZE;
-                cell.id = TILE_ID.AIR; 
+                cell.id = 0; 
             }
-            else if (id === TILE_ID.ENEMY) {
+            else if (prop.type === 'enemy') {
                 enemies.push({
                     x: x * TILE_SIZE,
                     y: y * TILE_SIZE,
                     width: TILE_SIZE,
                     height: TILE_SIZE,
                     vx: 0, vy: 0,
-                    onGround: false, isDead: false
+                    onGround: false, 
+                    isDead: false,
+                    tileId: cell.id, 
+                    rot: cell.rot,   
+                    fx: cell.fx,
+                    fy: cell.fy
                 });
-                cell.id = TILE_ID.AIR;
+                cell.id = 0; 
             }
         }
     }
@@ -356,7 +184,8 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-function updateCamera() {
+// engine.jsから呼ばれる
+window.updateCamera = function() {
     const viewportW = CANVAS_WIDTH / ZOOM_LEVEL;
     const viewportH = CANVAS_HEIGHT / ZOOM_LEVEL;
 
@@ -400,9 +229,14 @@ function update() {
     }
 
     if (keys.Space && player.onGround) {
-        player.vy = JUMP_POWER;
+        if (keys.ArrowDown) {
+            player.vy = JUMP_POWER * 1.4; // 大ジャンプ
+            AudioSys.playTone(400, 'square', 0.15, 0.1); 
+        } else {
+            player.vy = JUMP_POWER;
+            AudioSys.seJump();
+        }
         player.onGround = false;
-        AudioSys.seJump();
     }
 
     if (!player.onGround) {
@@ -503,13 +337,45 @@ function updateEnemies() {
     }
 }
 
+function getTileTopY(x, y) {
+    const col = Math.floor(x / TILE_SIZE);
+    const row = Math.floor(y / TILE_SIZE);
+    if (row < 0 || row >= mapRows || col < 0 || col >= mapCols) return null;
+    const id = mapData[row][col].id;
+    const prop = getTileProp(id);
+    if (!prop.solid) return null;
+    const offset = TILE_HITBOX_OFFSET[id] || 0;
+    return row * TILE_SIZE + offset;
+}
+
 function isSolid(x, y) {
     const col = Math.floor(x / TILE_SIZE);
     const row = Math.floor(y / TILE_SIZE);
     if (row < 0 || row >= mapRows || col < 0 || col >= mapCols) return false;
     
     const id = mapData[row][col].id;
-    return id === TILE_ID.WALL || id === TILE_ID.GROUND;
+    const prop = getTileProp(id);
+    
+    return prop.solid;
+}
+
+// 横方向の壁として判定するかどうか
+function isWall(x, y) {
+    const col = Math.floor(x / TILE_SIZE);
+    const row = Math.floor(y / TILE_SIZE);
+    if (row < 0 || row >= mapRows || col < 0 || col >= mapCols) return false;
+    
+    const id = mapData[row][col].id;
+    const prop = getTileProp(id);
+    
+    // solidでないなら壁ではない
+    if (!prop.solid) return false;
+
+    // オフセット設定があるタイル（細い床など）は
+    // 横方向の壁としては扱わない（すり抜ける）ようにする
+    if (TILE_HITBOX_OFFSET[id]) return false;
+
+    return true;
 }
 
 function checkObjectCollisionX(obj) {
@@ -519,17 +385,18 @@ function checkObjectCollisionX(obj) {
     const top = obj.y + padding;
     const bottom = obj.y + obj.height - padding;
 
-    if (isSolid(left, top) || isSolid(left, bottom)) {
+    // isSolid ではなく isWall を使用して判定
+    if (isWall(left, top) || isWall(left, bottom)) {
         obj.x = (Math.floor(left / TILE_SIZE) + 1) * TILE_SIZE;
         obj.vx = 0;
-    } else if (isSolid(right, top) || isSolid(right, bottom)) {
+    } else if (isWall(right, top) || isWall(right, bottom)) {
         obj.x = Math.floor(right / TILE_SIZE) * TILE_SIZE - obj.width;
         obj.vx = 0;
     }
 }
 
 function checkObjectCollisionY(obj) {
-    const padding = 4;
+    const padding = 12; 
     const left = obj.x + padding;
     const right = obj.x + obj.width - padding;
     const top = obj.y;
@@ -540,11 +407,23 @@ function checkObjectCollisionY(obj) {
             obj.y = (Math.floor(top / TILE_SIZE) + 1) * TILE_SIZE;
             obj.vy = 0;
         }
-    } else if (obj.vy > 0) {
-        if (isSolid(left, bottom) || isSolid(right, bottom)) {
-            obj.y = Math.floor(bottom / TILE_SIZE) * TILE_SIZE - obj.height;
-            obj.vy = 0;
-            obj.onGround = true;
+    } 
+    else if (obj.vy >= 0) {
+        const groundY_L = getTileTopY(left, bottom);
+        const groundY_R = getTileTopY(right, bottom);
+        let groundY = null;
+        if (groundY_L !== null && bottom >= groundY_L) groundY = groundY_L;
+        if (groundY_R !== null && bottom >= groundY_R) {
+            if (groundY === null || groundY_R < groundY) groundY = groundY_R;
+        }
+
+        if (groundY !== null) {
+            const maxSnap = Math.max(TILE_SIZE, obj.vy + 10);
+            if (bottom <= groundY + maxSnap) {
+                obj.y = groundY - obj.height;
+                obj.vy = 0;
+                obj.onGround = true;
+            }
         }
     }
 }
@@ -557,13 +436,24 @@ function checkInteraction() {
 
     if (row >= 0 && row < mapRows && col >= 0 && col < mapCols) {
         const cell = mapData[row][col];
-        const id = cell.id;
+        const prop = getTileProp(cell.id);
         
-        if (id === TILE_ID.SPIKE) showGameOver();
-        else if (id === TILE_ID.GOAL) showGameClear();
-        else if (id === TILE_ID.COIN) {
-            cell.id = TILE_ID.AIR; 
+        if (prop.type === 'spike') showGameOver();
+        else if (prop.type === 'goal') showGameClear();
+        else if (prop.type === 'item' || prop.type === 'coin') {
+            cell.id = 0; 
             AudioSys.playTone(1000, 'sine', 0.1);
+
+            // ★追加: スコア加算とUI更新
+            score++;
+            const scoreText = document.getElementById('score-text');
+            scoreText.textContent = score;
+            
+            // ちょっとした演出（文字を跳ねさせる）
+            scoreText.parentElement.style.transform = "scale(1.2)";
+            setTimeout(() => {
+                scoreText.parentElement.style.transform = "scale(1.0)";
+            }, 100);
         }
     }
 
@@ -572,13 +462,6 @@ function checkInteraction() {
             showGameOver();
         }
     }
-}
-
-function checkRectCollision(r1, r2) {
-    return r1.x < r2.x + r2.width &&
-           r1.x + r1.width > r2.x &&
-           r1.y < r2.y + r2.height &&
-           r1.y + r1.height > r2.y;
 }
 
 function showGameOver() {
@@ -607,18 +490,19 @@ function draw() {
     for (let y = 0; y < mapRows; y++) {
         for (let x = 0; x < mapCols; x++) {
             const cell = mapData[y][x];
-            if (cell.id !== TILE_ID.AIR) {
+            if (cell.id !== 0) {
                 drawTile(x * TILE_SIZE, y * TILE_SIZE, cell);
             }
         }
     }
 
     for (const e of enemies) {
-        ctx.drawImage(
-            tilesetImage,
-            TILE_ID.ENEMY * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE,
-            e.x, e.y, e.width, e.height
-        );
+        drawTile(e.x, e.y, { 
+            id: e.tileId, 
+            rot: e.rot, 
+            fx: e.fx, 
+            fy: e.fy 
+        });
     }
 
     ctx.fillStyle = '#ffec47';
@@ -638,23 +522,15 @@ function drawPlayer() {
         const anim = animData[player.state];
         frame = anim.frames[player.frameIndex % anim.frames.length];
     } else {
-        ctx.drawImage(
-            tilesetImage,
-            TILE_ID.START * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE,
-            player.x, player.y, player.width, player.height
-        );
+        drawTile(player.x, player.y, { id: 6, rot: 0, fx: false, fy: false });
         return;
     }
 
     ctx.save();
     ctx.translate(player.x + player.width/2, player.y + player.height/2);
-    
-    if (!player.facingRight) {
-        ctx.scale(-1, 1);
-    }
+    if (!player.facingRight) ctx.scale(-1, 1);
 
     const srcImg = charImage.complete ? charImage : tilesetImage;
-    
     ctx.drawImage(
         srcImg,
         frame.x, frame.y, frame.w, frame.h,
@@ -665,6 +541,8 @@ function drawPlayer() {
 }
 
 function drawTile(px, py, cell) {
+    if (cell.id === 0) return;
+
     const cx = px + TILE_SIZE / 2;
     const cy = py + TILE_SIZE / 2;
     
@@ -675,11 +553,20 @@ function drawTile(px, py, cell) {
     const scaleY = cell.fy ? -1 : 1;
     ctx.scale(scaleX, scaleY);
     
-    ctx.drawImage(
-        tilesetImage,
-        cell.id * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE,
-        -TILE_SIZE / 2, -TILE_SIZE / 2, TILE_SIZE, TILE_SIZE
-    );
+    if (tilesetImage.complete && tilesetImage.width > 0) {
+        const cols = Math.floor(tilesetImage.width / TILE_SIZE);
+        const srcX = (cell.id % cols) * TILE_SIZE;
+        const srcY = Math.floor(cell.id / cols) * TILE_SIZE;
+
+        ctx.drawImage(
+            tilesetImage,
+            srcX, srcY, TILE_SIZE, TILE_SIZE,
+            -TILE_SIZE / 2, -TILE_SIZE / 2, TILE_SIZE, TILE_SIZE
+        );
+    } else {
+        ctx.fillStyle = '#888';
+        ctx.fillRect(-TILE_SIZE/2, -TILE_SIZE/2, TILE_SIZE, TILE_SIZE);
+    }
     
     ctx.restore();
 }

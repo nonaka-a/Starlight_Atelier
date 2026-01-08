@@ -13,6 +13,12 @@
         <div id="game-container">
             <canvas id="game-canvas"></canvas>
             
+ <!-- ★ここに追加: アイテムカウンター -->
+    <div id="item-counter">
+        <span class="counter-icon">🟡</span>
+        <span id="score-text">0</span>
+    </div>
+
             <!-- ロード画面 -->
             <div id="screen-load" class="overlay">
                 <div class="modal">
@@ -71,6 +77,9 @@
     </div>
 
     <!-- キャッシュ対策 -->
-    <script src="game.js?v=3.2"></script>
+<script src="audio.js?v=4.0"></script>
+<script src="constants.js?v=4.0"></script>
+<script src="engine.js?v=4.0"></script>
+<script src="game.js?v=4.0"></script>
 </body>
 </html>
