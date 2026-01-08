@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pop 2D Action DX (v3.0)</title>
+    <link rel="stylesheet" href="game.css">
+</head>
+<body>
+
+    <div id="main-wrapper">
+        
+        <div id="game-container">
+            <canvas id="game-canvas"></canvas>
+            
+            <!-- ロード画面 -->
+            <div id="screen-load" class="overlay">
+                <div class="modal">
+                    <h1>ゲームをはじめる</h1>
+                    <p>マップデータが見つかりませんでした。</p>
+                    <label for="file-input" class="file-label">📂 JSONファイルを選択</label>
+                    <input type="file" id="file-input" accept=".json">
+                </div>
+            </div>
+
+            <!-- ゲームオーバー画面 -->
+            <div id="screen-gameover" class="overlay">
+                <div class="modal">
+                    <h1>GAME OVER</h1>
+                    <p>やられちゃった...</p>
+                    <button class="retry-btn" onclick="location.reload()">🔄 もう一回！</button>
+                </div>
+            </div>
+
+            <!-- クリア画面 -->
+            <div id="screen-clear" class="overlay">
+                <div class="modal">
+                    <h2 class="clear-title">STAGE CLEAR!!</h2>
+                    <p>おめでとう！完全勝利！</p>
+                    <button class="retry-btn" onclick="location.reload()">🔄 最初から遊ぶ</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- タッチ操作UI -->
+        <div id="ui-container">
+            <!-- 左下: 十字キー -->
+            <div class="dpad">
+                <!-- 配置用スペース -->
+                <div style="grid-column:2; grid-row:1;"></div>
+                <div id="btn-left" class="dpad-btn">←</div>
+                <div id="btn-down" class="dpad-btn">↓</div>
+                <div id="btn-right" class="dpad-btn">→</div>
+            </div>
+
+            <!-- 中央下: 機能ボタン -->
+            <div class="center-panel">
+                <div id="btn-zoom-in" class="func-btn" title="ズームイン">🔍+</div>
+                <div id="btn-zoom-out" class="func-btn" title="ズームアウト">🔍-</div>
+                <div id="btn-fullscreen" class="func-btn" title="フルスクリーン">⛶</div>
+                <div id="btn-mute" class="func-btn" title="ミュート">🔊</div>
+            </div>
+
+            <!-- 右下: アクションボタン -->
+            <div class="action-pad">
+                <div id="btn-attack" class="action-btn btn-attack">B</div>
+                <div id="btn-jump" class="action-btn btn-jump">A</div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- キャッシュ対策 -->
+    <script src="game.js?v=3.2"></script>
+</body>
+</html>
