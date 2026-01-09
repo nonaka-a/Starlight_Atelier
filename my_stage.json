@@ -7057,7 +7057,7 @@
             "fy": false
           },
           {
-            "id": 56,
+            "id": 0,
             "rot": 0,
             "fx": false,
             "fy": false
@@ -16642,7 +16642,25 @@
             "fy": false
           },
           {
-            "id": 0,
+            "id": 67,
+            "rot": 0,
+            "fx": false,
+            "fy": false
+          },
+          {
+            "id": 68,
+            "rot": 0,
+            "fx": false,
+            "fy": false
+          },
+          {
+            "id": 69,
+            "rot": 0,
+            "fx": false,
+            "fy": false
+          },
+          {
+            "id": 70,
             "rot": 0,
             "fx": false,
             "fy": false
@@ -16732,45 +16750,27 @@
             "fy": false
           },
           {
-            "id": 0,
+            "id": 70,
             "rot": 0,
-            "fx": false,
+            "fx": true,
             "fy": false
           },
           {
-            "id": 0,
+            "id": 69,
             "rot": 0,
-            "fx": false,
+            "fx": true,
             "fy": false
           },
           {
-            "id": 0,
+            "id": 68,
             "rot": 0,
-            "fx": false,
+            "fx": true,
             "fy": false
           },
           {
-            "id": 0,
+            "id": 67,
             "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
+            "fx": true,
             "fy": false
           }
         ],
@@ -16878,7 +16878,25 @@
             "fy": false
           },
           {
-            "id": 0,
+            "id": 75,
+            "rot": 0,
+            "fx": false,
+            "fy": false
+          },
+          {
+            "id": 76,
+            "rot": 0,
+            "fx": false,
+            "fy": false
+          },
+          {
+            "id": 77,
+            "rot": 0,
+            "fx": false,
+            "fy": false
+          },
+          {
+            "id": 78,
             "rot": 0,
             "fx": false,
             "fy": false
@@ -16968,45 +16986,27 @@
             "fy": false
           },
           {
-            "id": 0,
+            "id": 78,
             "rot": 0,
-            "fx": false,
+            "fx": true,
             "fy": false
           },
           {
-            "id": 0,
+            "id": 77,
             "rot": 0,
-            "fx": false,
+            "fx": true,
             "fy": false
           },
           {
-            "id": 0,
+            "id": 76,
             "rot": 0,
-            "fx": false,
+            "fx": true,
             "fy": false
           },
           {
-            "id": 0,
+            "id": 75,
             "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
+            "fx": true,
             "fy": false
           }
         ]
