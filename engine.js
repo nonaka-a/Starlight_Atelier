@@ -18,7 +18,12 @@ const keys = {
 // --- 入力処理 ---
 function setupControls() {
     window.addEventListener('keydown', (e) => {
+        // ★修正: BGM再生トリガーを追加
         AudioSys.init();
+        if(typeof AudioSys.playBGM === 'function' && !AudioSys.bgmSource && AudioSys.bgmBuffer && !isMuted) {
+            AudioSys.playBGM(0.3);
+        }
+
         if (e.code === 'Space') keys.Space = true;
         if (e.code === 'ArrowLeft') keys.ArrowLeft = true;
         if (e.code === 'ArrowRight') keys.ArrowRight = true;
@@ -40,17 +45,26 @@ function setupTouchControls() {
     const bindTouch = (id, code) => {
         const btn = document.getElementById(id);
         if (!btn) return;
+        
         const down = (e) => {
             if(e.cancelable) e.preventDefault();
+            
+            // ★修正: BGM再生トリガーを追加
             AudioSys.init();
+            if(typeof AudioSys.playBGM === 'function' && !AudioSys.bgmSource && AudioSys.bgmBuffer && !isMuted) {
+                AudioSys.playBGM(0.3);
+            }
+
             keys[code] = true;
             btn.classList.add('active');
         };
+        
         const up = (e) => {
             if(e.cancelable) e.preventDefault();
             keys[code] = false;
             btn.classList.remove('active');
         };
+
         btn.addEventListener('touchstart', down, {passive: false});
         btn.addEventListener('touchend', up);
         btn.addEventListener('mousedown', down);
@@ -86,8 +100,15 @@ let isMuted = false;
 function toggleMute() {
     isMuted = !isMuted;
     if(AudioSys.ctx) {
-        if(isMuted) AudioSys.ctx.suspend();
-        else AudioSys.ctx.resume();
+        if(isMuted) {
+            AudioSys.ctx.suspend();
+        } else {
+            AudioSys.ctx.resume();
+            // ミュート解除時に再生されていなければ再生
+            if(typeof AudioSys.playBGM === 'function' && !AudioSys.bgmSource && AudioSys.bgmBuffer) {
+                AudioSys.playBGM(0.3);
+            }
+        }
     }
     const btn = document.getElementById('btn-mute');
     btn.textContent = isMuted ? "🔇" : "🔊";
