@@ -407,6 +407,18 @@
             <div class="spacer"></div>
             <button id="btn-clear" class="danger">クリア</button>
         </div>
+        <div class="tool-group">
+    <label style="font-size:0.8rem; margin-right:5px; color:#aaa;">レイヤー:</label>
+    <label class="btn" style="padding:2px 8px;">
+        <input type="radio" name="layer" value="0" onclick="setLayer(0)"> 奥(BG)
+    </label>
+    <label class="btn active" style="padding:2px 8px;">
+        <input type="radio" name="layer" value="1" onclick="setLayer(1)" checked> メイン
+    </label>
+    <label class="btn" style="padding:2px 8px;">
+        <input type="radio" name="layer" value="2" onclick="setLayer(2)"> 手前(FG)
+    </label>
+</div>
 
         <div id="main-area">
             <div id="sidebar">

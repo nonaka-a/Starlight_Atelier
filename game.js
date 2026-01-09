@@ -1,6 +1,7 @@
 /**
  * --- ゲームの状態 ---
  */
+// mapData は [BGレイヤー, Mainレイヤー, FGレイヤー] の配列
 let mapData = [];
 let mapCols = 0;
 let mapRows = 0;
@@ -21,12 +22,13 @@ const player = {
     cooldown: 0,
     state: "idle",
     animTimer: 0,
-    frameIndex: 0
+    frameIndex: 0,
+    dropTimer: 0 
 };
 
 let enemies = [];
 let bullets = [];
-let score = 0; // ★追加
+let score = 0;
 
 /**
  * --- 初期化処理 ---
@@ -43,7 +45,6 @@ window.onload = () => {
     setupControls(); // engine.js
     window.addEventListener('resize', fitWindow);
 
-    // アニメーションデータ読み込み
     fetch(ANIM_FILE_SRC)
         .then(res => res.json())
         .then(data => {
@@ -84,11 +85,9 @@ function manualLoadMap(e) {
 }
 
 function initGameWithData(json) {
-    let loadedMap = json.map || json.data;
     mapCols = json.width;
     mapRows = json.height;
 
-    // タイル定義の読み込み
     tileDefs = {};
     if (json.tileDefs && Array.isArray(json.tileDefs)) {
         json.tileDefs.forEach(def => {
@@ -97,20 +96,50 @@ function initGameWithData(json) {
     }
 
     mapData = [];
-    for(let y=0; y<mapRows; y++) {
-        const row = [];
-        for(let x=0; x<mapCols; x++) {
-            let cell = loadedMap[y][x];
-            if (typeof cell === 'number') {
-                cell = { id: cell, rot: 0, fx: false, fy: false };
+    
+    if (json.layers) {
+        const layerNames = ["background", "main", "foreground"];
+        for(let i=0; i<3; i++) {
+            const target = json.layers.find(l => l.name === layerNames[i]);
+            if(target) {
+                mapData.push(normalizeLayer(target.data, mapCols, mapRows));
+            } else {
+                mapData.push(createEmptyLayer(mapCols, mapRows));
             }
-            row.push(cell);
         }
-        mapData.push(row);
+    } else {
+        mapData.push(createEmptyLayer(mapCols, mapRows)); 
+        const rawMap = json.map || json.data;
+        mapData.push(normalizeLayer(rawMap, mapCols, mapRows)); 
+        mapData.push(createEmptyLayer(mapCols, mapRows)); 
     }
 
     document.getElementById('screen-load').style.display = 'none';
     setupGame();
+}
+
+function createEmptyLayer(w, h) {
+    const layer = [];
+    for(let y=0; y<h; y++) {
+        const row = [];
+        for(let x=0; x<w; x++) row.push({id:0, rot:0, fx:false, fy:false});
+        layer.push(row);
+    }
+    return layer;
+}
+
+function normalizeLayer(data, w, h) {
+    const layer = [];
+    for(let y=0; y<h; y++) {
+        const row = [];
+        for(let x=0; x<w; x++) {
+            let cell = data[y][x];
+            if(typeof cell === 'number') cell = {id:cell, rot:0, fx:false, fy:false};
+            row.push(cell);
+        }
+        layer.push(row);
+    }
+    return layer;
 }
 
 function getTileProp(id) {
@@ -118,6 +147,13 @@ function getTileProp(id) {
     const type = DEFAULT_ID_TYPE[id] || 'air';
     const solid = (type === 'wall' || type === 'ground');
     return { id, type, solid };
+}
+
+function getTileId(x, y) {
+    const col = Math.floor(x / TILE_SIZE);
+    const row = Math.floor(y / TILE_SIZE);
+    if (row < 0 || row >= mapRows || col < 0 || col >= mapCols) return null;
+    return mapData[1][row][col].id;
 }
 
 function setupGame() {
@@ -131,10 +167,11 @@ function setupGame() {
     const ui = document.getElementById('ui-container');
     if(ui) ui.style.width = CANVAS_WIDTH + "px";
 
-    fitWindow();
+    fitWindow(); // engine.jsで定義（userScale考慮済み）
 
-    score = 0; // ★リセット
-    document.getElementById('score-text').textContent = score; // ★表示リセット
+    score = 0;
+    const st = document.getElementById('score-text');
+    if(st) st.textContent = score;
 
     enemies = [];
     bullets = [];
@@ -145,12 +182,14 @@ function setupGame() {
 }
 
 function scanMapAndSetupObjects() {
+    const mainLayer = mapData[1]; 
+    
     for (let y = 0; y < mapRows; y++) {
         for (let x = 0; x < mapCols; x++) {
-            const cell = mapData[y][x];
+            const cell = mainLayer[y][x];
             const prop = getTileProp(cell.id);
 
-            if (prop.type === 'start') {
+            if (prop.type === 'start' || cell.id === 118) {
                 player.x = x * TILE_SIZE + (TILE_SIZE - player.width) / 2;
                 player.y = y * TILE_SIZE;
                 cell.id = 0; 
@@ -184,10 +223,9 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-// engine.jsから呼ばれる
 window.updateCamera = function() {
-    const viewportW = CANVAS_WIDTH / ZOOM_LEVEL;
-    const viewportH = CANVAS_HEIGHT / ZOOM_LEVEL;
+    const viewportW = CANVAS_WIDTH; // 内部ズーム廃止のため等倍
+    const viewportH = CANVAS_HEIGHT;
 
     let camX = player.x + player.width / 2 - viewportW / 2;
     let camY = player.y + player.height / 2 - viewportH / 2;
@@ -215,6 +253,8 @@ function update() {
     if (player.isDead || player.isClear) return;
 
     let newState = "idle";
+    
+    if (player.dropTimer > 0) player.dropTimer--;
 
     if (keys.ArrowLeft) {
         player.vx = -SPEED;
@@ -228,9 +268,24 @@ function update() {
         player.vx = 0;
     }
 
+    if (keys.ArrowDown && player.onGround) {
+        const checkY = player.y + player.height + 2;
+        const leftId = getTileId(player.x + 4, checkY);
+        const rightId = getTileId(player.x + player.width - 4, checkY);
+        
+        if ((leftId && TILE_HITBOX_OFFSET[leftId]) || (rightId && TILE_HITBOX_OFFSET[rightId])) {
+             player.y += 1; 
+             player.dropTimer = 10; 
+             player.onGround = false;
+        } else {
+             player.vx = 0;
+             newState = "crouch";
+        }
+    }
+
     if (keys.Space && player.onGround) {
         if (keys.ArrowDown) {
-            player.vy = JUMP_POWER * 1.4; // 大ジャンプ
+            player.vy = JUMP_POWER * 1.4; 
             AudioSys.playTone(400, 'square', 0.15, 0.1); 
         } else {
             player.vy = JUMP_POWER;
@@ -241,9 +296,6 @@ function update() {
 
     if (!player.onGround) {
         newState = "jump";
-    } else if (keys.ArrowDown) {
-        player.vx = 0;
-        newState = "crouch";
     }
 
     if (player.state !== newState) {
@@ -341,9 +393,11 @@ function getTileTopY(x, y) {
     const col = Math.floor(x / TILE_SIZE);
     const row = Math.floor(y / TILE_SIZE);
     if (row < 0 || row >= mapRows || col < 0 || col >= mapCols) return null;
-    const id = mapData[row][col].id;
+    
+    const id = mapData[1][row][col].id; 
     const prop = getTileProp(id);
     if (!prop.solid) return null;
+    
     const offset = TILE_HITBOX_OFFSET[id] || 0;
     return row * TILE_SIZE + offset;
 }
@@ -353,28 +407,34 @@ function isSolid(x, y) {
     const row = Math.floor(y / TILE_SIZE);
     if (row < 0 || row >= mapRows || col < 0 || col >= mapCols) return false;
     
-    const id = mapData[row][col].id;
+    const id = mapData[1][row][col].id; 
     const prop = getTileProp(id);
-    
     return prop.solid;
 }
 
-// 横方向の壁として判定するかどうか
+function isSolidWall(x, y) {
+    const col = Math.floor(x / TILE_SIZE);
+    const row = Math.floor(y / TILE_SIZE);
+    if (row < 0 || row >= mapRows || col < 0 || col >= mapCols) return false;
+    
+    const id = mapData[1][row][col].id; 
+    const prop = getTileProp(id);
+    
+    if (!prop.solid) return false;
+    if (TILE_HITBOX_OFFSET[id]) return false;
+    return true;
+}
+
 function isWall(x, y) {
     const col = Math.floor(x / TILE_SIZE);
     const row = Math.floor(y / TILE_SIZE);
     if (row < 0 || row >= mapRows || col < 0 || col >= mapCols) return false;
     
-    const id = mapData[row][col].id;
+    const id = mapData[1][row][col].id; 
     const prop = getTileProp(id);
     
-    // solidでないなら壁ではない
     if (!prop.solid) return false;
-
-    // オフセット設定があるタイル（細い床など）は
-    // 横方向の壁としては扱わない（すり抜ける）ようにする
     if (TILE_HITBOX_OFFSET[id]) return false;
-
     return true;
 }
 
@@ -385,7 +445,6 @@ function checkObjectCollisionX(obj) {
     const top = obj.y + padding;
     const bottom = obj.y + obj.height - padding;
 
-    // isSolid ではなく isWall を使用して判定
     if (isWall(left, top) || isWall(left, bottom)) {
         obj.x = (Math.floor(left / TILE_SIZE) + 1) * TILE_SIZE;
         obj.vx = 0;
@@ -403,12 +462,14 @@ function checkObjectCollisionY(obj) {
     const bottom = obj.y + obj.height;
 
     if (obj.vy < 0) {
-        if (isSolid(left, top) || isSolid(right, top)) {
+        if (isSolidWall(left, top) || isSolidWall(right, top)) {
             obj.y = (Math.floor(top / TILE_SIZE) + 1) * TILE_SIZE;
             obj.vy = 0;
         }
     } 
     else if (obj.vy >= 0) {
+        if (obj.dropTimer > 0) return;
+
         const groundY_L = getTileTopY(left, bottom);
         const groundY_R = getTileTopY(right, bottom);
         let groundY = null;
@@ -435,25 +496,25 @@ function checkInteraction() {
     const row = Math.floor(centerY / TILE_SIZE);
 
     if (row >= 0 && row < mapRows && col >= 0 && col < mapCols) {
-        const cell = mapData[row][col];
+        const cell = mapData[1][row][col];
         const prop = getTileProp(cell.id);
         
-        if (prop.type === 'spike') showGameOver();
-        else if (prop.type === 'goal') showGameClear();
+        if (prop.type === 'spike') {
+            showGameOver();
+        }
+        else if (prop.type === 'goal' || cell.id === 119) {
+            showGameClear();
+        }
         else if (prop.type === 'item' || prop.type === 'coin') {
             cell.id = 0; 
             AudioSys.playTone(1000, 'sine', 0.1);
-
-            // ★追加: スコア加算とUI更新
             score++;
-            const scoreText = document.getElementById('score-text');
-            scoreText.textContent = score;
-            
-            // ちょっとした演出（文字を跳ねさせる）
-            scoreText.parentElement.style.transform = "scale(1.2)";
-            setTimeout(() => {
-                scoreText.parentElement.style.transform = "scale(1.0)";
-            }, 100);
+            const st = document.getElementById('score-text');
+            if(st) {
+                st.textContent = score;
+                st.parentElement.style.transform = "scale(1.2)";
+                setTimeout(()=> st.parentElement.style.transform = "scale(1.0)", 100);
+            }
         }
     }
 
@@ -484,35 +545,38 @@ function draw() {
 
     ctx.save();
     
-    ctx.scale(ZOOM_LEVEL, ZOOM_LEVEL);
+    // 内部ズーム(ZOOM_LEVEL)は廃止のため scale は行わない
+    // ctx.scale(ZOOM_LEVEL, ZOOM_LEVEL); 
     ctx.translate(-Math.floor(camera.x), -Math.floor(camera.y));
 
+    drawLayer(0); // BG
+    drawLayer(1); // Main
+
+    for (const e of enemies) {
+        drawTile(e.x, e.y, { id: e.tileId, rot: e.rot, fx: e.fx, fy: e.fy });
+    }
+    ctx.fillStyle = '#ffec47';
+    for (const b of bullets) {
+        ctx.fillRect(b.x, b.y, b.width, b.height);
+    }
+    drawPlayer();
+
+    drawLayer(2); // FG
+    
+    ctx.restore();
+}
+
+function drawLayer(layerIndex) {
+    if(!mapData[layerIndex]) return;
+    const layer = mapData[layerIndex];
     for (let y = 0; y < mapRows; y++) {
         for (let x = 0; x < mapCols; x++) {
-            const cell = mapData[y][x];
+            const cell = layer[y][x];
             if (cell.id !== 0) {
                 drawTile(x * TILE_SIZE, y * TILE_SIZE, cell);
             }
         }
     }
-
-    for (const e of enemies) {
-        drawTile(e.x, e.y, { 
-            id: e.tileId, 
-            rot: e.rot, 
-            fx: e.fx, 
-            fy: e.fy 
-        });
-    }
-
-    ctx.fillStyle = '#ffec47';
-    for (const b of bullets) {
-        ctx.fillRect(b.x, b.y, b.width, b.height);
-    }
-
-    drawPlayer();
-    
-    ctx.restore();
 }
 
 function drawPlayer() {

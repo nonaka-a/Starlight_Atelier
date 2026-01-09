@@ -9,7 +9,7 @@ const PROPERTY_TYPES = [
     { value: 'wall', name: '壁 (Wall)', defaultSolid: true },
     { value: 'ground', name: '床 (Ground)', defaultSolid: true },
     { value: 'spike', name: 'トゲ (Spike)', defaultSolid: false },
-    { value: 'item', name: 'アイテム (Item)', defaultSolid: false }, // ★ここを変更 (coin -> item)
+    { value: 'item', name: 'アイテム (Item)', defaultSolid: false },
     { value: 'enemy', name: '敵 (Enemy)', defaultSolid: false },
     { value: 'start', name: '開始地点 (Start)', defaultSolid: false },
     { value: 'goal', name: 'ゴール (Goal)', defaultSolid: false }
@@ -21,19 +21,22 @@ const DEFAULT_ID_MAPPING = {
     1: 'wall',
     2: 'ground',
     3: 'spike',
-    4: 'item', // ★ここを変更 (coin -> item)
+    4: 'item',
     5: 'enemy',
-    6: 'start',
-    7: 'goal'
+    118: 'start', // ★追加
+    119: 'goal',  // ★追加
+    // 6, 7 は必要に応じて残すか削除
 };
 
 /** グローバル変数 */
-let mapData = [];
+// mapData は 3つのレイヤーを持つ配列になります: [BG(0), Main(1), FG(2)]
+let mapData = []; 
 let mapWidth = 20;
 let mapHeight = 15;
 
 let currentTileId = 1; // 選択中のタイルID
 let currentTool = 'brush'; 
+let currentLayerIndex = 1; // 0:BG, 1:Main, 2:FG (初期値はMain)
 let brushTransform = { rot: 0, fx: false, fy: false };
 
 // タイルごとの設定を保持する配列 [{ type: 'wall', solid: true }, ...]
@@ -77,14 +80,13 @@ window.initMapEditor = function() {
     tilesetImage.src = TILESET_SRC;
     tilesetImage.onload = () => {
         isImageLoaded = true;
-        initTileSettings(); // 画像サイズからタイル設定配列を初期化
-        drawPalette();      // パレット描画
-        draw();             // マップ描画
+        initTileSettings(); 
+        drawPalette();      
+        draw();             
     };
     tilesetImage.onerror = () => {
         console.warn("画像読み込み失敗");
         isImageLoaded = false;
-        // 画像がない場合でも最低限動くように
         initTileSettings(8); 
         drawPalette();
         draw();
@@ -97,7 +99,18 @@ window.initMapEditor = function() {
     isInitialized = true;
 };
 
-// タイルセット画像に基づき設定配列を初期化
+// --- レイヤー操作 ---
+window.setLayer = function(layerIndex) {
+    currentLayerIndex = parseInt(layerIndex);
+    // UIのラジオボタンのアクティブ表示更新（CSS依存）
+    document.querySelectorAll('input[name="layer"]').forEach(input => {
+        input.parentElement.classList.toggle('active', parseInt(input.value) === currentLayerIndex);
+    });
+    draw(); // 再描画（非アクティブレイヤーを薄くするため）
+};
+
+// --- 初期化関連 ---
+
 function initTileSettings(forceCount = null) {
     let count = 0;
     if (forceCount) {
@@ -108,12 +121,9 @@ function initTileSettings(forceCount = null) {
         count = cols * rows;
     }
 
-    // 既存の設定があれば維持、なければデフォルト作成
-    // 配列サイズを画像に合わせて拡張
     for (let i = 0; i < count; i++) {
         if (!tileSettings[i]) {
             const defaultType = DEFAULT_ID_MAPPING[i] || 'wall';
-            // プロパティ定義からデフォルトのSolid値を取得
             const propDef = PROPERTY_TYPES.find(p => p.value === defaultType);
             const defaultSolid = propDef ? propDef.defaultSolid : true;
 
@@ -124,12 +134,9 @@ function initTileSettings(forceCount = null) {
             };
         }
     }
-    
-    // UIを現在の選択タイルに合わせて更新
     updateTileInfoUI();
 }
 
-// プロパティ設定用UIの選択肢生成など
 function setupPropertyUI() {
     const select = document.getElementById('tile-type-select');
     select.innerHTML = '';
@@ -140,11 +147,9 @@ function setupPropertyUI() {
         select.appendChild(opt);
     });
 
-    // イベントリスナー設定
     select.addEventListener('change', (e) => {
         if (tileSettings[currentTileId]) {
             tileSettings[currentTileId].type = e.target.value;
-            // 属性を変えたらデフォルトのSolid値も連動させる（親切設計）
             const def = PROPERTY_TYPES.find(p => p.value === e.target.value);
             if (def) {
                 tileSettings[currentTileId].solid = def.defaultSolid;
@@ -161,7 +166,6 @@ function setupPropertyUI() {
     });
 }
 
-// 選択中のタイル情報をUIに反映
 function updateTileInfoUI() {
     const setting = tileSettings[currentTileId];
     if (!setting) return;
@@ -171,7 +175,6 @@ function updateTileInfoUI() {
     document.getElementById('tile-collision-check').checked = setting.solid;
 }
 
-// パレット（タイルセット画像）の描画
 function drawPalette() {
     if (!paletteCtx) return;
 
@@ -181,7 +184,6 @@ function drawPalette() {
         paletteCtx.clearRect(0, 0, paletteCanvas.width, paletteCanvas.height);
         paletteCtx.drawImage(tilesetImage, 0, 0);
 
-        // グリッド線
         paletteCtx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
         paletteCtx.lineWidth = 1;
         paletteCtx.beginPath();
@@ -195,7 +197,6 @@ function drawPalette() {
         }
         paletteCtx.stroke();
 
-        // 選択枠
         const cols = Math.floor(tilesetImage.width / TILE_SIZE);
         const tx = (currentTileId % cols) * TILE_SIZE;
         const ty = Math.floor(currentTileId / cols) * TILE_SIZE;
@@ -204,7 +205,6 @@ function drawPalette() {
         paletteCtx.lineWidth = 3;
         paletteCtx.strokeRect(tx, ty, TILE_SIZE, TILE_SIZE);
     } else {
-        // 画像がない場合のフォールバック（簡易表示）
         paletteCanvas.width = TILE_SIZE * 4;
         paletteCanvas.height = TILE_SIZE * 2;
         paletteCtx.fillStyle = '#444';
@@ -214,34 +214,45 @@ function drawPalette() {
     }
 }
 
+// --- マップデータ操作 ---
+
 function initMapData(w, h) {
+    // 3レイヤー分の配列を作成
     mapData = [];
+    for(let l=0; l<3; l++) {
+        const layer = [];
+        for(let y = 0; y < h; y++) {
+            const row = [];
+            for(let x = 0; x < w; x++) {
+                row.push({ id: 0, rot: 0, fx: false, fy: false });
+            }
+            layer.push(row);
+        }
+        mapData.push(layer);
+    }
     mapWidth = w;
     mapHeight = h;
-    for(let y = 0; y < h; y++) {
-        const row = [];
-        for(let x = 0; x < w; x++) {
-            row.push({ id: 0, rot: 0, fx: false, fy: false });
-        }
-        mapData.push(row);
-    }
     updateCanvasSize();
 }
 
 function resizeMapData(newW, newH) {
-    const newMap = [];
-    for(let y = 0; y < newH; y++) {
-        const row = [];
-        for(let x = 0; x < newW; x++) {
-            if(y < mapData.length && x < mapData[y].length) {
-                row.push({ ...mapData[y][x] });
-            } else {
-                row.push({ id: 0, rot: 0, fx: false, fy: false });
+    const newMapData = [];
+    for(let l=0; l<3; l++) {
+        const newLayer = [];
+        for(let y = 0; y < newH; y++) {
+            const row = [];
+            for(let x = 0; x < newW; x++) {
+                if(y < mapData[l].length && x < mapData[l][y].length) {
+                    row.push({ ...mapData[l][y][x] });
+                } else {
+                    row.push({ id: 0, rot: 0, fx: false, fy: false });
+                }
             }
+            newLayer.push(row);
         }
-        newMap.push(row);
+        newMapData.push(newLayer);
     }
-    mapData = newMap;
+    mapData = newMapData;
     mapWidth = newW;
     mapHeight = newH;
     updateCanvasSize();
@@ -265,7 +276,8 @@ function saveHistory() {
         data: JSON.parse(JSON.stringify(mapData)),
         w: mapWidth,
         h: mapHeight,
-        sel: selection ? { ...selection } : null
+        sel: selection ? { ...selection } : null,
+        layer: currentLayerIndex
     };
     historyStack.push(snapshot);
 }
@@ -280,8 +292,18 @@ window.undo = function() {
     mapHeight = prev.h;
     selection = prev.sel;
     
+    // 履歴のレイヤーに戻すかどうかはお好みですが、戻したほうが自然
+    if (prev.layer !== undefined) {
+        setLayer(prev.layer);
+        // ラジオボタンのチェック状態も同期
+        const radios = document.getElementsByName('layer');
+        if(radios[currentLayerIndex]) radios[currentLayerIndex].checked = true;
+    }
+    
     updateCanvasSize();
 };
+
+// --- 描画 ---
 
 function draw() {
     if(!ctx) return;
@@ -290,22 +312,53 @@ function draw() {
     ctx.fillStyle = '#111';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    // BG(0) -> Main(1) -> FG(2) の順に描画
+    // 現在選択中のレイヤー以外は半透明にして、編集対象をわかりやすくする
+    for(let l=0; l<3; l++) {
+        ctx.save();
+        if (l !== currentLayerIndex) {
+            ctx.globalAlpha = 0.4; // 非アクティブレイヤーは薄く
+        } else {
+            ctx.globalAlpha = 1.0;
+        }
+        
+        drawLayer(l);
+        
+        ctx.restore();
+    }
+
+    // 選択枠やグリッドの描画（現在のレイヤーに対して）
+    drawOverlays();
+}
+
+function drawLayer(layerIdx) {
+    const layer = mapData[layerIdx];
     for (let y = 0; y < mapHeight; y++) {
         for (let x = 0; x < mapWidth; x++) {
-            if (isMovingSelection && currentTool === 'move' && isInSelection(x, y)) {
+            // 移動中の選択範囲は元の位置を描画しない（現在のレイヤーのみ）
+            if (layerIdx === currentLayerIndex && isMovingSelection && currentTool === 'move' && isInSelection(x, y)) {
                 continue;
             }
-            drawOneTile(x * TILE_SIZE, y * TILE_SIZE, mapData[y][x]);
-            
-            ctx.strokeStyle = '#333';
-            ctx.lineWidth = 1;
+            drawOneTile(x * TILE_SIZE, y * TILE_SIZE, layer[y][x]);
+        }
+    }
+}
+
+function drawOverlays() {
+    // グリッド線（アクティブレイヤーの上に見えるように）
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    for (let y = 0; y < mapHeight; y++) {
+        for (let x = 0; x < mapWidth; x++) {
             ctx.strokeRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
         }
     }
 
+    // 移動プレビュー（現在のレイヤーのみ）
     if (isMovingSelection && selection) {
         const targetX = selection.x + moveOffset.x;
         const targetY = selection.y + moveOffset.y;
+        const layer = mapData[currentLayerIndex];
         
         ctx.save();
         ctx.globalAlpha = 0.8;
@@ -314,7 +367,7 @@ function draw() {
                 const mapY = selection.y + ly;
                 const mapX = selection.x + lx;
                 if(mapY < mapHeight && mapX < mapWidth) {
-                    const tile = mapData[mapY][mapX];
+                    const tile = layer[mapY][mapX];
                     drawOneTile((targetX + lx) * TILE_SIZE, (targetY + ly) * TILE_SIZE, tile);
                 }
             }
@@ -348,7 +401,6 @@ function drawOneTile(px, py, tile) {
     ctx.scale(scaleX, scaleY);
 
     if (isImageLoaded) {
-        // ★修正: 画像が複数行になっても正しく参照できるように計算
         const cols = Math.floor(tilesetImage.width / TILE_SIZE);
         const srcX = (tile.id % cols) * TILE_SIZE;
         const srcY = Math.floor(tile.id / cols) * TILE_SIZE;
@@ -359,7 +411,6 @@ function drawOneTile(px, py, tile) {
             -TILE_SIZE / 2, -TILE_SIZE / 2, TILE_SIZE, TILE_SIZE
         );
     } else {
-        // 画像がない場合の簡易表示
         ctx.fillStyle = '#888';
         ctx.fillRect(-TILE_SIZE/2, -TILE_SIZE/2, TILE_SIZE, TILE_SIZE);
         ctx.fillStyle = '#fff';
@@ -368,9 +419,13 @@ function drawOneTile(px, py, tile) {
     ctx.restore();
 }
 
+// --- ツール操作 ---
+
 window.setTool = function(tool) {
     currentTool = tool;
     document.querySelectorAll('#toolbar button').forEach(b => b.classList.remove('active'));
+    // レイヤーボタンのactiveクラスと競合しないように注意（クラス名を変えるか、親要素で絞る）
+    // ここではID指定しているボタンのみを対象としているので大丈夫
     const btnId = tool === 'copy' ? 'tool-copy' : `tool-${tool}`;
     const btn = document.getElementById(btnId);
     if(btn) btn.classList.add('active');
@@ -390,7 +445,6 @@ window.rotateAction = function(deg) {
         saveHistory();
         transformSelection('rotate', deg);
     } else {
-        // 現在の角度に加算して360度で丸める
         brushTransform.rot = (brushTransform.rot + deg + 360) % 360;
         updateTransformDisplay();
     }
@@ -401,7 +455,6 @@ window.flipAction = function(axis) {
         saveHistory();
         transformSelection('flip', axis);
     } else {
-        // ブラシ自体の反転フラグをトグル
         if(axis === 'x') brushTransform.fx = !brushTransform.fx;
         if(axis === 'y') brushTransform.fy = !brushTransform.fy;
         updateTransformDisplay();
@@ -416,13 +469,16 @@ function updateTransformDisplay() {
 function transformSelection(type, val) {
     if (!selection) return;
     
+    // 現在のレイヤーのみ対象
+    const layer = mapData[currentLayerIndex];
+    
     const subMap = [];
     for(let y=0; y<selection.h; y++) {
         const row = [];
         for(let x=0; x<selection.w; x++) {
             const ty = selection.y + y;
             const tx = selection.x + x;
-            if(ty < mapHeight && tx < mapWidth) row.push({...mapData[ty][tx]});
+            if(ty < mapHeight && tx < mapWidth) row.push({...layer[ty][tx]});
             else row.push({id:0, rot:0, fx:false, fy:false});
         }
         subMap.push(row);
@@ -469,7 +525,7 @@ function transformSelection(type, val) {
         for(let x=0; x<selection.w; x++) {
              const ty = selection.y + y;
              const tx = selection.x + x;
-             if(ty < mapHeight && tx < mapWidth) mapData[ty][tx] = {id:0,rot:0,fx:false,fy:false};
+             if(ty < mapHeight && tx < mapWidth) layer[ty][tx] = {id:0,rot:0,fx:false,fy:false};
         }
     }
 
@@ -480,7 +536,7 @@ function transformSelection(type, val) {
              const ty = selection.y + y;
              const tx = selection.x + x;
              if(ty < mapHeight && tx < mapWidth) {
-                 mapData[ty][tx] = newSubMap[y][x];
+                 layer[ty][tx] = newSubMap[y][x];
              }
         }
     }
@@ -498,7 +554,6 @@ function getTilePos(e) {
 }
 
 function setupEvents() {
-    // マップキャンバスのイベント
     canvas.addEventListener('mousedown', (e) => {
         const pos = getTilePos(e);
         
@@ -560,16 +615,12 @@ function setupEvents() {
         isResizing = false;
     });
 
-    // パレットキャンバスのイベント（クリックでID選択）
     paletteCanvas.addEventListener('mousedown', (e) => {
         if (!isImageLoaded) return;
         const rect = paletteCanvas.getBoundingClientRect();
-        
-        // ★修正: 表示サイズ(rect)とキャンバス実サイズ(width/height)の比率を計算
         const scaleX = paletteCanvas.width / rect.width;
         const scaleY = paletteCanvas.height / rect.height;
 
-        // クリック座標にスケールを適用
         const x = (e.clientX - rect.left) * scaleX;
         const y = (e.clientY - rect.top) * scaleY;
         
@@ -579,12 +630,12 @@ function setupEvents() {
         
         const id = row * cols + col;
         
-        // 有効なIDか確認（タイルセット内）
         if (id >= 0 && id < tileSettings.length) {
             currentTileId = id;
             brushTransform = { rot: 0, fx: false, fy: false };
+            updateTransformDisplay();
             updateTileInfoUI();
-            drawPalette(); // 選択枠更新
+            drawPalette(); 
         }
     });
 
@@ -615,15 +666,24 @@ function setupEvents() {
     
     document.getElementById('btn-export').onclick = () => {
         const name = document.getElementById('map-name').value || 'map';
+        
+        // レイヤー構造で保存
+        const layers = [
+            { name: "background", data: mapData[0] },
+            { name: "main", data: mapData[1] },
+            { name: "foreground", data: mapData[2] }
+        ];
+
         const json = JSON.stringify({
-            version: "3.1",
+            version: "4.0",
             name: name,
             width: mapWidth,
             height: mapHeight,
             tileSize: TILE_SIZE,
-            map: mapData,
-            tileDefs: tileSettings // タイル定義も含める
+            layers: layers,
+            tileDefs: tileSettings
         }, null, 2);
+        
         const url = URL.createObjectURL(new Blob([json], {type:'application/json'}));
         const a = document.createElement('a');
         a.href = url; a.download = `${name}.json`; a.click();
@@ -637,21 +697,9 @@ function setupEvents() {
         r.onload = (ev) => {
             try {
                 const d = JSON.parse(ev.target.result);
-                initMapData(d.width, d.height);
                 
-                // マップデータ読み込み
-                let loaded = d.map || d.data;
-                for(let y=0; y<d.height; y++){
-                    for(let x=0; x<d.width; x++){
-                        let cell = loaded[y][x];
-                        if(typeof cell === 'number') cell = {id:cell, rot:0, fx:false, fy:false};
-                        mapData[y][x] = cell;
-                    }
-                }
-                
-                // タイル定義読み込み（あれば上書き、なければ初期化のまま）
+                // タイル定義読み込み
                 if (d.tileDefs && Array.isArray(d.tileDefs)) {
-                    // ID順にマージする（画像サイズが変わっている可能性も考慮）
                     d.tileDefs.forEach(def => {
                         if (tileSettings[def.id]) {
                             tileSettings[def.id] = def;
@@ -660,8 +708,36 @@ function setupEvents() {
                     updateTileInfoUI();
                 }
 
+                // マップデータ読み込み (バージョン判定)
+                if (d.layers) {
+                    // v4.0 (レイヤーあり)
+                    mapWidth = d.width;
+                    mapHeight = d.height;
+                    mapData = [];
+                    // BG, Main, FG の順序で読み込む (無ければ空で作成)
+                    const layerNames = ["background", "main", "foreground"];
+                    for(let i=0; i<3; i++) {
+                        const targetLayer = d.layers.find(l => l.name === layerNames[i]);
+                        if(targetLayer) {
+                             mapData.push(normalizeLayer(targetLayer.data, mapWidth, mapHeight));
+                        } else {
+                             mapData.push(createEmptyLayer(mapWidth, mapHeight));
+                        }
+                    }
+                } else {
+                    // 旧バージョン (シングルレイヤー) -> Mainレイヤーに読み込み
+                    mapWidth = d.width;
+                    mapHeight = d.height;
+                    mapData = [];
+                    mapData.push(createEmptyLayer(mapWidth, mapHeight)); // BG
+                    const rawMap = d.map || d.data;
+                    mapData.push(normalizeLayer(rawMap, mapWidth, mapHeight)); // Main
+                    mapData.push(createEmptyLayer(mapWidth, mapHeight)); // FG
+                }
+
+                updateCanvasSize();
                 if(d.name) document.getElementById('map-name').value = d.name;
-                draw();
+                
             } catch(err) {
                 console.error(err);
                 alert('データ読み込みエラー');
@@ -670,6 +746,30 @@ function setupEvents() {
         r.readAsText(f);
         e.target.value = '';
     }
+}
+
+function createEmptyLayer(w, h) {
+    const layer = [];
+    for(let y=0; y<h; y++) {
+        const row = [];
+        for(let x=0; x<w; x++) row.push({id:0, rot:0, fx:false, fy:false});
+        layer.push(row);
+    }
+    return layer;
+}
+
+function normalizeLayer(data, w, h) {
+    const layer = [];
+    for(let y=0; y<h; y++) {
+        const row = [];
+        for(let x=0; x<w; x++) {
+            let cell = data[y][x];
+            if(typeof cell === 'number') cell = {id:cell, rot:0, fx:false, fy:false};
+            row.push(cell);
+        }
+        layer.push(row);
+    }
+    return layer;
 }
 
 function handleResize(e) {
@@ -685,9 +785,9 @@ function handleResize(e) {
 
 function putTile(tx, ty) {
     if(tx >= 0 && tx < mapWidth && ty >= 0 && ty < mapHeight) {
-        mapData[ty][tx] = {
+        // 現在のレイヤーに書き込み
+        mapData[currentLayerIndex][ty][tx] = {
             id: currentTileId,
-            // ここで現在のブラシ状態を適用
             rot: brushTransform.rot,
             fx: brushTransform.fx,
             fy: brushTransform.fy
@@ -707,6 +807,7 @@ function commitMove() {
     if (moveOffset.x === 0 && moveOffset.y === 0) return;
 
     saveHistory();
+    const layer = mapData[currentLayerIndex];
 
     const tempBuffer = [];
     for(let ly = 0; ly < selection.h; ly++) {
@@ -714,7 +815,7 @@ function commitMove() {
         for(let lx = 0; lx < selection.w; lx++) {
             const y = selection.y + ly;
             const x = selection.x + lx;
-            if (y<mapHeight && x<mapWidth) row.push({...mapData[y][x]});
+            if (y<mapHeight && x<mapWidth) row.push({...layer[y][x]});
             else row.push({id:0, rot:0, fx:false, fy:false});
         }
         tempBuffer.push(row);
@@ -725,7 +826,7 @@ function commitMove() {
             for(let lx = 0; lx < selection.w; lx++) {
                 const y = selection.y + ly;
                 const x = selection.x + lx;
-                if (y<mapHeight && x<mapWidth) mapData[y][x] = {id:0, rot:0, fx:false, fy:false};
+                if (y<mapHeight && x<mapWidth) layer[y][x] = {id:0, rot:0, fx:false, fy:false};
             }
         }
     }
@@ -738,7 +839,7 @@ function commitMove() {
             const y = targetY + ly;
             const x = targetX + lx;
             if (y >= 0 && y < mapHeight && x >= 0 && x < mapWidth) {
-                mapData[y][x] = tempBuffer[ly][lx];
+                layer[y][x] = tempBuffer[ly][lx];
             }
         }
     }
