@@ -1,7 +1,7 @@
 /** 定数 */
 const TILE_SIZE = 64;
 // ルートフォルダの画像を参照するためパス変更
-const TILESET_SRC = '../tileset.png';
+const TILESET_SRC = '../image/forest_tileset.png';
 
 // 属性（プロパティ）定義リスト
 const PROPERTY_TYPES = [
@@ -30,12 +30,12 @@ const DEFAULT_ID_MAPPING = {
 
 /** グローバル変数 */
 // mapData は 3つのレイヤーを持つ配列になります: [BG(0), Main(1), FG(2)]
-let mapData = []; 
+let mapData = [];
 let mapWidth = 20;
 let mapHeight = 15;
 
 let currentTileId = 1; // 選択中のタイルID
-let currentTool = 'brush'; 
+let currentTool = 'brush';
 let currentLayerIndex = 1; // 0:BG, 1:Main, 2:FG (初期値はMain)
 let brushTransform = { rot: 0, fx: false, fy: false };
 
@@ -63,14 +63,14 @@ let canvas, ctx, container, viewport;
 let paletteCanvas, paletteCtx;
 
 /** 初期化（外部から呼び出し可能） */
-window.initMapEditor = function() {
+window.initMapEditor = function () {
     if (isInitialized) return;
 
     canvas = document.getElementById('editor-canvas');
     ctx = canvas.getContext('2d');
     container = document.getElementById('canvas-container');
     viewport = document.getElementById('viewport');
-    
+
     paletteCanvas = document.getElementById('palette-canvas');
     paletteCtx = paletteCanvas.getContext('2d');
 
@@ -80,14 +80,14 @@ window.initMapEditor = function() {
     tilesetImage.src = TILESET_SRC;
     tilesetImage.onload = () => {
         isImageLoaded = true;
-        initTileSettings(); 
-        drawPalette();      
-        draw();             
+        initTileSettings();
+        drawPalette();
+        draw();
     };
     tilesetImage.onerror = () => {
         console.warn("画像読み込み失敗");
         isImageLoaded = false;
-        initTileSettings(8); 
+        initTileSettings(8);
         drawPalette();
         draw();
     };
@@ -95,12 +95,26 @@ window.initMapEditor = function() {
     setupEvents();
     updateTransformDisplay();
     saveHistory();
-    
+
     isInitialized = true;
 };
 
+// --- 追加: タイルセット読み込み ---
+window.changeTileset = function (file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        tilesetImage.src = e.target.result;
+        // ファイル名を保存 (パス全体はブラウザセキュリティで取れないため、ファイル名のみ)
+        // 実際のゲーム動作時は 'image/' + filename となる想定
+        mapData.tilesetImage = file.name;
+        console.log("Tileset changed to:", file.name);
+    };
+    reader.readAsDataURL(file);
+};
+
 // --- レイヤー操作 ---
-window.setLayer = function(layerIndex) {
+window.setLayer = function (layerIndex) {
     currentLayerIndex = parseInt(layerIndex);
     // UIのラジオボタンのアクティブ表示更新（CSS依存）
     document.querySelectorAll('input[name="layer"]').forEach(input => {
@@ -208,7 +222,7 @@ function drawPalette() {
         paletteCanvas.width = TILE_SIZE * 4;
         paletteCanvas.height = TILE_SIZE * 2;
         paletteCtx.fillStyle = '#444';
-        paletteCtx.fillRect(0,0,paletteCanvas.width, paletteCanvas.height);
+        paletteCtx.fillRect(0, 0, paletteCanvas.width, paletteCanvas.height);
         paletteCtx.fillStyle = '#fff';
         paletteCtx.fillText("No Image", 10, 20);
     }
@@ -219,11 +233,11 @@ function drawPalette() {
 function initMapData(w, h) {
     // 3レイヤー分の配列を作成
     mapData = [];
-    for(let l=0; l<3; l++) {
+    for (let l = 0; l < 3; l++) {
         const layer = [];
-        for(let y = 0; y < h; y++) {
+        for (let y = 0; y < h; y++) {
             const row = [];
-            for(let x = 0; x < w; x++) {
+            for (let x = 0; x < w; x++) {
                 row.push({ id: 0, rot: 0, fx: false, fy: false });
             }
             layer.push(row);
@@ -237,12 +251,12 @@ function initMapData(w, h) {
 
 function resizeMapData(newW, newH) {
     const newMapData = [];
-    for(let l=0; l<3; l++) {
+    for (let l = 0; l < 3; l++) {
         const newLayer = [];
-        for(let y = 0; y < newH; y++) {
+        for (let y = 0; y < newH; y++) {
             const row = [];
-            for(let x = 0; x < newW; x++) {
-                if(y < mapData[l].length && x < mapData[l][y].length) {
+            for (let x = 0; x < newW; x++) {
+                if (y < mapData[l].length && x < mapData[l][y].length) {
                     row.push({ ...mapData[l][y][x] });
                 } else {
                     row.push({ id: 0, rot: 0, fx: false, fy: false });
@@ -259,7 +273,7 @@ function resizeMapData(newW, newH) {
 }
 
 function updateCanvasSize() {
-    if(!canvas) return;
+    if (!canvas) return;
     canvas.width = mapWidth * TILE_SIZE;
     canvas.height = mapHeight * TILE_SIZE;
     container.style.transform = `scale(${zoomLevel})`;
@@ -269,7 +283,7 @@ function updateCanvasSize() {
 }
 
 function saveHistory() {
-    if(historyStack.length >= MAX_HISTORY) {
+    if (historyStack.length >= MAX_HISTORY) {
         historyStack.shift();
     }
     const snapshot = {
@@ -282,48 +296,48 @@ function saveHistory() {
     historyStack.push(snapshot);
 }
 
-window.undo = function() {
-    if(historyStack.length === 0) return;
+window.undo = function () {
+    if (historyStack.length === 0) return;
     const prev = historyStack.pop();
-    if(!prev) return;
+    if (!prev) return;
 
     mapData = prev.data;
     mapWidth = prev.w;
     mapHeight = prev.h;
     selection = prev.sel;
-    
+
     // 履歴のレイヤーに戻すかどうかはお好みですが、戻したほうが自然
     if (prev.layer !== undefined) {
         setLayer(prev.layer);
         // ラジオボタンのチェック状態も同期
         const radios = document.getElementsByName('layer');
-        if(radios[currentLayerIndex]) radios[currentLayerIndex].checked = true;
+        if (radios[currentLayerIndex]) radios[currentLayerIndex].checked = true;
     }
-    
+
     updateCanvasSize();
 };
 
 // --- 描画 ---
 
 function draw() {
-    if(!ctx) return;
+    if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
+
     ctx.fillStyle = '#111';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // BG(0) -> Main(1) -> FG(2) の順に描画
     // 現在選択中のレイヤー以外は半透明にして、編集対象をわかりやすくする
-    for(let l=0; l<3; l++) {
+    for (let l = 0; l < 3; l++) {
         ctx.save();
         if (l !== currentLayerIndex) {
             ctx.globalAlpha = 0.4; // 非アクティブレイヤーは薄く
         } else {
             ctx.globalAlpha = 1.0;
         }
-        
+
         drawLayer(l);
-        
+
         ctx.restore();
     }
 
@@ -359,21 +373,21 @@ function drawOverlays() {
         const targetX = selection.x + moveOffset.x;
         const targetY = selection.y + moveOffset.y;
         const layer = mapData[currentLayerIndex];
-        
+
         ctx.save();
         ctx.globalAlpha = 0.8;
-        for(let ly = 0; ly < selection.h; ly++) {
-            for(let lx = 0; lx < selection.w; lx++) {
+        for (let ly = 0; ly < selection.h; ly++) {
+            for (let lx = 0; lx < selection.w; lx++) {
                 const mapY = selection.y + ly;
                 const mapX = selection.x + lx;
-                if(mapY < mapHeight && mapX < mapWidth) {
+                if (mapY < mapHeight && mapX < mapWidth) {
                     const tile = layer[mapY][mapX];
                     drawOneTile((targetX + lx) * TILE_SIZE, (targetY + ly) * TILE_SIZE, tile);
                 }
             }
         }
         ctx.restore();
-        
+
         ctx.strokeStyle = '#ffff00';
         ctx.lineWidth = 2;
         ctx.strokeRect(targetX * TILE_SIZE, targetY * TILE_SIZE, selection.w * TILE_SIZE, selection.h * TILE_SIZE);
@@ -412,7 +426,7 @@ function drawOneTile(px, py, tile) {
         );
     } else {
         ctx.fillStyle = '#888';
-        ctx.fillRect(-TILE_SIZE/2, -TILE_SIZE/2, TILE_SIZE, TILE_SIZE);
+        ctx.fillRect(-TILE_SIZE / 2, -TILE_SIZE / 2, TILE_SIZE, TILE_SIZE);
         ctx.fillStyle = '#fff';
         ctx.fillText(tile.id, -10, 5);
     }
@@ -421,69 +435,83 @@ function drawOneTile(px, py, tile) {
 
 // --- ツール操作 ---
 
-window.setTool = function(tool) {
+// --- ツール操作 ---
+
+window.setTool = function (tool) {
     currentTool = tool;
+
+    // 全ボタンのactive解除
     document.querySelectorAll('#toolbar button').forEach(b => b.classList.remove('active'));
-    // レイヤーボタンのactiveクラスと競合しないように注意（クラス名を変えるか、親要素で絞る）
-    // ここではID指定しているボタンのみを対象としているので大丈夫
-    const btnId = tool === 'copy' ? 'tool-copy' : `tool-${tool}`;
+
+    // ツールボタンのハイライト
+    let btnId = `tool-${tool}`;
+    // 特殊ツール名のIDマッピング
+    if (tool === 'copy') btnId = 'tool-copy';
+    if (tool === 'rot-left') btnId = 'btn-rot-left';
+    if (tool === 'rot-right') btnId = 'btn-rot-right';
+    if (tool === 'flip-x') btnId = 'btn-flip-x';
+    if (tool === 'flip-y') btnId = 'btn-flip-y';
+
     const btn = document.getElementById(btnId);
-    if(btn) btn.classList.add('active');
+    if (btn) btn.classList.add('active');
 
     if (tool === 'select') canvas.style.cursor = 'crosshair';
     else if (tool === 'move' || tool === 'copy') canvas.style.cursor = 'move';
+    else if (tool.startsWith('rot') || tool.startsWith('flip')) canvas.style.cursor = 'pointer'; // 回転反転ツール用カーソル
     else canvas.style.cursor = 'default';
 };
 
-window.deselect = function() {
+window.deselect = function () {
     selection = null;
     draw();
 };
 
-window.rotateAction = function(deg) {
+window.rotateAction = function (deg) {
     if (selection) {
         saveHistory();
         transformSelection('rotate', deg);
     } else {
-        brushTransform.rot = (brushTransform.rot + deg + 360) % 360;
-        updateTransformDisplay();
+        // 選択範囲がない場合はツールモード切り替え
+        // deg = 90 -> 右回転ツール, -90 -> 左回転ツール
+        if (deg === 90) setTool('rot-right');
+        else if (deg === -90) setTool('rot-left');
     }
 };
 
-window.flipAction = function(axis) {
+window.flipAction = function (axis) {
     if (selection) {
         saveHistory();
         transformSelection('flip', axis);
     } else {
-        if(axis === 'x') brushTransform.fx = !brushTransform.fx;
-        if(axis === 'y') brushTransform.fy = !brushTransform.fy;
-        updateTransformDisplay();
+        // 選択範囲がない場合はツールモード切り替え
+        if (axis === 'x') setTool('flip-x');
+        else if (axis === 'y') setTool('flip-y');
     }
 };
 
 function updateTransformDisplay() {
     const el = document.getElementById('brush-status');
-    if(el) el.textContent = `ブラシ: ${brushTransform.rot}° / ${brushTransform.fx?'反転':''} ${brushTransform.fy?'反転':''}`;
+    if (el) el.textContent = `ブラシ: ${brushTransform.rot}° / ${brushTransform.fx ? '反転' : ''} ${brushTransform.fy ? '反転' : ''}`;
 }
 
 function transformSelection(type, val) {
     if (!selection) return;
-    
+
     // 現在のレイヤーのみ対象
     const layer = mapData[currentLayerIndex];
-    
+
     const subMap = [];
-    for(let y=0; y<selection.h; y++) {
+    for (let y = 0; y < selection.h; y++) {
         const row = [];
-        for(let x=0; x<selection.w; x++) {
+        for (let x = 0; x < selection.w; x++) {
             const ty = selection.y + y;
             const tx = selection.x + x;
-            if(ty < mapHeight && tx < mapWidth) row.push({...layer[ty][tx]});
-            else row.push({id:0, rot:0, fx:false, fy:false});
+            if (ty < mapHeight && tx < mapWidth) row.push({ ...layer[ty][tx] });
+            else row.push({ id: 0, rot: 0, fx: false, fy: false });
         }
         subMap.push(row);
     }
-    
+
     let newSubMap = [];
     let newW = selection.w;
     let newH = selection.h;
@@ -491,18 +519,18 @@ function transformSelection(type, val) {
     if (type === 'rotate') {
         newW = selection.h;
         newH = selection.w;
-        for(let y=0; y<newH; y++) {
+        for (let y = 0; y < newH; y++) {
             const row = [];
-            for(let x=0; x<newW; x++) {
+            for (let x = 0; x < newW; x++) {
                 let srcX, srcY;
-                if (val === 90) { 
+                if (val === 90) {
                     srcX = y;
                     srcY = newW - 1 - x;
-                } else { 
+                } else {
                     srcX = newH - 1 - y;
                     srcY = x;
                 }
-                const tile = {...subMap[srcY][srcX]};
+                const tile = { ...subMap[srcY][srcX] };
                 if (tile.id !== 0) {
                     tile.rot = (tile.rot + val + 360) % 360;
                 }
@@ -511,7 +539,7 @@ function transformSelection(type, val) {
             newSubMap.push(row);
         }
     } else if (type === 'flip') {
-        newSubMap = subMap; 
+        newSubMap = subMap;
         if (val === 'x') {
             newSubMap.forEach(row => row.reverse());
             newSubMap.forEach(row => row.forEach(t => t.fx = !t.fx));
@@ -521,23 +549,23 @@ function transformSelection(type, val) {
         }
     }
 
-    for(let y=0; y<selection.h; y++) {
-        for(let x=0; x<selection.w; x++) {
-             const ty = selection.y + y;
-             const tx = selection.x + x;
-             if(ty < mapHeight && tx < mapWidth) layer[ty][tx] = {id:0,rot:0,fx:false,fy:false};
+    for (let y = 0; y < selection.h; y++) {
+        for (let x = 0; x < selection.w; x++) {
+            const ty = selection.y + y;
+            const tx = selection.x + x;
+            if (ty < mapHeight && tx < mapWidth) layer[ty][tx] = { id: 0, rot: 0, fx: false, fy: false };
         }
     }
 
     selection.w = newW;
     selection.h = newH;
-    for(let y=0; y<selection.h; y++) {
-        for(let x=0; x<selection.w; x++) {
-             const ty = selection.y + y;
-             const tx = selection.x + x;
-             if(ty < mapHeight && tx < mapWidth) {
-                 layer[ty][tx] = newSubMap[y][x];
-             }
+    for (let y = 0; y < selection.h; y++) {
+        for (let x = 0; x < selection.w; x++) {
+            const ty = selection.y + y;
+            const tx = selection.x + x;
+            if (ty < mapHeight && tx < mapWidth) {
+                layer[ty][tx] = newSubMap[y][x];
+            }
         }
     }
     draw();
@@ -556,11 +584,11 @@ function getTilePos(e) {
 function setupEvents() {
     canvas.addEventListener('mousedown', (e) => {
         const pos = getTilePos(e);
-        
+
         if (currentTool === 'brush') {
             saveHistory();
             isDrawing = true;
-            putTile(pos.tx, pos.ty);
+            putTile(pos.tx, pos.ty, true); // 第3引数trueでクリック判定
         } else if (currentTool === 'select') {
             isDragSelecting = true;
             dragStartPos = pos;
@@ -573,6 +601,10 @@ function setupEvents() {
                 moveOffset = { x: 0, y: 0 };
                 draw();
             }
+        } else if (currentTool.startsWith('rot') || currentTool.startsWith('flip')) {
+            // クリックで回転・反転ツール実行
+            saveHistory();
+            applySingleTileTransform(pos.tx, pos.ty, currentTool);
         }
     });
 
@@ -590,7 +622,7 @@ function setupEvents() {
             const minY = Math.min(dragStartPos.ty, pos.ty);
             const absW = Math.abs(pos.tx - dragStartPos.tx) + 1;
             const absH = Math.abs(pos.ty - dragStartPos.ty) + 1;
-            
+
             selection = {
                 x: minX, y: minY,
                 w: absW, h: absH
@@ -623,19 +655,21 @@ function setupEvents() {
 
         const x = (e.clientX - rect.left) * scaleX;
         const y = (e.clientY - rect.top) * scaleY;
-        
+
         const col = Math.floor(x / TILE_SIZE);
         const row = Math.floor(y / TILE_SIZE);
         const cols = Math.floor(tilesetImage.width / TILE_SIZE);
-        
+
         const id = row * cols + col;
-        
+
         if (id >= 0 && id < tileSettings.length) {
             currentTileId = id;
             brushTransform = { rot: 0, fx: false, fy: false };
             updateTransformDisplay();
             updateTileInfoUI();
-            drawPalette(); 
+            drawPalette();
+            // ★追加: 自動でペンツールに切り替え
+            setTool('brush');
         }
     });
 
@@ -644,7 +678,7 @@ function setupEvents() {
         saveHistory();
         isResizing = true;
     };
-    
+
     document.getElementById('btn-zoom-in').onclick = () => {
         zoomLevel = Math.min(2.0, zoomLevel + 0.1);
         updateCanvasSize();
@@ -655,18 +689,18 @@ function setupEvents() {
         updateCanvasSize();
         document.getElementById('zoom-level').textContent = Math.round(zoomLevel * 100) + '%';
     };
-    
+
     document.getElementById('btn-clear').onclick = () => {
-        if(confirm('マップを完全にクリアしますか？')) {
+        if (confirm('マップを完全にクリアしますか？')) {
             saveHistory();
             initMapData(mapWidth, mapHeight);
             draw();
         }
     };
-    
+
     document.getElementById('btn-export').onclick = () => {
         const name = document.getElementById('map-name').value || 'map';
-        
+
         // レイヤー構造で保存
         const layers = [
             { name: "background", data: mapData[0] },
@@ -680,24 +714,42 @@ function setupEvents() {
             width: mapWidth,
             height: mapHeight,
             tileSize: TILE_SIZE,
+            tilesetImage: mapData.tilesetImage || "image/forest_tileset.png", // ★追加
             layers: layers,
             tileDefs: tileSettings
         }, null, 2);
-        
-        const url = URL.createObjectURL(new Blob([json], {type:'application/json'}));
+
+        const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
         const a = document.createElement('a');
         a.href = url; a.download = `${name}.json`; a.click();
     };
-    
+
     document.getElementById('file-input').onchange = (e) => {
         const f = e.target.files[0];
-        if(!f) return;
+        if (!f) return;
+
+        // ★追加: ファイル名を自動で入力欄に反映 (拡張子除去)
+        const fileName = f.name.replace(/\.[^/.]+$/, "");
+        document.getElementById('map-name').value = fileName;
+
         saveHistory();
         const r = new FileReader();
         r.onload = (ev) => {
             try {
                 const d = JSON.parse(ev.target.result);
-                
+
+                // ★追加: タイルセット画像情報の読み込み
+                if (d.tilesetImage) {
+                    // エディタ上では相対パスで読み込みを試みる
+                    let src = d.tilesetImage;
+                    // "image/tileset.png" -> "../image/tileset.png"
+                    if (!src.startsWith('../') && !src.startsWith('http') && !src.startsWith('/')) {
+                        src = '../' + src;
+                    }
+                    tilesetImage.src = src;
+                    mapData.tilesetImage = d.tilesetImage;
+                }
+
                 // タイル定義読み込み
                 if (d.tileDefs && Array.isArray(d.tileDefs)) {
                     d.tileDefs.forEach(def => {
@@ -716,12 +768,12 @@ function setupEvents() {
                     mapData = [];
                     // BG, Main, FG の順序で読み込む (無ければ空で作成)
                     const layerNames = ["background", "main", "foreground"];
-                    for(let i=0; i<3; i++) {
+                    for (let i = 0; i < 3; i++) {
                         const targetLayer = d.layers.find(l => l.name === layerNames[i]);
-                        if(targetLayer) {
-                             mapData.push(normalizeLayer(targetLayer.data, mapWidth, mapHeight));
+                        if (targetLayer) {
+                            mapData.push(normalizeLayer(targetLayer.data, mapWidth, mapHeight));
                         } else {
-                             mapData.push(createEmptyLayer(mapWidth, mapHeight));
+                            mapData.push(createEmptyLayer(mapWidth, mapHeight));
                         }
                     }
                 } else {
@@ -736,23 +788,28 @@ function setupEvents() {
                 }
 
                 updateCanvasSize();
-                if(d.name) document.getElementById('map-name').value = d.name;
-                
-            } catch(err) {
+                // if (d.name) document.getElementById('map-name').value = d.name; // ファイル名を優先するためコメントアウト
+
+            } catch (err) {
                 console.error(err);
                 alert('データ読み込みエラー');
             }
         };
         r.readAsText(f);
         e.target.value = '';
-    }
+    };
+
+    // ★追加: タイルセット画像選択イベント
+    document.getElementById('tileset-input').onchange = (e) => {
+        window.changeTileset(e.target.files[0]);
+    };
 }
 
 function createEmptyLayer(w, h) {
     const layer = [];
-    for(let y=0; y<h; y++) {
+    for (let y = 0; y < h; y++) {
         const row = [];
-        for(let x=0; x<w; x++) row.push({id:0, rot:0, fx:false, fy:false});
+        for (let x = 0; x < w; x++) row.push({ id: 0, rot: 0, fx: false, fy: false });
         layer.push(row);
     }
     return layer;
@@ -760,11 +817,11 @@ function createEmptyLayer(w, h) {
 
 function normalizeLayer(data, w, h) {
     const layer = [];
-    for(let y=0; y<h; y++) {
+    for (let y = 0; y < h; y++) {
         const row = [];
-        for(let x=0; x<w; x++) {
+        for (let x = 0; x < w; x++) {
             let cell = data[y][x];
-            if(typeof cell === 'number') cell = {id:cell, rot:0, fx:false, fy:false};
+            if (typeof cell === 'number') cell = { id: cell, rot: 0, fx: false, fy: false };
             row.push(cell);
         }
         layer.push(row);
@@ -780,11 +837,45 @@ function handleResize(e) {
     const realY = rawY / zoomLevel;
     let newW = Math.max(5, Math.ceil(realX / TILE_SIZE));
     let newH = Math.max(5, Math.ceil(realY / TILE_SIZE));
-    if(newW !== mapWidth || newH !== mapHeight) resizeMapData(newW, newH);
+    if (newW !== mapWidth || newH !== mapHeight) resizeMapData(newW, newH);
 }
 
-function putTile(tx, ty) {
-    if(tx >= 0 && tx < mapWidth && ty >= 0 && ty < mapHeight) {
+function putTile(tx, ty, isClick = false) {
+    if (tx >= 0 && tx < mapWidth && ty >= 0 && ty < mapHeight) {
+        const layer = mapData[currentLayerIndex];
+        const currentCell = layer[ty][tx];
+
+        // クリック時、かつ既に同じIDのタイルがある場合、回転・反転をサイクルさせる
+        if (isClick && currentCell.id === currentTileId) {
+            // 現在のブラシ状態とタイルの状態が一致しているか確認
+            // (一致していなければ、まずはブラシの状態を適用する = 上書き)
+            // (一致していれば、ユーザーは「変えたい」ので回転させる)
+
+            const isMatch = (currentCell.rot === brushTransform.rot &&
+                currentCell.fx === brushTransform.fx &&
+                currentCell.fy === brushTransform.fy);
+
+            if (isMatch) {
+                // 次のステートへ
+                // ステート定義: 0, 90, 180, 270 (Normal) -> 0, 90, 180, 270 (FlipX) -> Loop
+
+                let rot = brushTransform.rot;
+                let fx = brushTransform.fx;
+
+                rot += 90;
+                if (rot >= 360) {
+                    rot = 0;
+                    fx = !fx; // 1周回ったら反転トグル
+                }
+
+                // ブラシ状態も同期更新
+                brushTransform.rot = rot;
+                brushTransform.fx = fx;
+
+                updateTransformDisplay();
+            }
+        }
+
         // 現在のレイヤーに書き込み
         mapData[currentLayerIndex][ty][tx] = {
             id: currentTileId,
@@ -799,7 +890,7 @@ function putTile(tx, ty) {
 function isInSelection(tx, ty) {
     if (!selection) return false;
     return tx >= selection.x && tx < selection.x + selection.w &&
-           ty >= selection.y && ty < selection.y + selection.h;
+        ty >= selection.y && ty < selection.y + selection.h;
 }
 
 function commitMove() {
@@ -810,32 +901,32 @@ function commitMove() {
     const layer = mapData[currentLayerIndex];
 
     const tempBuffer = [];
-    for(let ly = 0; ly < selection.h; ly++) {
+    for (let ly = 0; ly < selection.h; ly++) {
         const row = [];
-        for(let lx = 0; lx < selection.w; lx++) {
+        for (let lx = 0; lx < selection.w; lx++) {
             const y = selection.y + ly;
             const x = selection.x + lx;
-            if (y<mapHeight && x<mapWidth) row.push({...layer[y][x]});
-            else row.push({id:0, rot:0, fx:false, fy:false});
+            if (y < mapHeight && x < mapWidth) row.push({ ...layer[y][x] });
+            else row.push({ id: 0, rot: 0, fx: false, fy: false });
         }
         tempBuffer.push(row);
     }
-    
+
     if (currentTool !== 'copy') {
-        for(let ly = 0; ly < selection.h; ly++) {
-            for(let lx = 0; lx < selection.w; lx++) {
+        for (let ly = 0; ly < selection.h; ly++) {
+            for (let lx = 0; lx < selection.w; lx++) {
                 const y = selection.y + ly;
                 const x = selection.x + lx;
-                if (y<mapHeight && x<mapWidth) layer[y][x] = {id:0, rot:0, fx:false, fy:false};
+                if (y < mapHeight && x < mapWidth) layer[y][x] = { id: 0, rot: 0, fx: false, fy: false };
             }
         }
     }
-    
+
     const targetX = selection.x + moveOffset.x;
     const targetY = selection.y + moveOffset.y;
-    
-    for(let ly = 0; ly < selection.h; ly++) {
-        for(let lx = 0; lx < selection.w; lx++) {
+
+    for (let ly = 0; ly < selection.h; ly++) {
+        for (let lx = 0; lx < selection.w; lx++) {
             const y = targetY + ly;
             const x = targetX + lx;
             if (y >= 0 && y < mapHeight && x >= 0 && x < mapWidth) {
@@ -843,9 +934,31 @@ function commitMove() {
             }
         }
     }
-    
+
     selection.x = targetX;
     selection.y = targetY;
     moveOffset = { x: 0, y: 0 };
     draw();
+}
+
+// ★追加: 単一タイルの変形適用
+function applySingleTileTransform(tx, ty, toolType) {
+    if (tx >= 0 && tx < mapWidth && ty >= 0 && ty < mapHeight) {
+        const layer = mapData[currentLayerIndex];
+        const tile = layer[ty][tx];
+
+        if (tile.id === 0) return; // 空タイルは何もしない
+
+        if (toolType === 'rot-left') {
+            tile.rot = (tile.rot - 90 + 360) % 360;
+        } else if (toolType === 'rot-right') {
+            tile.rot = (tile.rot + 90 + 360) % 360;
+        } else if (toolType === 'flip-x') {
+            tile.fx = !tile.fx;
+        } else if (toolType === 'flip-y') {
+            tile.fy = !tile.fy;
+        }
+
+        draw();
+    }
 }

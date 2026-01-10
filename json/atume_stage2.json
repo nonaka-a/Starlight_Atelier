@@ -1,9 +1,10 @@
 {
   "version": "4.0",
-  "name": "my_stage",
+  "name": "atume_stage2",
   "width": 39,
   "height": 24,
   "tileSize": 64,
+  "tilesetImage": "image/forest_tileset.png",
   "layers": [
     {
       "name": "background",
@@ -10235,19 +10236,19 @@
             "fy": false
           },
           {
+            "id": 0,
+            "rot": 0,
+            "fx": false,
+            "fy": false
+          },
+          {
+            "id": 0,
+            "rot": 0,
+            "fx": false,
+            "fy": false
+          },
+          {
             "id": 40,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
             "rot": 0,
             "fx": false,
             "fy": false

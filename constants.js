@@ -5,10 +5,10 @@ const TILE_SIZE = 64;
 const GRAVITY = 0.6;
 const JUMP_POWER = -14;
 const SPEED = 6;
-const TILESET_SRC = 'tileset.png';
-const CHAR_SRC = 'char.png';
-const MAP_FILE_SRC = 'my_stage.json'; 
-const ANIM_FILE_SRC = 'animations.json';
+const TILESET_SRC = 'image/forest_tileset.png';
+const CHAR_SRC = 'image/char.png';
+const MAP_FILE_SRC = 'json/atume_stage2.json';
+const ANIM_FILE_SRC = 'json/animations.json';
 const BULLET_SPEED = 12;
 
 // 旧バージョン互換用IDマッピング

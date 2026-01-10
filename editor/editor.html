@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -42,7 +43,11 @@
             line-height: 30px;
             transition: background 0.2s;
         }
-        .tab-btn:hover { background: #3a3a3a; }
+
+        .tab-btn:hover {
+            background: #3a3a3a;
+        }
+
         .tab-btn.active {
             background: #444;
             color: #fff;
@@ -63,6 +68,7 @@
             background-color: #222;
             box-sizing: border-box;
         }
+
         .mode-area.active {
             display: flex;
         }
@@ -79,7 +85,9 @@
             flex-wrap: wrap;
         }
 
-        .spacer { flex: 1; }
+        .spacer {
+            flex: 1;
+        }
 
         .tool-group {
             display: flex;
@@ -89,7 +97,11 @@
             padding-right: 10px;
             margin-right: 5px;
         }
-        .tool-group:last-child { border-right: none; margin-right: 0; }
+
+        .tool-group:last-child {
+            border-right: none;
+            margin-right: 0;
+        }
 
         input[type="text"] {
             padding: 4px;
@@ -100,7 +112,8 @@
             width: 100px;
         }
 
-        button, label.btn {
+        button,
+        label.btn {
             padding: 5px 12px;
             background-color: #444;
             color: white;
@@ -109,15 +122,34 @@
             border-radius: 2px;
             font-size: 0.85rem;
         }
-        button:hover, label.btn:hover { background-color: #555; }
-        button:active { background-color: #333; }
-        
-        button.active { background-color: #66aa44; border-color: #88cc66; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
-        
-        button.danger { background-color: #844; border-color: #a66; }
-        button.danger:hover { background-color: #955; }
 
-        input[type="file"] { display: none; }
+        button:hover,
+        label.btn:hover {
+            background-color: #555;
+        }
+
+        button:active {
+            background-color: #333;
+        }
+
+        button.active {
+            background-color: #66aa44;
+            border-color: #88cc66;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        button.danger {
+            background-color: #844;
+            border-color: #a66;
+        }
+
+        button.danger:hover {
+            background-color: #955;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
 
         #main-area {
             display: flex;
@@ -127,11 +159,13 @@
         }
 
         #sidebar {
-            width: 400px; /* 横幅を拡張 */
+            width: 400px;
+            /* 横幅を拡張 */
             display: flex;
             flex-direction: column;
             gap: 10px;
-            min-width: 320px; /* 最小幅も拡張 */
+            min-width: 320px;
+            /* 最小幅も拡張 */
         }
 
         /* --- タイルプロパティエリア --- */
@@ -144,16 +178,20 @@
             flex-direction: column;
             gap: 8px;
         }
+
         .prop-item {
             display: flex;
             flex-direction: column;
             gap: 2px;
         }
+
         .prop-item label {
             font-size: 0.75rem;
             color: #aaa;
         }
-        .prop-item select, .prop-item input[type="text"] {
+
+        .prop-item select,
+        .prop-item input[type="text"] {
             background: #222;
             color: #fff;
             border: 1px solid #555;
@@ -161,6 +199,7 @@
             width: 100%;
             box-sizing: border-box;
         }
+
         .prop-checkbox {
             display: flex;
             flex-direction: row;
@@ -168,6 +207,7 @@
             gap: 5px;
             cursor: pointer;
         }
+
         .prop-checkbox input {
             cursor: pointer;
         }
@@ -186,18 +226,21 @@
 
         #palette-canvas {
             display: block;
-            background-image: 
-                linear-gradient(45deg, #222 25%, transparent 25%), 
-                linear-gradient(-45deg, #222 25%, transparent 25%), 
-                linear-gradient(45deg, transparent 75%, #222 75%), 
+            background-image:
+                linear-gradient(45deg, #222 25%, transparent 25%),
+                linear-gradient(-45deg, #222 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #222 75%),
                 linear-gradient(-45deg, transparent 75%, #222 75%);
             background-size: 20px 20px;
             background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
             background-color: #333;
             cursor: pointer;
-            margin: 0 auto; /* 中央寄せ */
-            width: 100%; /* 親コンテナ幅に合わせる */
-            height: auto; /* アスペクト比を維持 */
+            margin: 0 auto;
+            /* 中央寄せ */
+            width: 100%;
+            /* 親コンテナ幅に合わせる */
+            height: auto;
+            /* アスペクト比を維持 */
         }
 
         #brush-status {
@@ -215,7 +258,7 @@
             border: 1px solid #555;
             overflow: auto;
             position: relative;
-            background-image: 
+            background-image:
                 linear-gradient(#222 1px, transparent 1px),
                 linear-gradient(90deg, #222 1px, transparent 1px);
             background-size: 20px 20px;
@@ -226,7 +269,7 @@
             transform-origin: 0 0;
             display: inline-block;
             margin: 20px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
         }
 
         canvas {
@@ -264,11 +307,13 @@
             display: flex;
             flex-direction: column;
         }
+
         .anim-list {
             flex: 1;
             overflow-y: auto;
             padding: 5px;
         }
+
         .anim-item {
             padding: 8px;
             margin-bottom: 2px;
@@ -276,8 +321,16 @@
             background: #444;
             border-left: 3px solid transparent;
         }
-        .anim-item:hover { background: #555; }
-        .anim-item.selected { background: #555; border-left-color: #66aa44; color: #fff; }
+
+        .anim-item:hover {
+            background: #555;
+        }
+
+        .anim-item.selected {
+            background: #555;
+            border-left-color: #66aa44;
+            color: #fff;
+        }
 
         /* 中央: ワークスペース */
         .anim-workspace {
@@ -292,9 +345,10 @@
             flex: 2;
             display: flex;
             gap: 10px;
-            min-height: 0; /* Flexboxのoverflow対策 */
+            min-height: 0;
+            /* Flexboxのoverflow対策 */
         }
-        
+
         .source-view {
             flex: 1;
             background: #111;
@@ -302,7 +356,7 @@
             overflow: auto;
             position: relative;
         }
-        
+
         .preview-view {
             width: 300px;
             background: #111;
@@ -312,7 +366,7 @@
             align-items: center;
             justify-content: center;
         }
-        
+
         /* 下部: タイムライン */
         .timeline-view {
             height: 140px;
@@ -321,6 +375,7 @@
             display: flex;
             flex-direction: column;
         }
+
         .timeline-frames {
             flex: 1;
             display: flex;
@@ -330,6 +385,7 @@
             gap: 5px;
             background: #222;
         }
+
         .frame-card {
             min-width: 64px;
             height: 80px;
@@ -342,15 +398,38 @@
             cursor: pointer;
             position: relative;
         }
-        .frame-card.active { border-color: #ffff00; }
-        .frame-thumb { width: 48px; height: 48px; image-rendering: pixelated; background-size: cover; }
-        .frame-num { font-size: 0.7rem; color: #aaa; margin-top: 2px; }
-        .frame-del { 
-            position: absolute; top: -5px; right: -5px; 
-            background: red; color: white; width: 16px; height: 16px; 
-            border-radius: 50%; font-size: 10px; text-align: center; line-height: 16px;
+
+        .frame-card.active {
+            border-color: #ffff00;
         }
-        
+
+        .frame-thumb {
+            width: 48px;
+            height: 48px;
+            image-rendering: pixelated;
+            background-size: cover;
+        }
+
+        .frame-num {
+            font-size: 0.7rem;
+            color: #aaa;
+            margin-top: 2px;
+        }
+
+        .frame-del {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: red;
+            color: white;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            font-size: 10px;
+            text-align: center;
+            line-height: 16px;
+        }
+
         .prop-row {
             padding: 10px;
             border-bottom: 1px solid #555;
@@ -359,11 +438,22 @@
             align-items: center;
             background: #333;
         }
-        .prop-label { font-size: 0.8rem; color: #ccc; }
-        .prop-val { width: 50px; padding: 2px; background: #222; border: 1px solid #555; color: #fff; }
 
+        .prop-label {
+            font-size: 0.8rem;
+            color: #ccc;
+        }
+
+        .prop-val {
+            width: 50px;
+            padding: 2px;
+            background: #222;
+            border: 1px solid #555;
+            color: #fff;
+        }
     </style>
 </head>
+
 <body>
 
     <!-- タブ切り替えバー -->
@@ -382,6 +472,8 @@
                 <button id="btn-export">保存</button>
                 <label class="btn" for="file-input">読込</label>
                 <input type="file" id="file-input" accept=".json">
+                <label class="btn" for="tileset-input" style="background-color:#468; border-color:#57a;">タイル読込</label>
+                <input type="file" id="tileset-input" accept="image/*">
             </div>
             <div class="tool-group">
                 <button id="btn-zoom-out">-</button>
@@ -396,10 +488,10 @@
                 <button onclick="deselect()">解除</button>
             </div>
             <div class="tool-group">
-                <button onclick="window.rotateAction(90)">右回転</button>
-                <button onclick="window.rotateAction(-90)">左回転</button>
-                <button onclick="window.flipAction('x')">左右反転</button>
-                <button onclick="window.flipAction('y')">上下反転</button>
+                <button id="btn-rot-left" onclick="window.rotateAction(-90)">左回転</button>
+                <button id="btn-rot-right" onclick="window.rotateAction(90)">右回転</button>
+                <button id="btn-flip-x" onclick="window.flipAction('x')">左右反転</button>
+                <button id="btn-flip-y" onclick="window.flipAction('y')">上下反転</button>
             </div>
             <div class="tool-group">
                 <button onclick="undo()">↩ やり直し</button>
@@ -408,17 +500,17 @@
             <button id="btn-clear" class="danger">クリア</button>
         </div>
         <div class="tool-group">
-    <label style="font-size:0.8rem; margin-right:5px; color:#aaa;">レイヤー:</label>
-    <label class="btn" style="padding:2px 8px;">
-        <input type="radio" name="layer" value="0" onclick="setLayer(0)"> 奥(BG)
-    </label>
-    <label class="btn active" style="padding:2px 8px;">
-        <input type="radio" name="layer" value="1" onclick="setLayer(1)" checked> メイン
-    </label>
-    <label class="btn" style="padding:2px 8px;">
-        <input type="radio" name="layer" value="2" onclick="setLayer(2)"> 手前(FG)
-    </label>
-</div>
+            <label style="font-size:0.8rem; margin-right:5px; color:#aaa;">レイヤー:</label>
+            <label class="btn" style="padding:2px 8px;">
+                <input type="radio" name="layer" value="0" onclick="setLayer(0)"> 奥(BG)
+            </label>
+            <label class="btn active" style="padding:2px 8px;">
+                <input type="radio" name="layer" value="1" onclick="setLayer(1)" checked> メイン
+            </label>
+            <label class="btn" style="padding:2px 8px;">
+                <input type="radio" name="layer" value="2" onclick="setLayer(2)"> 手前(FG)
+            </label>
+        </div>
 
         <div id="main-area">
             <div id="sidebar">
@@ -464,7 +556,7 @@
                 <button onclick="anim_create()">➕ 新規アニメ</button>
                 <label class="btn" for="anim-img-input" style="background:#559;">🖼️ 画像読込</label>
                 <input type="file" id="anim-img-input" accept="image/*" multiple onchange="anim_loadImages(this)">
-                
+
                 <!-- 画像保存ボタン追加 -->
                 <button onclick="anim_saveImage()" style="background:#559;">🖼️ 画像保存</button>
 
@@ -496,23 +588,28 @@
                             <canvas id="anim-source-canvas"></canvas>
                         </div>
                     </div>
-                    
+
                     <!-- プレビュー -->
                     <div class="preview-view">
                         <div style="margin-bottom:10px; color:#aaa; font-size:0.9rem;">プレビュー</div>
-                        <canvas id="anim-preview-canvas" width="128" height="128" style="background:#444; border:1px solid #666;"></canvas>
-                        
+                        <canvas id="anim-preview-canvas" width="128" height="128"
+                            style="background:#444; border:1px solid #666;"></canvas>
+
                         <div style="margin-top:10px; display:flex; gap:5px;">
                             <!-- 再生/停止ボタン追加 -->
                             <button id="btn-anim-play" onclick="anim_togglePlay()" style="width:40px;">⏸</button>
                         </div>
 
-                        <div class="prop-row" style="margin-top:5px; width:100%; box-sizing:border-box; justify-content:center; flex-wrap:wrap;">
+                        <div class="prop-row"
+                            style="margin-top:5px; width:100%; box-sizing:border-box; justify-content:center; flex-wrap:wrap;">
                             <span class="prop-label">名前:</span>
-                            <input type="text" id="inp-anim-name" class="prop-val" style="width:80px;" onchange="anim_updateProp()">
+                            <input type="text" id="inp-anim-name" class="prop-val" style="width:80px;"
+                                onchange="anim_updateProp()">
                             <span class="prop-label">FPS:</span>
-                            <input type="number" id="inp-anim-fps" class="prop-val" value="10" min="1" max="60" onchange="anim_updateProp()">
-                            <label style="font-size:0.8rem; color:#ccc;"><input type="checkbox" id="inp-anim-loop" checked onchange="anim_updateProp()"> ループ</label>
+                            <input type="number" id="inp-anim-fps" class="prop-val" value="10" min="1" max="60"
+                                onchange="anim_updateProp()">
+                            <label style="font-size:0.8rem; color:#ccc;"><input type="checkbox" id="inp-anim-loop"
+                                    checked onchange="anim_updateProp()"> ループ</label>
                         </div>
                     </div>
                 </div>
@@ -534,17 +631,18 @@
             document.getElementById(`tab-${mode}`).classList.add('active');
             document.querySelectorAll('.mode-area').forEach(area => area.classList.remove('active'));
             document.getElementById(`mode-${mode}`).classList.add('active');
-            
-            if(mode === 'map' && window.initMapEditor) window.initMapEditor();
-            if(mode === 'anim' && window.initAnimEditor) window.initAnimEditor();
+
+            if (mode === 'map' && window.initMapEditor) window.initMapEditor();
+            if (mode === 'anim' && window.initAnimEditor) window.initAnimEditor();
         }
-        
+
         window.onload = () => {
-            if(window.initMapEditor) window.initMapEditor();
+            if (window.initMapEditor) window.initMapEditor();
         };
     </script>
-    
+
     <script src="editor_map.js"></script>
     <script src="editor_anim.js"></script>
 </body>
+
 </html>

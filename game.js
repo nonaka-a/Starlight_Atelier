@@ -52,10 +52,10 @@ window.onload = () => {
 
     tilesetImage.src = TILESET_SRC;
     charImage.src = CHAR_SRC;
-    bgImage.src = BG_SRC; 
+    bgImage.src = BG_SRC;
 
     // ★追加: BGMの読み込みを開始
-    if(typeof AudioSys !== 'undefined' && AudioSys.loadBGM) {
+    if (typeof AudioSys !== 'undefined' && AudioSys.loadBGM) {
         AudioSys.loadBGM(BGM_SRC);
     }
 
@@ -123,6 +123,21 @@ function initGameWithData(json) {
     tileDefs[119] = { id: 119, type: 'goal', solid: false };
 
 
+    // ★追加: タイルセット画像の動的切り替え
+    if (json.tilesetImage) {
+        // 画像読み込み完了を待ってからゲーム開始する必要があります
+        // (ゲームループ開始後に画像が変わるとチラつく可能性があるため)
+        tilesetImage.src = json.tilesetImage;
+        tilesetImage.onload = () => {
+            finishInitGame(json);
+        }
+    } else {
+        // 設定がない場合はデフォルトを使用（既にwindow.onloadで設定済みだが念のため）
+        finishInitGame(json);
+    }
+}
+
+function finishInitGame(json) {
     mapData = [];
     if (json.layers) {
         const layerNames = ["background", "main", "foreground"];
@@ -166,11 +181,11 @@ function normalizeLayer(data, w, h) {
                 cell = { id: cell, rot: 0, fx: false, fy: false };
             } else {
                 // 既存オブジェクトの場合もコピーを作成して参照を切る
-                cell = { 
-                    id: cell.id, 
-                    rot: cell.rot || 0, 
-                    fx: cell.fx || false, 
-                    fy: cell.fy || false 
+                cell = {
+                    id: cell.id,
+                    rot: cell.rot || 0,
+                    fx: cell.fx || false,
+                    fy: cell.fy || false
                 };
             }
             row.push(cell);
@@ -216,7 +231,7 @@ function setupGame() {
     scanMapAndSetupObjects();
 
     isGameRunning = true;
-    
+
     // ★修正: 既存のループがあればキャンセルして二重起動を防止
     if (gameLoopId) cancelAnimationFrame(gameLoopId);
     gameLoopId = requestAnimationFrame(gameLoop);
@@ -637,11 +652,11 @@ function drawBackground() {
     if (!bgImage.complete || bgImage.width === 0) return;
 
     // カメラ移動量の係数（小さいほど遠くにあるように見える）
-    const factor = 0.2; 
-     
+    const factor = 0.2;
+
     // ★調整済みサイズ
-    const w = 1280; 
-    const h = 720; 
+    const w = 1280;
+    const h = 800;
 
     // カメラ位置に応じたオフセット計算（画像をループさせるための剰余算）
     let offsetX = -(camera.x * factor) % w;
@@ -661,10 +676,10 @@ function drawBackground() {
 function drawVignette() {
     const w = canvas.width;
     const h = canvas.height;
-    
+
     const gradient = ctx.createRadialGradient(w / 2, h / 2, w * 0.3, w / 2, h / 2, w * 0.8);
-    
-    gradient.addColorStop(0, 'rgba(0, 0, 0, 0)'); 
+
+    gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
     gradient.addColorStop(1, 'rgba(0, 0, 0, 0.8)'); // 濃さ0.8
 
     ctx.fillStyle = gradient;
@@ -742,7 +757,7 @@ function drawTile(px, py, cell) {
 }
 
 // ★追加: ゲームリセット関数 (グローバルスコープで呼べるように window に割り当て)
-window.resetGame = function() {
+window.resetGame = function () {
     if (!currentLevelData) {
         location.reload(); // データがない場合は通常リロード
         return;
@@ -756,19 +771,19 @@ window.resetGame = function() {
     player.cooldown = 0;
     player.state = "idle";
     player.dropTimer = 0;
-    
+
     isGameRunning = false; // 一旦停止
-    
+
     // 2. UIを隠す
     document.getElementById('screen-gameover').style.display = 'none';
     document.getElementById('screen-clear').style.display = 'none';
-    
+
     // 3. マップとオブジェクトの再初期化
     // initGameWithDataを呼ぶと mapDataの再生成と setupGame -> scanMapAndSetupObjects が走る
     initGameWithData(currentLevelData);
 
     // 4. BGM再開 (止まっていた場合)
-    if(typeof AudioSys !== 'undefined' && AudioSys.bgmBuffer && !isMuted) {
+    if (typeof AudioSys !== 'undefined' && AudioSys.bgmBuffer && !isMuted) {
         AudioSys.playBGM(0.3);
     }
 };
