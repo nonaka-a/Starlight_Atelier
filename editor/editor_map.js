@@ -55,6 +55,8 @@ let zoomLevel = 1.0;
 let isDrawing = false;
 let isResizing = false;
 let tilesetImage = new Image();
+// ★追加: タイルセットのパスを保持する変数 (保存用)
+let currentTilesetJsonPath = "image/forest_tileset.png";
 let isImageLoaded = false;
 let isInitialized = false;
 
@@ -107,8 +109,9 @@ window.changeTileset = function (file) {
         tilesetImage.src = e.target.result;
         // ファイル名を保存 (パス全体はブラウザセキュリティで取れないため、ファイル名のみ)
         // 実際のゲーム動作時は 'image/' + filename となる想定
-        mapData.tilesetImage = file.name;
-        console.log("Tileset changed to:", file.name);
+        // 保存用にパス形式を整える
+        currentTilesetJsonPath = 'image/' + file.name;
+        console.log("Tileset changed to:", currentTilesetJsonPath);
     };
     reader.readAsDataURL(file);
 };
@@ -714,7 +717,7 @@ function setupEvents() {
             width: mapWidth,
             height: mapHeight,
             tileSize: TILE_SIZE,
-            tilesetImage: mapData.tilesetImage || "image/forest_tileset.png", // ★追加
+            tilesetImage: currentTilesetJsonPath, // ★修正: 保存していたパスを使用
             layers: layers,
             tileDefs: tileSettings
         }, null, 2);
@@ -740,6 +743,9 @@ function setupEvents() {
 
                 // ★追加: タイルセット画像情報の読み込み
                 if (d.tilesetImage) {
+                    // 保存用変数を更新
+                    currentTilesetJsonPath = d.tilesetImage;
+
                     // エディタ上では相対パスで読み込みを試みる
                     let src = d.tilesetImage;
                     // "image/tileset.png" -> "../image/tileset.png"
@@ -747,7 +753,7 @@ function setupEvents() {
                         src = '../' + src;
                     }
                     tilesetImage.src = src;
-                    mapData.tilesetImage = d.tilesetImage;
+                    // mapData.tilesetImage = d.tilesetImage; // mapData再生成で消えるので削除
                 }
 
                 // タイル定義読み込み

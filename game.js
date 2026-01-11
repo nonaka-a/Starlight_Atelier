@@ -23,6 +23,10 @@ let currentLevelData = null;
 // ★追加: ゲームループのID管理用（倍速バグ防止）
 let gameLoopId = null;
 
+// ★追加: アイテム持越し管理 & 工房モードフラグ
+let totalItemCount = 0;
+let isAtelierMode = false;
+
 const player = {
     x: 0, y: 0,
     vx: 0, vy: 0,
@@ -109,6 +113,12 @@ function manualLoadMap(e) {
 }
 
 function initGameWithData(json) {
+    isGameRunning = false; // ★重要: マップ読み込み中はループを停止（サイズ不整合によるクラッシュ防止）
+    if (gameLoopId) {
+        cancelAnimationFrame(gameLoopId);
+        gameLoopId = null;
+    }
+
     mapCols = json.width;
     mapRows = json.height;
 
@@ -128,8 +138,19 @@ function initGameWithData(json) {
         // 画像読み込み完了を待ってからゲーム開始する必要があります
         // (ゲームループ開始後に画像が変わるとチラつく可能性があるため)
         tilesetImage.src = json.tilesetImage;
-        tilesetImage.onload = () => {
+
+        // ★修正: 既に読み込み済みの場合やキャッシュの場合に対応
+        if (tilesetImage.complete) {
             finishInitGame(json);
+        } else {
+            tilesetImage.onload = () => {
+                finishInitGame(json);
+            };
+            tilesetImage.onerror = () => {
+                console.error("Tileset image load failed");
+                alert("タイルセット画像の読み込みに失敗しました");
+                finishInitGame(json); // エラーでもとりあえず進める
+            };
         }
     } else {
         // 設定がない場合はデフォルトを使用（既にwindow.onloadで設定済みだが念のため）
@@ -389,8 +410,11 @@ function update() {
     checkObjectCollisionX(player);
 
     if (keys.KeyB && player.cooldown <= 0) {
-        shootBullet();
-        player.cooldown = 20;
+        // ★修正: 工房モードでは発射不可
+        if (!isAtelierMode) {
+            shootBullet();
+            player.cooldown = 20;
+        }
     }
     if (player.cooldown > 0) player.cooldown--;
 
@@ -615,6 +639,11 @@ function showGameClear() {
     if (player.isClear) return;
     player.isClear = true;
     AudioSys.seClear();
+
+    // ★追加: ゴール時にアイテムを保存（持越し）
+    totalItemCount += score;
+    console.log("Total Items:", totalItemCount);
+
     document.getElementById('screen-clear').style.display = 'flex';
 }
 
@@ -786,4 +815,47 @@ window.resetGame = function () {
     if (typeof AudioSys !== 'undefined' && AudioSys.bgmBuffer && !isMuted) {
         AudioSys.playBGM(0.3);
     }
+};
+
+// ★追加: 工房へ移動する関数
+window.goToAtelier = function () {
+    document.getElementById('screen-clear').style.display = 'none';
+    isAtelierMode = true;
+
+    // 工房マップをロード
+    fetch(ATELIER_MAP_SRC)
+        .then(res => {
+            if (!res.ok) throw new Error('Not found');
+            return res.json();
+        })
+        .then(data => {
+            // ★修正: プレイヤー状態のリセット（これをしないと isClear=true のままで動かない）
+            player.isDead = false;
+            player.isClear = false;
+            player.vx = 0;
+            player.vy = 0;
+            player.cooldown = 0;
+            player.state = "idle";
+            player.dropTimer = 0;
+
+            // 工房ではBGMを変えたりするかもしれないが、とりあえずそのまま
+            // マップ初期化
+            currentLevelData = data;
+            initGameWithData(data);
+
+            // プレイヤー位置などの微調整が必要ならここで行う
+            // 例: player.x = ...
+
+            // スコア表示のリセット（工房でのスコア扱いは仕様次第だが、とりあえず0表示）
+            score = 0;
+            const st = document.getElementById('score-text');
+            if (st) st.textContent = totalItemCount; // ここで所持数を表示しても良いかも
+        })
+        .catch(err => {
+            console.error(err);
+            alert("工房データが見つかりませんでした");
+            // 失敗したらリセットして元のステージに戻すなどが安全
+            isAtelierMode = false;
+            resetGame();
+        });
 };

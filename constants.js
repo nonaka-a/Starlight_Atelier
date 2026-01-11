@@ -8,6 +8,7 @@ const SPEED = 6;
 const TILESET_SRC = 'image/forest_tileset.png';
 const CHAR_SRC = 'image/char.png';
 const MAP_FILE_SRC = 'json/atume_stage2.json';
+const ATELIER_MAP_SRC = 'json/atelier_stage1.json'; // ★追加: 工房マップ
 const ANIM_FILE_SRC = 'json/animations.json';
 const BULLET_SPEED = 12;
 

@@ -258,6 +258,7 @@ p {
 }
 
 button.retry-btn,
+button.atelier-btn,
 .file-label {
     background-color: #ff6b6b;
     color: white;
@@ -275,6 +276,7 @@ button.retry-btn,
 }
 
 button.retry-btn:active,
+button.atelier-btn:active,
 .file-label:active {
     transform: translateY(5px);
     box-shadow: 0 0 0 #d64545;
@@ -287,6 +289,16 @@ button.retry-btn {
 
 button.retry-btn:active {
     box-shadow: 0 0 0 #36b0a8;
+}
+
+button.atelier-btn {
+    background-color: #ffaa00;
+    box-shadow: 0 5px 0 #cc8800;
+    margin-left: 10px;
+}
+
+button.atelier-btn:active {
+    box-shadow: 0 0 0 #cc8800;
 }
 
 input[type="file"] {
