@@ -951,15 +951,19 @@ window.loadStage = function (url, isAtelier = false) {
         // 場所名の設定
         let name = "ほしあかりの森";
         if (isAtelier || url.includes("atelier")) name = "工房";
-
         locText.textContent = name;
-        locText.classList.remove('fade-in-text');
-        void locText.offsetWidth; // リフロー強制
-        locText.classList.add('fade-in-text');
 
+        // まずコンテナを表示状態にする
         transition.style.display = 'flex';
         transition.classList.remove('fade-out');
         transition.style.opacity = '1';
+
+        // 1フレーム待ってからアニメーションを開始させる（Safari対策）
+        requestAnimationFrame(() => {
+            locText.classList.remove('fade-in-text');
+            void locText.offsetWidth; // 強制リフロー
+            locText.classList.add('fade-in-text');
+        });
     }
 
     // 次のステージへ行く前に現在のスコアをトータルに加算（工房での取得分などの保存）
