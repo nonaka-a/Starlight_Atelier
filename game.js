@@ -39,6 +39,9 @@ const player = {
     animTimer: 0,
     frameIndex: 0,
     dropTimer: 0,
+    hp: 3,
+    maxHp: 3,
+    invincible: 0,
     downPressTime: 0 // 長押し計測用
 };
 
@@ -108,6 +111,24 @@ function updateScoreDisplay() {
     if (st) {
         // 所持合計 + 今拾った数
         st.textContent = totalItemCount + score;
+    }
+}
+
+// ★追加: HP表示更新用
+function updateHPDisplay() {
+    const hpContainer = document.getElementById('hp-counter');
+    if (!hpContainer) return;
+
+    hpContainer.innerHTML = '';
+    for (let i = 0; i < player.maxHp; i++) {
+        const img = document.createElement('img');
+        img.src = 'image/heart.png';
+        img.className = 'heart-icon';
+        if (i >= player.hp) {
+            img.style.filter = 'grayscale(100%) opacity(0.3)';
+            img.style.animation = 'none';
+        }
+        hpContainer.appendChild(img);
     }
 }
 
@@ -244,6 +265,9 @@ function setupGame() {
 
     score = 0;
     updateScoreDisplay();
+    player.hp = player.maxHp;
+    player.invincible = 0;
+    updateHPDisplay();
 
     enemies = [];
     bullets = [];
@@ -441,7 +465,13 @@ function update() {
     player.onGround = false;
     checkObjectCollisionY(player);
 
-    if (player.y > mapRows * TILE_SIZE) showGameOver();
+    if (player.invincible > 0) player.invincible--;
+
+    if (player.y > mapRows * TILE_SIZE) {
+        player.hp = 0;
+        updateHPDisplay();
+        showGameOver();
+    }
 
     updateBullets();
     updateEnemies();
@@ -622,7 +652,7 @@ function checkTileAt(x, y) {
         }
 
         if (prop.type === 'spike') {
-            showGameOver();
+            takeDamage();
         }
         else if (prop.type === 'goal' || cell.id === 119) {
             showGameClear();
@@ -666,8 +696,23 @@ function checkInteraction() {
 
     for (const e of enemies) {
         if (checkRectCollision(player, e)) {
-            showGameOver();
+            takeDamage();
         }
+    }
+}
+
+// ★追加: ダメージ処理
+function takeDamage() {
+    if (player.invincible > 0 || player.isDead || player.isClear) return;
+
+    player.hp--;
+    updateHPDisplay();
+
+    if (player.hp <= 0) {
+        showGameOver();
+    } else {
+        AudioSys.playTone(200, 'square', 0.2); // ダメージ音（仮）
+        player.invincible = 60; // 約1秒の無敵時間
     }
 }
 
@@ -857,6 +902,11 @@ function drawPlayer() {
     ctx.translate(player.x + player.width / 2, player.y + player.height / 2);
     if (!player.facingRight) ctx.scale(-1, 1);
 
+    // ★追加: 無敵時間中の点滅処理
+    if (player.invincible > 0 && Math.floor(Date.now() / 100) % 2 === 0) {
+        ctx.globalAlpha = 0.5;
+    }
+
     const srcImg = charImage.complete ? charImage : tilesetImage;
     ctx.drawImage(
         srcImg,
@@ -865,6 +915,7 @@ function drawPlayer() {
     );
 
     ctx.restore();
+    ctx.globalAlpha = 1.0;
 }
 
 function drawTile(px, py, cell) {
@@ -913,12 +964,15 @@ window.resetGame = function () {
     player.cooldown = 0;
     player.state = "idle";
     player.dropTimer = 0;
+    player.hp = player.maxHp;
+    player.invincible = 0;
 
     isGameRunning = false; // 一旦停止
 
     // 2. UIを隠す
     document.getElementById('screen-gameover').style.display = 'none';
     document.getElementById('screen-clear').style.display = 'none';
+    updateHPDisplay();
 
     // 3. マップとオブジェクトの再初期化
     // initGameWithDataを呼ぶと mapDataの再生成と setupGame -> scanMapAndSetupObjects が走る
@@ -998,6 +1052,10 @@ window.loadStage = function (url, isAtelier = false) {
 
             // 今のステージの取得数をリセット
             score = 0;
+            // ライフも回復（工房に戻った際、または新しいステージ開始時）
+            player.hp = player.maxHp;
+            player.invincible = 0;
+            updateHPDisplay();
             updateScoreDisplay();
 
             // 2.2秒後に暗転解除 (1秒延長)
