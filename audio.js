@@ -3,62 +3,68 @@
  */
 const AudioSys = {
     ctx: null,
-    bgmBuffer: null, // BGMデータを保持するバッファ
-    bgmSource: null, // 再生中のソースノード
-    
-    init: function() {
+    buffers: {}, // ★BGMデータを名前付きで保持
+    bgmSource: null,
+    currentBgmName: null, // ★現在再生中のBGM名
+    isMuted: false,
+
+    init: function () {
         if (!this.ctx) {
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             this.ctx = new AudioContext();
-        } else if (this.ctx.state === 'suspended') {
+        } else if (this.ctx.state === 'suspended' && !this.isMuted) {
             this.ctx.resume();
         }
     },
 
     // 外部ファイルを読み込む関数
-    loadBGM: function(url) {
+    loadBGM: function (name, url) {
         if (!this.ctx) this.init();
         return fetch(url)
             .then(response => response.arrayBuffer())
             .then(arrayBuffer => this.ctx.decodeAudioData(arrayBuffer))
             .then(audioBuffer => {
-                this.bgmBuffer = audioBuffer;
+                this.buffers[name] = audioBuffer;
                 return audioBuffer;
             })
-            .catch(e => console.error("BGM Load Error:", e));
+            .catch(e => console.error(`BGM Load Error (${name}):`, e));
     },
 
-    // BGM再生
-    playBGM: function(vol = 0.5) {
-        if (!this.ctx || !this.bgmBuffer) return;
-        
-        // 既に再生中なら止める（二重再生防止）
+    // BGM再生 (名前を指定)
+    playBGM: function (name, vol = 0.5) {
+        if (!this.ctx || !this.buffers[name]) return;
+
+        // 同じ曲が既に流れていれば何もしない
+        if (this.currentBgmName === name && this.bgmSource) return;
+
         this.stopBGM();
 
         const source = this.ctx.createBufferSource();
-        source.buffer = this.bgmBuffer;
-        source.loop = true; // ループ再生
+        source.buffer = this.buffers[name];
+        source.loop = true;
 
         const gain = this.ctx.createGain();
         gain.gain.value = vol;
 
         source.connect(gain);
         gain.connect(this.ctx.destination);
-        
+
         source.start(0);
         this.bgmSource = source;
+        this.currentBgmName = name;
     },
 
-    stopBGM: function() {
+    stopBGM: function () {
         if (this.bgmSource) {
             try {
                 this.bgmSource.stop();
-            } catch(e) {} // 既に停止している場合のエラー無視
+            } catch (e) { }
             this.bgmSource = null;
+            this.currentBgmName = null;
         }
     },
 
-    playTone: function(freq, type, duration, vol = 0.1) {
+    playTone: function (freq, type, duration, vol = 0.1) {
         if (!this.ctx) return;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
@@ -71,7 +77,7 @@ const AudioSys = {
         osc.start();
         osc.stop(this.ctx.currentTime + duration);
     },
-    playNoise: function(duration, vol = 0.2) {
+    playNoise: function (duration, vol = 0.2) {
         if (!this.ctx) return;
         const bufferSize = this.ctx.sampleRate * duration;
         const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
@@ -88,19 +94,18 @@ const AudioSys = {
         gain.connect(this.ctx.destination);
         noise.start();
     },
-    
-    // 効果音系はそのまま
-    seJump: function() { this.playTone(300, 'square', 0.1, 0.1); },
-    seShoot: function() { this.playNoise(0.1, 0.1); },
-    seExplosion: function() { this.playNoise(0.3, 0.2); },
-    seClear: function() { 
-        this.stopBGM(); // クリア時にBGMを止める
-        this.playTone(523, 'sine', 0.2); 
-        setTimeout(()=>this.playTone(659, 'sine', 0.2), 200);
-        setTimeout(()=>this.playTone(783, 'sine', 0.4), 400);
+
+    seJump: function () { this.playTone(300, 'square', 0.1, 0.1); },
+    seShoot: function () { this.playNoise(0.1, 0.1); },
+    seExplosion: function () { this.playNoise(0.3, 0.2); },
+    seClear: function () {
+        this.stopBGM();
+        this.playTone(523, 'sine', 0.2);
+        setTimeout(() => this.playTone(659, 'sine', 0.2), 200);
+        setTimeout(() => this.playTone(783, 'sine', 0.4), 400);
     },
-    seGameOver: function() { 
-        this.stopBGM(); // ゲームオーバー時にBGMを止める
-        this.playTone(100, 'sawtooth', 0.5, 0.2); 
+    seGameOver: function () {
+        this.stopBGM();
+        this.playTone(100, 'sawtooth', 0.5, 0.2);
     }
 };

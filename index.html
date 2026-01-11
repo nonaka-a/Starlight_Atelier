@@ -1,23 +1,30 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>まいまいの ほしぞら工房</title>
     <link rel="stylesheet" href="game.css">
 </head>
+
 <body>
 
     <div id="main-wrapper">
-        
+
         <div id="game-container">
             <canvas id="game-canvas"></canvas>
-            
- <!-- ★ここに追加: アイテムカウンター -->
-    <div id="item-counter">
-        <span class="counter-icon">🟡</span>
-        <span id="score-text">0</span>
-    </div>
+
+            <!-- ステージ遷移演出 -->
+            <div id="screen-transition">
+                <div id="location-name">ほしあかりの森</div>
+            </div>
+
+            <!-- ★ここに追加: アイテムカウンター -->
+            <div id="item-counter">
+                <span class="counter-icon">🟡</span>
+                <span id="score-text">0</span>
+            </div>
 
             <!-- ロード画面 -->
             <div id="screen-load" class="overlay">
@@ -51,38 +58,41 @@
                 </div>
             </div>
 
-        <!-- タッチ操作UI -->
-        <div id="ui-container">
-            <!-- 左下: 十字キー -->
-            <div class="dpad">
-                <!-- 配置用スペース -->
-                <div style="grid-column:2; grid-row:1;"></div>
-                <div id="btn-left" class="dpad-btn">←</div>
-                <div id="btn-down" class="dpad-btn">↓</div>
-                <div id="btn-right" class="dpad-btn">→</div>
+            <!-- タッチ操作UI -->
+            <div id="ui-container">
+                <!-- 左下: 十字キー -->
+                <div class="dpad">
+                    <!-- 配置用スペース -->
+                    <div style="grid-column:2; grid-row:1;"></div>
+                    <div id="btn-left" class="dpad-btn">←</div>
+                    <div id="btn-down" class="dpad-btn">↓</div>
+                    <div id="btn-right" class="dpad-btn">→</div>
+                </div>
+
+                <div class="center-panel">
+                    <!-- ズームボタン削除 -->
+                </div>
+
+                <!-- 右下: アクションボタン -->
+                <div class="action-pad">
+                    <div id="btn-attack" class="action-btn btn-attack">B</div>
+                    <div id="btn-jump" class="action-btn btn-jump">A</div>
+                </div>
             </div>
 
-            <div class="center-panel">
-    <!-- ズームボタン削除 -->
-    <!-- <div id="btn-zoom-in" class="func-btn" title="ズームイン">🔍+</div> -->
-    <!-- <div id="btn-zoom-out" class="func-btn" title="ズームアウト">🔍-</div> -->
-    <div id="btn-fullscreen" class="func-btn" title="フルスクリーン">⛶</div>
-    <div id="btn-mute" class="func-btn" title="ミュート">🔊</div>
-</div>
-
-            <!-- 右下: アクションボタン -->
-            <div class="action-pad">
-                <div id="btn-attack" class="action-btn btn-attack">B</div>
-                <div id="btn-jump" class="action-btn btn-jump">A</div>
+            <!-- 画面中央下の設定ボタン -->
+            <div id="control-panel">
+                <div id="btn-fullscreen" class="func-btn" title="フルスクリーン">⛶</div>
+                <div id="btn-mute" class="func-btn" title="ミュート">🔊</div>
             </div>
+
         </div>
 
-    </div>
-
-    <!-- キャッシュ対策 -->
-<script src="audio.js?v=4.0"></script>
-<script src="constants.js?v=4.0"></script>
-<script src="engine.js?v=4.0"></script>
-<script src="game.js?v=4.0"></script>
+        <!-- キャッシュ対策 -->
+        <script src="audio.js?v=4.0"></script>
+        <script src="constants.js?v=4.0"></script>
+        <script src="engine.js?v=4.0"></script>
+        <script src="game.js?v=4.0"></script>
 </body>
+
 </html>

@@ -20,8 +20,9 @@ function setupControls() {
     window.addEventListener('keydown', (e) => {
         // ★修正: BGM再生トリガーを追加
         AudioSys.init();
-        if(typeof AudioSys.playBGM === 'function' && !AudioSys.bgmSource && AudioSys.bgmBuffer && !isMuted) {
-            AudioSys.playBGM(0.3);
+        if (typeof AudioSys.playBGM === 'function' && !AudioSys.bgmSource && !AudioSys.isMuted) {
+            const bgmName = (typeof isAtelierMode !== 'undefined' && isAtelierMode) ? 'atelier' : 'forest';
+            AudioSys.playBGM(bgmName, 0.3);
         }
 
         if (e.code === 'Space') keys.Space = true;
@@ -30,7 +31,7 @@ function setupControls() {
         if (e.code === 'ArrowDown') keys.ArrowDown = true;
         if (e.code === 'KeyB' || e.code === 'KeyZ') keys.KeyB = true;
     });
-    
+
     window.addEventListener('keyup', (e) => {
         if (e.code === 'Space') keys.Space = false;
         if (e.code === 'ArrowLeft') keys.ArrowLeft = false;
@@ -45,27 +46,28 @@ function setupTouchControls() {
     const bindTouch = (id, code) => {
         const btn = document.getElementById(id);
         if (!btn) return;
-        
+
         const down = (e) => {
-            if(e.cancelable) e.preventDefault();
-            
+            if (e.cancelable) e.preventDefault();
+
             // ★修正: BGM再生トリガーを追加
             AudioSys.init();
-            if(typeof AudioSys.playBGM === 'function' && !AudioSys.bgmSource && AudioSys.bgmBuffer && !isMuted) {
-                AudioSys.playBGM(0.3);
+            if (typeof AudioSys.playBGM === 'function' && !AudioSys.bgmSource && !AudioSys.isMuted) {
+                const bgmName = (typeof isAtelierMode !== 'undefined' && isAtelierMode) ? 'atelier' : 'forest';
+                AudioSys.playBGM(bgmName, 0.3);
             }
 
             keys[code] = true;
             btn.classList.add('active');
         };
-        
+
         const up = (e) => {
-            if(e.cancelable) e.preventDefault();
+            if (e.cancelable) e.preventDefault();
             keys[code] = false;
             btn.classList.remove('active');
         };
 
-        btn.addEventListener('touchstart', down, {passive: false});
+        btn.addEventListener('touchstart', down, { passive: false });
         btn.addEventListener('touchend', up);
         btn.addEventListener('mousedown', down);
         btn.addEventListener('mouseup', up);
@@ -78,7 +80,7 @@ function setupTouchControls() {
     bindTouch('btn-jump', 'Space');
     bindTouch('btn-attack', 'KeyB');
 
-    
+
     document.getElementById('btn-fullscreen')?.addEventListener('click', toggleFullScreen);
     document.getElementById('btn-mute')?.addEventListener('click', toggleMute);
 }
@@ -96,42 +98,43 @@ function toggleFullScreen() {
     }
 }
 
-let isMuted = false;
+// let isMuted = false; // 削除: AudioSys.isMutedを使用
 function toggleMute() {
-    isMuted = !isMuted;
-    if(AudioSys.ctx) {
-        if(isMuted) {
+    AudioSys.isMuted = !AudioSys.isMuted;
+    if (AudioSys.ctx) {
+        if (AudioSys.isMuted) {
             AudioSys.ctx.suspend();
         } else {
             AudioSys.ctx.resume();
             // ミュート解除時に再生されていなければ再生
-            if(typeof AudioSys.playBGM === 'function' && !AudioSys.bgmSource && AudioSys.bgmBuffer) {
-                AudioSys.playBGM(0.3);
+            if (typeof AudioSys.playBGM === 'function' && !AudioSys.bgmSource) {
+                const bgmName = (typeof isAtelierMode !== 'undefined' && isAtelierMode) ? 'atelier' : 'forest';
+                AudioSys.playBGM(bgmName, 0.3);
             }
         }
     }
     const btn = document.getElementById('btn-mute');
-    btn.textContent = isMuted ? "🔇" : "🔊";
+    if (btn) btn.textContent = AudioSys.isMuted ? "🔇" : "🔊";
 }
 
 function fitWindow() {
     const wrapper = document.getElementById('main-wrapper');
     // UIパネル分の高さ加算(+160)を削除し、純粋にCanvasサイズで計算
-    const totalHeight = CANVAS_HEIGHT; 
+    const totalHeight = CANVAS_HEIGHT;
     const totalWidth = CANVAS_WIDTH;
-    
+
     // ウィンドウサイズに合わせてスケール計算
     const scaleX = window.innerWidth / totalWidth;
     const scaleY = window.innerHeight / totalHeight;
     const scale = Math.min(scaleX, scaleY); // 画面に収まる最大サイズ
-    
+
     wrapper.style.transform = `scale(${scale})`;
 }
 
 // --- 衝突判定ユーティリティ ---
 function checkRectCollision(r1, r2) {
     return r1.x < r2.x + r2.width &&
-           r1.x + r1.width > r2.x &&
-           r1.y < r2.y + r2.height &&
-           r1.y + r1.height > r2.y;
+        r1.x + r1.width > r2.x &&
+        r1.y < r2.y + r2.height &&
+        r1.y + r1.height > r2.y;
 }

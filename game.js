@@ -10,7 +10,6 @@ let tileDefs = {};
 // 定数は constants.js で定義済み
 
 const BG_SRC = 'image/BG01.jpg'; // 背景画像のパス
-const BGM_SRC = 'sounds/stage_bgm1.mp3'; // ★追加: BGMのパス
 
 let tilesetImage = new Image();
 let charImage = new Image();
@@ -45,6 +44,7 @@ const player = {
 
 let enemies = [];
 let bullets = [];
+let atelierStations = []; // ★追加: 工房内の設備(UI表示用)
 let score = 0;
 
 /**
@@ -58,9 +58,10 @@ window.onload = () => {
     charImage.src = CHAR_SRC;
     bgImage.src = BG_SRC;
 
-    // ★追加: BGMの読み込みを開始
+    // ★追加: 各BGMの読み込みを開始
     if (typeof AudioSys !== 'undefined' && AudioSys.loadBGM) {
-        AudioSys.loadBGM(BGM_SRC);
+        AudioSys.loadBGM('forest', FOREST_BGM_SRC);
+        AudioSys.loadBGM('atelier', ATELIER_BGM_SRC);
     }
 
     document.getElementById('file-input').addEventListener('change', manualLoadMap);
@@ -82,18 +83,7 @@ window.onload = () => {
 };
 
 function tryAutoLoad() {
-    fetch(MAP_FILE_SRC)
-        .then(res => {
-            if (!res.ok) throw new Error();
-            return res.json();
-        })
-        .then(data => {
-            currentLevelData = data; // ★追加: データを保存
-            initGameWithData(data);
-        })
-        .catch(() => {
-            document.getElementById('screen-load').style.display = 'flex';
-        });
+    loadStage(MAP_FILE_SRC);
 }
 
 function manualLoadMap(e) {
@@ -110,6 +100,15 @@ function manualLoadMap(e) {
         }
     };
     reader.readAsText(file);
+}
+
+// ★追加: スコア表示更新用
+function updateScoreDisplay() {
+    const st = document.getElementById('score-text');
+    if (st) {
+        // 所持合計 + 今拾った数
+        st.textContent = totalItemCount + score;
+    }
 }
 
 function initGameWithData(json) {
@@ -244,8 +243,7 @@ function setupGame() {
     fitWindow();
 
     score = 0;
-    const st = document.getElementById('score-text');
-    if (st) st.textContent = score;
+    updateScoreDisplay();
 
     enemies = [];
     bullets = [];
@@ -286,6 +284,24 @@ function scanMapAndSetupObjects() {
                 });
                 cell.id = 0; // マップ上から敵タイルを消す
             }
+            // ★追加: 工房の設備 (ID 112, 113, 114, 115)
+            else if ([112, 113, 114, 115].includes(cell.id)) {
+                let text = "";
+                if (cell.id === 112) text = "さがす";
+                if (cell.id === 113) text = "つくる";
+                if (cell.id === 114) text = "うちあげる";
+                if (cell.id === 115) text = "ほしを見る";
+
+                // DOM要素作成は廃止し、データのみ保持
+                atelierStations.push({
+                    x: x * TILE_SIZE + TILE_SIZE / 2, // 中心座標
+                    y: y * TILE_SIZE + TILE_SIZE / 2, // ★修正: タイル中心に合わせる
+                    text: text,
+                    id: cell.id
+                });
+
+                cell.id = 0; // ★修正: タイルを隠す（削除する）
+            }
         }
     }
     updateCamera();
@@ -325,6 +341,8 @@ window.updateCamera = function () {
 
     camera.x = camX;
     camera.y = camY;
+
+    // ワールドUIの位置更新(DOM版)は削除
 }
 
 function update() {
@@ -588,6 +606,21 @@ function checkTileAt(x, y) {
         const cell = mapData[1][row][col];
         const prop = getTileProp(cell.id);
 
+        // ★追加: 工房設備のインタラクション
+        if (cell.id === 112) {
+            // さがす -> マップ遷移
+            // ※連続ロードを防ぐため、フラグ管理が必要かも
+            if (!player.isClear && !player.isDead) {
+                // AudioSys.seDecide(); // 決定音があれば鳴らす
+                loadStage('json/atume_stage2.json');
+            }
+            return;
+        }
+        if (cell.id === 113 || cell.id === 114) {
+            // つくる / うちあげる -> 現状は何もしない
+            return;
+        }
+
         if (prop.type === 'spike') {
             showGameOver();
         }
@@ -598,9 +631,9 @@ function checkTileAt(x, y) {
             cell.id = 0;
             AudioSys.playTone(1000, 'sine', 0.1);
             score++;
+            updateScoreDisplay();
             const st = document.getElementById('score-text');
             if (st) {
-                st.textContent = score;
                 st.parentElement.style.transform = "scale(1.2)";
                 setTimeout(() => st.parentElement.style.transform = "scale(1.0)", 100);
             }
@@ -611,6 +644,23 @@ function checkTileAt(x, y) {
 function checkInteraction() {
     const cx = player.x + player.width / 2;
     const cy = player.y + player.height / 2;
+
+    if (isAtelierMode) {
+        // 工房モード：タイル判定ではなく設備との距離判定
+        for (const st of atelierStations) {
+            // プレイヤーがウィンドウの範囲（タイルの位置付近）に重なっているか判定
+            if (Math.abs(cx - st.x) < TILE_SIZE && Math.abs(cy - st.y) < TILE_SIZE) {
+                if (st.id === 112) {
+                    if (!player.isClear && !player.isDead) {
+                        loadStage('json/atume_stage2.json');
+                    }
+                    return;
+                }
+            }
+        }
+    }
+
+    // 工房モードでも通常タイル判定（アイテム取得など）は常に行う
     checkTileAt(cx, cy);
     checkTileAt(cx, player.y + player.height - 2);
 
@@ -632,6 +682,14 @@ function showGameOver() {
     if (player.isDead) return;
     player.isDead = true;
     AudioSys.seGameOver();
+
+    // ★追加: やられたら「今拾った分」は没収 (所持金/トータルは残すのが一般的だが、
+    // 前のタスク16では「クリアする」となっていたので、もし全部消すならここ)
+    // 今回は「森でゴールできたら所持してほしい」とのことなので、
+    // ゴールする前の分(score)だけをリセットすることにする。
+    score = 0;
+    updateScoreDisplay();
+
     document.getElementById('screen-gameover').style.display = 'flex';
 }
 
@@ -642,6 +700,8 @@ function showGameClear() {
 
     // ★追加: ゴール時にアイテムを保存（持越し）
     totalItemCount += score;
+    score = 0; // 保存したのでリセット
+    updateScoreDisplay();
     console.log("Total Items:", totalItemCount);
 
     document.getElementById('screen-clear').style.display = 'flex';
@@ -660,6 +720,9 @@ function draw() {
     drawLayer(0);
     drawLayer(1);
 
+    // ★追加: 工房ウィンドウを描画 (プレイヤーの後ろ)
+    drawAtelierWindows();
+
     for (const e of enemies) {
         drawTile(e.x, e.y, { id: e.tileId, rot: e.rot, fx: e.fx, fy: e.fy });
     }
@@ -673,8 +736,58 @@ function draw() {
 
     ctx.restore();
 
-    // ★追加: ビネット効果（最前面）
-    drawVignette();
+    // ★追加: ビネット効果（最前面）※工房では表示しない
+    if (!isAtelierMode) {
+        drawVignette();
+    }
+}
+
+// ★追加: 工房ウィンドウ描画 (Canvas)
+function drawAtelierWindows() {
+    if (!isAtelierMode) return;
+
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "bold 28px 'M PLUS Rounded 1c', sans-serif"; // フォントを大きく
+
+    for (const st of atelierStations) {
+        const x = st.x;
+        const y = st.y; // タイル中心に表示
+
+        // ウィンドウのサイズとスタイル (さらに大きく、ポップに)
+        const w = 180;
+        const h = 80;
+        const r = 20; // 角丸を大きくしてポップに
+
+        // 影
+        ctx.fillStyle = "rgba(0,0,0,0.2)";
+        ctx.beginPath();
+        ctx.roundRect(x - w / 2 + 6, y - h / 2 + 6, w, h, r);
+        ctx.fill();
+
+        // 枠 (白)
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.roundRect(x - w / 2, y - h / 2, w, h, r);
+        ctx.fill();
+
+        // 縁取りとテキストの色 (ID 115は紫、他はオレンジ)
+        ctx.lineWidth = 6;
+        if (st.id === 115) {
+            ctx.strokeStyle = "#8233ff"; // 濃いめの紫
+            ctx.stroke();
+            ctx.fillStyle = "#6622dd";   // テキスト濃い紫
+        } else {
+            ctx.strokeStyle = "#ffaa00"; // オレンジ
+            ctx.stroke();
+            ctx.fillStyle = "#e67e22";   // テキストオレンジ
+        }
+
+        // テキスト
+        ctx.fillText(st.text, x, y);
+    }
+    ctx.restore();
 }
 
 function drawBackground() {
@@ -812,24 +925,65 @@ window.resetGame = function () {
     initGameWithData(currentLevelData);
 
     // 4. BGM再開 (止まっていた場合)
-    if (typeof AudioSys !== 'undefined' && AudioSys.bgmBuffer && !isMuted) {
-        AudioSys.playBGM(0.3);
+    if (typeof AudioSys !== 'undefined' && !AudioSys.isMuted) {
+        const bgmName = isAtelierMode ? 'atelier' : 'forest';
+        AudioSys.playBGM(bgmName, 0.3);
     }
 };
 
 // ★追加: 工房へ移動する関数
 window.goToAtelier = function () {
     document.getElementById('screen-clear').style.display = 'none';
-    isAtelierMode = true;
+    loadStage(ATELIER_MAP_SRC, true);
+};
 
-    // 工房マップをロード
-    fetch(ATELIER_MAP_SRC)
+// ★追加: 汎用ステージ読み込み処理
+window.loadStage = function (url, isAtelier = false) {
+    // 既存UIのクリア
+    const layer = document.getElementById('world-ui-layer');
+    if (layer) layer.innerHTML = '';
+    atelierStations = [];
+
+    // ステージ遷移演出の開始
+    const transition = document.getElementById('screen-transition');
+    const locText = document.getElementById('location-name');
+    if (transition && locText) {
+        // 場所名の設定
+        let name = "ほしあかりの森";
+        if (isAtelier || url.includes("atelier")) name = "工房";
+
+        locText.textContent = name;
+        locText.classList.remove('fade-in-text');
+        void locText.offsetWidth; // リフロー強制
+        locText.classList.add('fade-in-text');
+
+        transition.style.display = 'flex';
+        transition.classList.remove('fade-out');
+        transition.style.opacity = '1';
+    }
+
+    // 次のステージへ行く前に現在のスコアをトータルに加算（工房での取得分などの保存）
+    totalItemCount += score;
+    score = 0;
+
+    isAtelierMode = isAtelier;
+
+    // BGMの切り替え
+    if (typeof AudioSys !== 'undefined' && !AudioSys.isMuted) {
+        const bgmName = isAtelier ? 'atelier' : 'forest';
+        AudioSys.playBGM(bgmName, 0.3);
+    }
+
+    fetch(url)
         .then(res => {
             if (!res.ok) throw new Error('Not found');
             return res.json();
         })
         .then(data => {
-            // ★修正: プレイヤー状態のリセット（これをしないと isClear=true のままで動かない）
+            currentLevelData = data;
+            initGameWithData(data);
+
+            // フラグ等のリセット
             player.isDead = false;
             player.isClear = false;
             player.vx = 0;
@@ -838,24 +992,24 @@ window.goToAtelier = function () {
             player.state = "idle";
             player.dropTimer = 0;
 
-            // 工房ではBGMを変えたりするかもしれないが、とりあえずそのまま
-            // マップ初期化
-            currentLevelData = data;
-            initGameWithData(data);
-
-            // プレイヤー位置などの微調整が必要ならここで行う
-            // 例: player.x = ...
-
-            // スコア表示のリセット（工房でのスコア扱いは仕様次第だが、とりあえず0表示）
+            // 今のステージの取得数をリセット
             score = 0;
-            const st = document.getElementById('score-text');
-            if (st) st.textContent = totalItemCount; // ここで所持数を表示しても良いかも
+            updateScoreDisplay();
+
+            // 2.2秒後に暗転解除 (1秒延長)
+            setTimeout(() => {
+                if (transition) {
+                    transition.classList.add('fade-out');
+                    setTimeout(() => {
+                        transition.style.display = 'none';
+                    }, 1000);
+                }
+            }, 2200);
+
         })
         .catch(err => {
             console.error(err);
-            alert("工房データが見つかりませんでした");
-            // 失敗したらリセットして元のステージに戻すなどが安全
-            isAtelierMode = false;
-            resetGame();
+            alert("ステージデータが見つかりませんでした: " + url);
+            if (transition) transition.style.display = 'none';
         });
 };

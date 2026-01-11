@@ -13,21 +13,26 @@ body {
     /* モバイルでの選択防止 */
     user-select: none;
     -webkit-user-select: none;
-    background-color: #222; /* 背景色を少し暗めに */
+    background-color: #222;
+    /* 背景色を少し暗めに */
     color: #eee;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     font-family: 'M PLUS Rounded 1c', sans-serif;
-    touch-action: none; /* ピンチズームなどを無効化 */
+    touch-action: none;
+    /* ピンチズームなどを無効化 */
 }
 
 /* 全体ラッパー: 画面サイズに合わせて縮小拡大 */
 #main-wrapper {
-    position: relative; /* 子要素の基準点 */
-    width: 1000px;  /* engine.jsのCANVAS_WIDTHに合わせる */
-    height: 600px; /* engine.jsのCANVAS_HEIGHTに合わせる */
+    position: relative;
+    /* 子要素の基準点 */
+    width: 1000px;
+    /* engine.jsのCANVAS_WIDTHに合わせる */
+    height: 600px;
+    /* engine.jsのCANVAS_HEIGHTに合わせる */
     transform-origin: center center;
     background-color: #000;
     box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
@@ -58,13 +63,18 @@ canvas {
     left: 0;
     width: 100%;
     height: 100%;
-    pointer-events: none; /* UIのない場所はゲーム画面を操作できるようにする */
+    pointer-events: none;
+    /* UIのない場所はゲーム画面を操作できるようにする */
     z-index: 100;
-    display: block; /* flexからblockに変更して絶対配置しやすくする */
+    display: block;
+    /* flexからblockに変更して絶対配置しやすくする */
 }
 
 /* 操作可能な要素だけ入力を受け付ける */
-.dpad, .action-pad, .center-panel, .func-btn {
+.dpad,
+.action-pad,
+.center-panel,
+.func-btn {
     pointer-events: auto;
 }
 
@@ -85,7 +95,8 @@ canvas {
 .dpad-btn {
     width: 75px;
     height: 75px;
-    background: #444; /* 不透明 */
+    background: #444;
+    /* 不透明 */
     border-radius: 12px;
     border: 2px solid #666;
     color: #fff;
@@ -96,7 +107,8 @@ canvas {
     cursor: pointer;
     touch-action: none;
     box-shadow: 0 4px 0 #111;
-    opacity: 0.9; /* わずかに透過させつつ視認性確保 */
+    opacity: 0.9;
+    /* わずかに透過させつつ視認性確保 */
 }
 
 .dpad-btn:active,
@@ -117,7 +129,7 @@ canvas {
     grid-column: 2;
     grid-row: 2;
     /* 位置調整 */
-    transform: translateY(0); 
+    transform: translateY(0);
 }
 
 #btn-down:active,
@@ -131,15 +143,9 @@ canvas {
 }
 
 
-/* 中央: 機能ボタン (画面上部中央へ移動) */
+/* パネルは index.html から空にしたが一応スタイルは消しておく */
 .center-panel {
-    position: absolute;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 15px;
-    align-items: center;
+    display: none;
 }
 
 .func-btn {
@@ -200,7 +206,8 @@ canvas {
 .btn-jump {
     background: #d64545;
     border-color: #ff6b6b;
-    margin-bottom: 20px; /* ジャンプボタンを少し上に配置 */
+    margin-bottom: 20px;
+    /* ジャンプボタンを少し上に配置 */
 }
 
 .btn-attack {
@@ -220,7 +227,8 @@ canvas {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    z-index: 200; /* UIより前面に */
+    z-index: 200;
+    /* UIより前面に */
     display: none;
 }
 
@@ -236,11 +244,19 @@ canvas {
 }
 
 @keyframes popIn {
-    0% { transform: scale(0.5); opacity: 0; }
-    100% { transform: scale(1); opacity: 1; }
+    0% {
+        transform: scale(0.5);
+        opacity: 0;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
-h1, h2 {
+h1,
+h2 {
     margin: 0 0 15px 0;
     color: #ff6b6b;
     text-shadow: 2px 2px 0 #ffd3d3;
@@ -316,13 +332,14 @@ input[type="file"] {
     display: flex;
     align-items: center;
     gap: 8px;
-    box-shadow: 0 4px 0 rgba(0,0,0,0.2);
+    box-shadow: 0 4px 0 rgba(0, 0, 0, 0.2);
     border: 3px solid #ffaa00;
     color: #d35400;
     font-family: 'M PLUS Rounded 1c', sans-serif;
     font-weight: 800;
     font-size: 24px;
-    z-index: 150; /* UIより手前 */
+    z-index: 150;
+    /* UIより手前 */
     pointer-events: none;
 }
 
@@ -333,4 +350,115 @@ input[type="file"] {
     align-items: center;
     justify-content: center;
     font-size: 24px;
+}
+
+/* --- ワールド内UI（カメラ追従） --- */
+#world-ui-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    /* ゲーム操作を邪魔しない */
+    overflow: hidden;
+    z-index: 5;
+}
+
+.world-window {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.8);
+    border: 2px solid #fff;
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: bold;
+    text-align: center;
+    white-space: nowrap;
+    transform: translate(-50%, -100%);
+    /* 座標を基準に上に表示 */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+    pointer-events: auto;
+    /* ボタンとしてクリック可能にする場合 */
+}
+
+/* --- 特殊効果: ステージ遷移 --- */
+#screen-transition {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+    display: none;
+    /* JSで制御 */
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    pointer-events: none;
+}
+
+#location-name {
+    color: #fff;
+    font-family: 'M PLUS Rounded 1c', sans-serif;
+    font-size: 64px;
+    font-weight: 900;
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.5), 0 0 40px rgba(255, 255, 0, 0.3);
+    opacity: 0;
+    transform: translateY(20px);
+}
+
+/* 遷移アニメーション用 */
+.fade-in-text {
+    animation: fadeInName 2.2s forwards;
+}
+
+@keyframes fadeInName {
+    0% {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    15% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    85% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+}
+
+#screen-transition.fade-out {
+    animation: fadeOutScreen 1s forwards;
+}
+
+@keyframes fadeOutScreen {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
+    }
+}
+
+/* --- 下部中央の設定パネル --- */
+#control-panel {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 15px;
+    z-index: 100;
+    pointer-events: auto;
 }
