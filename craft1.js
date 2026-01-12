@@ -26,6 +26,7 @@ const CraftMixing = {
     dragDistance: 0,
     blobPoints: [],
     pourWaitTimer: 0,
+    elapsedTime: 0, // ★追加: 落下開始からの経過時間
     lastMx: 0, // マウス速度計算用
     lastMy: 0,
 
@@ -214,7 +215,8 @@ const CraftMixing = {
                 r: 8 + Math.random() * 4,
                 color: '#FFD700',
                 isIngredient: true,
-                settled: false
+                settled: false,
+                landed: false // ★追加: 着地フラグ
             });
         }
 
@@ -227,6 +229,7 @@ const CraftMixing = {
             });
         }
         this.pourWaitTimer = 0;
+        this.elapsedTime = 0; // ★経過時間リセット
         this.dragDistance = 0;
 
         this.lastMx = Input.x - CraftManager.camera.x;
@@ -241,38 +244,101 @@ const CraftMixing = {
 
     updatePouring: function () {
         const cm = CraftManager;
-        let settledCount = 0;
-        const gravity = 0.5;
+        const particles = cm.currentStar.particles;
+        const gravity = 0.5; // 落下速度
+        const slopeGravity = 0.1; // ボウルの傾斜による重力（中央へ転がる力）
 
-        for (const p of cm.currentStar.particles) {
+        // ★時間経過による強制遷移 (2秒 = 120フレーム)
+        this.elapsedTime++;
+        if (this.elapsedTime > 120) {
+            cm.state = 'mixing';
+            return;
+        }
+
+        for (let i = 0; i < particles.length; i++) {
+            const p = particles[i];
             if (!p.isIngredient) continue;
 
-            if (!p.settled) {
+            // まだ着地していない場合（落下中）
+            if (!p.landed) {
                 p.vy += gravity;
                 p.y += p.vy;
 
+                // 地面に到達
                 if (p.y >= p.groundY) {
                     p.y = p.groundY;
                     p.x = p.groundX;
 
                     if (Math.abs(p.vy) > 2) {
-                        p.vy *= -0.3;
+                        p.vy *= -0.3; // バウンド
                         AudioSys.playNoise(0.05, 0.05);
                     } else {
                         p.vy = 0;
-                        p.settled = true;
+                        p.landed = true; // 着地完了
                     }
                 }
-            } else {
-                settledCount++;
             }
-        }
+            
+            // 着地後の挙動（ボウル中央へ転がる + 衝突）
+            if (p.landed) {
+                // 中央へのベクトル
+                const dx = this.baseX - p.x;
+                const dy = this.baseY - p.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
 
-        // 大半が止まったら次へ
-        if (settledCount >= cm.currentStar.particles.length * 0.9) {
-            this.pourWaitTimer++;
-            if (this.pourWaitTimer > 30) {
-                cm.state = 'mixing';
+                // 中央に向かう力を加える
+                if (dist > 5) {
+                    const angle = Math.atan2(dy, dx);
+                    // 外側ほど傾斜がきついイメージで力を強くする
+                    const force = slopeGravity * (dist / this.bowlRadius);
+                    p.vx += Math.cos(angle) * force;
+                    p.vy += Math.sin(angle) * force;
+                }
+
+                // 摩擦
+                p.vx *= 0.95;
+                p.vy *= 0.95;
+
+                p.x += p.vx;
+                p.y += p.vy;
+                
+                // ★衝突判定 (自分より後ろのインデックスのみチェック)
+                for (let j = i + 1; j < particles.length; j++) {
+                    const other = particles[j];
+                    if (!other.isIngredient || !other.landed) continue;
+                    
+                    const pdx = p.x - other.x;
+                    const pdy = p.y - other.y;
+                    const pdist = Math.sqrt(pdx * pdx + pdy * pdy);
+                    const minDist = p.r + other.r;
+                    
+                    if (pdist < minDist && pdist > 0) {
+                        // 重なっているので反発させる
+                        const overlap = (minDist - pdist) / 2;
+                        const angle = Math.atan2(pdy, pdx);
+                        
+                        const pushX = Math.cos(angle) * overlap;
+                        const pushY = Math.sin(angle) * overlap;
+                        
+                        p.x += pushX;
+                        p.y += pushY;
+                        other.x -= pushX;
+                        other.y -= pushY;
+                        
+                        // 速度も少し交換・減衰
+                        p.vx += pushX * 0.1;
+                        p.vy += pushY * 0.1;
+                        other.vx -= pushX * 0.1;
+                        other.vy -= pushY * 0.1;
+                    }
+                }
+
+                // ほぼ停止したら定着とみなす
+                if (Math.abs(p.vx) < 0.05 && Math.abs(p.vy) < 0.05) {
+                    p.settled = true;
+                } else {
+                    p.settled = false;
+                }
             }
         }
     },
@@ -280,6 +346,7 @@ const CraftMixing = {
     // --- State: Mixing ---
     updateMix: function () {
         const cm = CraftManager;
+        const particles = cm.currentStar.particles;
 
         // スタート演出管理
         if (!this.isMixingStarted) {
@@ -322,13 +389,12 @@ const CraftMixing = {
             if (dist < this.bowlRadius + 50) {
                 const moveDist = Math.sqrt(mvx * mvx + mvy * mvy);
                 this.dragDistance += moveDist;
-                // ★進捗は加算するが、100でストップせず継続可能に見せる
-                // (内部値は100で止めるが、UI表示や演出は続く)
+                
                 if (cm.currentStar.mixProgress < 100) {
                     cm.currentStar.mixProgress = Math.min(100, this.dragDistance / 150);
                 }
 
-                for (const p of cm.currentStar.particles) {
+                for (const p of particles) {
                     if (!p.isIngredient) continue;
                     const pdx = mx - p.x;
                     const pdy = my - p.y;
@@ -344,7 +410,8 @@ const CraftMixing = {
         }
 
         // 物理演算
-        for (const p of cm.currentStar.particles) {
+        for (let i = 0; i < particles.length; i++) {
+            const p = particles[i];
             if (!p.isIngredient) continue;
 
             p.vx *= 0.9;
@@ -352,14 +419,51 @@ const CraftMixing = {
             p.x += p.vx;
             p.y += p.vy;
 
-            // ボウル壁判定
-            const bdx = p.x - this.baseX;
-            const bdy = p.y - this.baseY;
-            const dist = Math.sqrt(bdx * bdx + bdy * bdy);
-            const limitR = this.bowlRadius - 15;
+            // ボウル中央への重力（傾斜）
+            const dx = this.baseX - p.x;
+            const dy = this.baseY - p.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
 
+            if (dist > 5) {
+                const angle = Math.atan2(dy, dx);
+                const force = 0.15 * (dist / this.bowlRadius);
+                p.vx += Math.cos(angle) * force;
+                p.vy += Math.sin(angle) * force;
+            }
+            
+            // ★衝突判定
+            for (let j = i + 1; j < particles.length; j++) {
+                const other = particles[j];
+                if (!other.isIngredient) continue;
+                
+                const pdx = p.x - other.x;
+                const pdy = p.y - other.y;
+                const pdist = Math.sqrt(pdx * pdx + pdy * pdy);
+                const minDist = p.r + other.r;
+                
+                if (pdist < minDist && pdist > 0) {
+                    const overlap = (minDist - pdist) / 2;
+                    const angle = Math.atan2(pdy, pdx);
+                    
+                    const pushX = Math.cos(angle) * overlap;
+                    const pushY = Math.sin(angle) * overlap;
+                    
+                    p.x += pushX;
+                    p.y += pushY;
+                    other.x -= pushX;
+                    other.y -= pushY;
+                    
+                    p.vx += pushX * 0.1;
+                    p.vy += pushY * 0.1;
+                    other.vx -= pushX * 0.1;
+                    other.vy -= pushY * 0.1;
+                }
+            }
+
+            // ボウル壁判定
+            const limitR = this.bowlRadius - 15;
             if (dist > limitR) {
-                const angle = Math.atan2(bdy, bdx);
+                const angle = Math.atan2(dy, dx);
                 p.x = this.baseX + Math.cos(angle) * limitR;
                 p.y = this.baseY + Math.sin(angle) * limitR;
                 p.vx *= -0.5;
@@ -369,10 +473,8 @@ const CraftMixing = {
 
         const progress = cm.currentStar.mixProgress / 100;
         if (progress > 0) {
-            // ドラッグ中かつ時間切れなどでない時のみ揺らす
-            const isActiveMixing = Input.isDown && this.isMixingStarted && !this.isTimeUp;
             for (const pt of this.blobPoints) {
-                const wave = isActiveMixing ? Math.sin(Date.now() / 150 + pt.angle * 3) * 5 : 0;
+                const wave = Math.sin(Date.now() / 150 + pt.angle * 3) * 5;
                 pt.currentR = pt.r + (pt.targetR - pt.r) * progress + wave;
             }
         }
@@ -459,7 +561,7 @@ const CraftMixing = {
 
 
         if (CraftManager.state === 'mixing') {
-            // --- 吹き出し (さらに左へ) ---
+            // --- 吹き出し (元の位置 +50 へ) ---
             this.drawCuteSpeechBubble(offsetX + 50, 480, 320, 70, "きじをしっかりまぜよう！");
 
             // --- 残り時間ウィンドウ (枠線太く) ---
