@@ -153,29 +153,43 @@ function initGameWithData(json) {
     tileDefs[119] = { id: 119, type: 'goal', solid: false };
 
 
-    // ★追加: タイルセット画像の動的切り替え
-    if (json.tilesetImage) {
-        // 画像読み込み完了を待ってからゲーム開始する必要があります
-        // (ゲームループ開始後に画像が変わるとチラつく可能性があるため)
-        tilesetImage.src = json.tilesetImage;
-
-        // ★修正: 既に読み込み済みの場合やキャッシュの場合に対応
-        if (tilesetImage.complete) {
+    // ★追加: タイルセット画像の動的切り替え (Promise化して確実に待つ)
+    return new Promise((resolve) => {
+        const onReady = () => {
             finishInitGame(json);
+            resolve();
+        };
+
+        if (json.tilesetImage) {
+            // 画像が同じ場合は読み込みイベントが発火しない場合があるためチェック
+            if (tilesetImage.src.includes(json.tilesetImage) && tilesetImage.complete) {
+                onReady();
+            } else {
+                tilesetImage.onload = onReady;
+                tilesetImage.onerror = () => {
+                    console.error("Tileset image load failed:", json.tilesetImage);
+                    onReady(); // 失敗しても進める
+                };
+                tilesetImage.src = json.tilesetImage;
+
+                // iPad/Safari対策: src代入直後に complete になる場合がある
+                if (tilesetImage.complete) {
+                    tilesetImage.onload = null;
+                    onReady();
+                }
+            }
         } else {
-            tilesetImage.onload = () => {
-                finishInitGame(json);
-            };
-            tilesetImage.onerror = () => {
-                console.error("Tileset image load failed");
-                alert("タイルセット画像の読み込みに失敗しました");
-                finishInitGame(json); // エラーでもとりあえず進める
-            };
+            onReady();
         }
-    } else {
-        // 設定がない場合はデフォルトを使用（既にwindow.onloadで設定済みだが念のため）
-        finishInitGame(json);
-    }
+
+        // フェイルセーフ: 3秒経っても読み込めない場合は強制的に進める
+        setTimeout(() => {
+            if (!isGameRunning) {
+                console.warn("Loading timeout - forcing start");
+                onReady();
+            }
+        }, 3000);
+    });
 }
 
 function finishInitGame(json) {
@@ -998,7 +1012,8 @@ window.loadStage = function (url, isAtelier = false) {
     if (layer) layer.innerHTML = '';
     atelierStations = [];
 
-    // ステージ遷移演出の開始
+    // ステージ遷移演出の開始時刻
+    const startTime = Date.now();
     const transition = document.getElementById('screen-transition');
     const locText = document.getElementById('location-name');
     if (transition && locText) {
@@ -1037,11 +1052,13 @@ window.loadStage = function (url, isAtelier = false) {
             if (!res.ok) throw new Error('Not found');
             return res.json();
         })
-        .then(data => {
+        .then(async data => {
             currentLevelData = data;
-            initGameWithData(data);
 
-            // フラグ等のリセット
+            // 重要: 画像の読み込み完了を確実に待機する
+            await initGameWithData(data);
+
+            // フラグ等のリセット (initGameの後に行う)
             player.isDead = false;
             player.isClear = false;
             player.vx = 0;
@@ -1049,16 +1066,16 @@ window.loadStage = function (url, isAtelier = false) {
             player.cooldown = 0;
             player.state = "idle";
             player.dropTimer = 0;
+            player.hp = player.maxHp;
+            player.invincible = 0;
 
             // 今のステージの取得数をリセット
             score = 0;
-            // ライフも回復（工房に戻った際、または新しいステージ開始時）
-            player.hp = player.maxHp;
-            player.invincible = 0;
             updateHPDisplay();
             updateScoreDisplay();
 
-            // 2.2秒後に暗転解除 (1秒延長)
+            // 遷移中の演出時間を考慮して暗転解除 (最低でも一定時間は表示を維持)
+            const remainingTime = Math.max(500, 2200 - (Date.now() - startTime));
             setTimeout(() => {
                 if (transition) {
                     transition.classList.add('fade-out');
@@ -1066,7 +1083,7 @@ window.loadStage = function (url, isAtelier = false) {
                         transition.style.display = 'none';
                     }, 1000);
                 }
-            }, 2200);
+            }, remainingTime);
 
         })
         .catch(err => {
