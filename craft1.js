@@ -190,11 +190,14 @@ const CraftMixing = {
         cm.drawBtn(btn);
     },
 
-    // --- State: Pouring ---
+   // --- State: Pouring ---
     initPouring: function () {
         const cm = CraftManager;
         cm.currentStar.particles = [];
-        const totalParticles = cm.craftAmount * 5;
+        
+        // ★修正: 視覚的な上限を30に設定
+        const visualAmount = Math.min(cm.craftAmount, 30);
+        const totalParticles = visualAmount * 5;
 
         for (let i = 0; i < totalParticles; i++) {
             const angle = Math.random() * Math.PI * 2;
