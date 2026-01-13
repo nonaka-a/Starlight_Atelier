@@ -8,13 +8,13 @@ const CraftFiring = {
     requiredTime: 180,
     isComplete: false,
 
-    init: function() {
+    init: function () {
         CraftManager.currentStar.bakeTemp = 20;
         this.timerInZone = 0;
         this.isComplete = false;
     },
 
-    update: function() {
+    update: function () {
         if (this.isComplete) {
             CraftManager.ui.btnNext.visible = true;
             return;
@@ -25,7 +25,7 @@ const CraftFiring = {
         if (Input.isJustPressed || keys.Space) {
             CraftManager.currentStar.bakeTemp += 8;
             CraftManager.addParticle(2000 + 500, 400, '#ff4500', 3);
-            if(keys.Space) keys.Space = false;
+            if (keys.Space) keys.Space = false;
         }
         if (CraftManager.currentStar.bakeTemp > 120) CraftManager.currentStar.bakeTemp = 120;
 
@@ -40,20 +40,29 @@ const CraftFiring = {
         }
     },
 
-    draw: function(offsetX) {
+    draw: function (offsetX) {
         const ctx = CraftManager.ctx;
+
+        // タイトルと吹き出し
+        CraftManager.drawTitle(offsetX, "ほし焼き");
+        CraftManager.drawSpeechBubble(offsetX, "温度に気をつけて 焼こう！");
+
+        // 進行度を黄色ウィンドウで表示
+        const progress = Math.min(100, Math.floor(this.timerInZone / this.requiredTime * 100));
+        CraftManager.drawYellowWindow(offsetX, 700, 480, 150, 100, "やき加減", progress + "%");
+
         ctx.fillStyle = '#444';
         ctx.fillRect(offsetX + 300, 200, 400, 300);
         ctx.fillStyle = `rgba(255, 100, 0, ${CraftManager.currentStar.bakeTemp / 150})`;
         ctx.fillRect(offsetX + 350, 250, 300, 200);
-        
+
         ctx.save();
         ctx.translate(offsetX + 500, 350);
-        
+
         let starColor = '#FFA500';
         if (CraftManager.currentStar.bakeTemp > 90) starColor = '#8b4513';
         else if (this.timerInZone > 60) starColor = '#f0e68c';
-        
+
         ctx.fillStyle = starColor;
         ctx.beginPath();
         CraftManager.drawStarShape(ctx, 0, 0, 60, 30);
@@ -72,8 +81,5 @@ const CraftFiring = {
         const curH = (CraftManager.currentStar.bakeTemp / 120) * barH;
         ctx.fillStyle = '#ff0000';
         ctx.fillRect(barX, barY + barH - curH, 30, curH);
-        const progress = Math.min(1, this.timerInZone / this.requiredTime);
-        ctx.fillStyle = '#fff';
-        ctx.fillText(`${Math.floor(progress * 100)}%`, offsetX + 500, 530);
     }
 };

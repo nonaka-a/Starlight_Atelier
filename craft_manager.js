@@ -164,19 +164,19 @@ const CraftManager = {
 
         // Craft 2 (Mold) - Offset 1000
         if (typeof CraftMolding !== 'undefined') {
-            this.drawTable(1000, "かたぬき タイミング！");
+            this.drawTable(1000, "");
             CraftMolding.draw(1000);
         }
 
         // Craft 3 (Fire) - Offset 2000
         if (typeof CraftFiring !== 'undefined') {
-            this.drawTable(2000, "かげんを みて焼こう！");
+            this.drawTable(2000, "");
             CraftFiring.draw(2000);
         }
 
         // Craft 4 (Polish) - Offset 3000
         if (typeof CraftPolishing !== 'undefined') {
-            this.drawTable(3000, "さいごの 仕上げ！");
+            this.drawTable(3000, "");
             CraftPolishing.draw(3000);
         }
 
@@ -308,8 +308,14 @@ const CraftManager = {
         if (!btn.visible && btn.visible !== undefined) return;
         const ctx = this.ctx;
 
-        // 影を先に描画 (CSSのbox-shadowに近い見た目)
-        ctx.fillStyle = '#36b0a8';
+        // ボタンの色に応じた影色の設定
+        let shadowColor = '#36b0a8'; // デフォルト (青緑系)
+        if (color === '#ff6b6b') {
+            shadowColor = '#d64545'; // 赤系
+        }
+
+        // 影を先に描画
+        ctx.fillStyle = shadowColor;
         ctx.beginPath();
         ctx.roundRect(btn.x, btn.y + 5, btn.w, btn.h, 30);
         ctx.fill();
@@ -364,6 +370,117 @@ const CraftManager = {
         ctx.font = "bold 32px 'M PLUS Rounded 1c', sans-serif";
         ctx.textAlign = 'center';
         ctx.fillText(title, offsetX + 500, 100);
+    },
+
+    // --- 共通UI描画ヘルパー ---
+
+    // 画面上部中央に表示するミニゲームタイトル
+    drawTitle: function (offsetX, text) {
+        const ctx = this.ctx;
+        const cx = offsetX + 500;
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = "900 48px 'M PLUS Rounded 1c', sans-serif";
+        ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+        ctx.shadowBlur = 10;
+        ctx.shadowOffsetY = 4;
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 8;
+        ctx.strokeText(text, cx, 60);
+        ctx.shadowColor = "transparent";
+        ctx.fillStyle = '#ff6b6b';
+        ctx.fillText(text, cx, 60);
+        ctx.restore();
+    },
+
+    // 左下に表示する吹き出しテキスト
+    drawSpeechBubble: function (offsetX, text) {
+        const ctx = this.ctx;
+        const x = offsetX + 50;
+        const y = 480;
+        const w = 350;
+        const h = 80;
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.shadowColor = "rgba(0, 0, 0, 0.2)";
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 4;
+        ctx.fillStyle = '#fff';
+        ctx.strokeStyle = '#ff6b6b';
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.roundRect(0, 0, w, h, 30);
+        ctx.fill();
+        ctx.shadowColor = "transparent";
+        ctx.stroke();
+
+        // 吹き出しのしっぽ
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        const tailX = w * 0.7;
+        ctx.moveTo(tailX, h - 3);
+        ctx.quadraticCurveTo(tailX + 10, h + 20, tailX + 20, h - 3);
+        ctx.fill();
+        ctx.lineWidth = 5;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(tailX - 2, h - 1);
+        ctx.quadraticCurveTo(tailX + 10, h + 24, tailX + 22, h - 1);
+        ctx.stroke();
+
+        ctx.fillStyle = '#555';
+        ctx.font = "bold 22px 'M PLUS Rounded 1c', sans-serif";
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, w / 2, h / 2 + 2);
+        ctx.restore();
+    },
+
+    // 情報表示用の黄色枠ウィンドウ
+    drawYellowWindow: function (offsetX, cx, cy, w, h, title, content, contentColor) {
+        const ctx = this.ctx;
+        const r = 15;
+        const tx = offsetX + cx;
+        const ty = cy;
+
+        ctx.save();
+        ctx.translate(tx - w / 2, ty - h / 2);
+
+        // 影
+        ctx.fillStyle = "rgba(0,0,0,0.2)";
+        ctx.beginPath();
+        ctx.roundRect(6, 6, w, h, r);
+        ctx.fill();
+
+        // 本体
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.roundRect(0, 0, w, h, r);
+        ctx.fill();
+
+        // 枠
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = "#ffaa00";
+        ctx.stroke();
+
+        // タイトル
+        if (title) {
+            ctx.fillStyle = "#e67e22";
+            ctx.font = "bold 16px 'M PLUS Rounded 1c', sans-serif";
+            ctx.textAlign = 'center';
+            ctx.fillText(title, w / 2, 25);
+        }
+
+        // 内容
+        if (content !== undefined) {
+            ctx.fillStyle = contentColor || "#333";
+            ctx.font = "bold 48px 'M PLUS Rounded 1c', sans-serif";
+            ctx.textAlign = 'center';
+            ctx.fillText(content, w / 2, title ? 65 : h / 2 + 15);
+        }
+        ctx.restore();
     },
 
     drawProgressBar: function (x, y, current, max) {

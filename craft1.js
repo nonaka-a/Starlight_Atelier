@@ -14,9 +14,9 @@ const CraftImages = {
 
     load: function () {
         if (this.loaded) return;
-        
+
         const path = 'image/craft_image/';
-        
+
         // 背景・ボウル
         this.bgBack.src = path + 'bg_bowl_back.png';
         this.bowlFront.src = path + 'bowl_front.png';
@@ -78,7 +78,7 @@ const CraftMixing = {
 
     // アニメーション用
     animFrameTimer: 0,
-    currentAnimFrame: 0, 
+    currentAnimFrame: 0,
 
     // --- State: Select ---
     updateSelect: function () {
@@ -228,7 +228,7 @@ const CraftMixing = {
     initPouring: function () {
         const cm = CraftManager;
         cm.currentStar.particles = [];
-        
+
         // 視覚的な上限を30に設定
         const visualAmount = Math.min(cm.craftAmount, 30);
         const totalParticles = visualAmount * 5;
@@ -241,7 +241,7 @@ const CraftMixing = {
             const groundY = this.baseY + Math.sin(angle) * r;
 
             const dropHeight = 300 + Math.random() * 200;
-            
+
             const vanishThreshold = 50 + Math.random() * 40;
 
             cm.currentStar.particles.push({
@@ -280,7 +280,7 @@ const CraftMixing = {
     updatePouring: function () {
         const cm = CraftManager;
         const particles = cm.currentStar.particles;
-        const gravity = 0.5; 
+        const gravity = 0.5;
         const slopeGravity = 0.1;
 
         this.elapsedTime++;
@@ -310,7 +310,7 @@ const CraftMixing = {
                     }
                 }
             }
-            
+
             if (p.landed) {
                 const dx = this.baseX - p.x;
                 const dy = this.baseY - p.y;
@@ -328,29 +328,29 @@ const CraftMixing = {
 
                 p.x += p.vx;
                 p.y += p.vy;
-                
+
                 // 衝突判定
                 for (let j = i + 1; j < particles.length; j++) {
                     const other = particles[j];
                     if (!other.isIngredient || !other.landed) continue;
-                    
+
                     const pdx = p.x - other.x;
                     const pdy = p.y - other.y;
                     const pdist = Math.sqrt(pdx * pdx + pdy * pdy);
                     const minDist = p.r + other.r;
-                    
+
                     if (pdist < minDist && pdist > 0) {
                         const overlap = (minDist - pdist) / 2;
                         const angle = Math.atan2(pdy, pdx);
-                        
+
                         const pushX = Math.cos(angle) * overlap;
                         const pushY = Math.sin(angle) * overlap;
-                        
+
                         p.x += pushX;
                         p.y += pushY;
                         other.x -= pushX;
                         other.y -= pushY;
-                        
+
                         p.vx += pushX * 0.1;
                         p.vy += pushY * 0.1;
                         other.vx -= pushX * 0.1;
@@ -417,7 +417,7 @@ const CraftMixing = {
             if (dist < this.bowlRadius + 50) {
                 const moveDist = Math.sqrt(mvx * mvx + mvy * mvy);
                 this.dragDistance += moveDist;
-                
+
                 if (cm.currentStar.mixProgress < 100) {
                     cm.currentStar.mixProgress = Math.min(100, this.dragDistance / 150);
                 }
@@ -456,28 +456,28 @@ const CraftMixing = {
                 p.vx += Math.cos(angle) * force;
                 p.vy += Math.sin(angle) * force;
             }
-            
+
             for (let j = i + 1; j < particles.length; j++) {
                 const other = particles[j];
                 if (!other.isIngredient) continue;
-                
+
                 const pdx = p.x - other.x;
                 const pdy = p.y - other.y;
                 const pdist = Math.sqrt(pdx * pdx + pdy * pdy);
                 const minDist = p.r + other.r;
-                
+
                 if (pdist < minDist && pdist > 0) {
                     const overlap = (minDist - pdist) / 2;
                     const angle = Math.atan2(pdy, pdx);
-                    
+
                     const pushX = Math.cos(angle) * overlap;
                     const pushY = Math.sin(angle) * overlap;
-                    
+
                     p.x += pushX;
                     p.y += pushY;
                     other.x -= pushX;
                     other.y -= pushY;
-                    
+
                     p.vx += pushX * 0.1;
                     p.vy += pushY * 0.1;
                     other.vx -= pushX * 0.1;
@@ -515,20 +515,7 @@ const CraftMixing = {
 
         // --- 画面上部 タイトル ---
         if (CraftManager.state === 'mixing') {
-            ctx.save();
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.font = "900 48px 'M PLUS Rounded 1c', sans-serif";
-            ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
-            ctx.shadowBlur = 10;
-            ctx.shadowOffsetY = 4;
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 8;
-            ctx.strokeText("きじづくり", cx, 60);
-            ctx.shadowColor = "transparent";
-            ctx.fillStyle = '#ff6b6b';
-            ctx.fillText("きじづくり", cx, 60);
-            ctx.restore();
+            CraftManager.drawTitle(offsetX, "きじづくり");
         }
 
         const progress = CraftManager.currentStar.mixProgress; // 0-100
@@ -556,7 +543,7 @@ const CraftMixing = {
         // --- ほしのもと (パーティクル) ---
         for (const p of CraftManager.currentStar.particles) {
             if (!p.isIngredient) continue;
-            
+
             let alpha = 1.0;
             if (progress > p.vanishThreshold) {
                 alpha = Math.max(0, 1.0 - (progress - p.vanishThreshold) / 10);
@@ -566,8 +553,8 @@ const CraftMixing = {
             if (ctx.globalAlpha > 0) {
                 const starImg = CraftImages.stars[p.imgIndex];
                 if (starImg && starImg.complete) {
-                    const size = p.r * 3; 
-                    ctx.drawImage(starImg, p.x - size/2, p.y - size/2, size, size);
+                    const size = p.r * 3;
+                    ctx.drawImage(starImg, p.x - size / 2, p.y - size / 2, size, size);
                 } else {
                     ctx.fillStyle = '#FFD700';
                     ctx.beginPath();
@@ -590,8 +577,10 @@ const CraftMixing = {
         }
 
         if (CraftManager.state === 'mixing') {
-            this.drawCuteSpeechBubble(offsetX + 50, 480, 320, 70, "きじをしっかりまぜよう！");
-            this.drawAtelierStyleTimer(offsetX + 850, 300, Math.ceil(this.timeLeft));
+            CraftManager.drawSpeechBubble(offsetX, "きじをしっかりまぜよう！");
+
+            const timeColor = this.timeLeft <= 3 ? '#ff4500' : '#333';
+            CraftManager.drawYellowWindow(offsetX, 850, 300, 120, 100, "のこり", Math.ceil(this.timeLeft), timeColor);
 
             if (!this.isMixingStarted) {
                 ctx.save();
@@ -609,71 +598,5 @@ const CraftMixing = {
                 ctx.restore();
             }
         }
-    },
-
-    // ヘルパー: かわいい吹き出し
-    drawCuteSpeechBubble: function (x, y, w, h, text) {
-        const ctx = CraftManager.ctx;
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.shadowColor = "rgba(0, 0, 0, 0.2)";
-        ctx.shadowBlur = 8;
-        ctx.shadowOffsetY = 4;
-        ctx.fillStyle = '#fff';
-        ctx.strokeStyle = '#ff6b6b';
-        ctx.lineWidth = 5; 
-        ctx.beginPath();
-        ctx.roundRect(0, 0, w, h, 30);
-        ctx.fill();
-        ctx.shadowColor = "transparent";
-        ctx.stroke();
-        ctx.fillStyle = '#fff';
-        ctx.beginPath();
-        const tailX = w * 0.7;
-        ctx.moveTo(tailX, h - 3);
-        ctx.quadraticCurveTo(tailX + 10, h + 20, tailX + 20, h - 3);
-        ctx.fill();
-        ctx.lineWidth = 5;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(tailX - 2, h - 1);
-        ctx.quadraticCurveTo(tailX + 10, h + 24, tailX + 22, h - 1);
-        ctx.stroke();
-        ctx.fillStyle = '#555';
-        ctx.font = "bold 22px 'M PLUS Rounded 1c', sans-serif";
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(text, w / 2, h / 2 + 2);
-        ctx.restore();
-    },
-
-    // ヘルパー: 工房スタイルタイマーウィンドウ
-    drawAtelierStyleTimer: function (cx, cy, time) {
-        const ctx = CraftManager.ctx;
-        const w = 120;
-        const h = 100;
-        const r = 15;
-        ctx.save();
-        ctx.translate(cx - w / 2, cy - h / 2);
-        ctx.fillStyle = "rgba(0,0,0,0.2)";
-        ctx.beginPath();
-        ctx.roundRect(6, 6, w, h, r);
-        ctx.fill();
-        ctx.fillStyle = "#fff";
-        ctx.beginPath();
-        ctx.roundRect(0, 0, w, h, r);
-        ctx.fill();
-        ctx.lineWidth = 6;
-        ctx.strokeStyle = "#ffaa00";
-        ctx.stroke();
-        ctx.fillStyle = "#e67e22";
-        ctx.font = "bold 16px 'M PLUS Rounded 1c', sans-serif";
-        ctx.textAlign = 'center';
-        ctx.fillText("のこり", w / 2, 25);
-        const timeColor = time <= 3 ? '#ff4500' : '#333';
-        ctx.fillStyle = timeColor;
-        ctx.font = "bold 48px 'M PLUS Rounded 1c', sans-serif";
-        ctx.fillText(time, w / 2, 65);
-        ctx.restore();
     }
 };
