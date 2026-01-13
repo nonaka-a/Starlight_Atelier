@@ -1057,18 +1057,20 @@ window.resetGameFromCraft = function (starRewardAmount) {
     }
 
     totalStarCount += starRewardAmount;
-    AudioSys.playTone(1200, 'sine', 0.3);
+    if (starRewardAmount > 0) {
+        AudioSys.playTone(1200, 'sine', 0.3);
+    }
     updateScoreDisplay();
 
-    // ★重要: 中断時(starRewardAmount === 0)などは、作業窓への即再入を防ぐため初期位置に戻す
-    if (starRewardAmount === 0) {
+    // ★修正: 完了時も中断時も、常に初期位置(入り口)に戻して作業台への再接触ループを防ぐ
+    if (spawnPoint) {
         player.x = spawnPoint.x;
         player.y = spawnPoint.y;
-        player.vx = 0;
-        player.vy = 0;
-        // 即座の誤操作防止のためクールダウンを設定
-        player.cooldown = 30;
     }
+    player.vx = 0;
+    player.vy = 0;
+    // 即座の誤操作防止のためクールダウンを設定
+    player.cooldown = 30;
 
     updateCamera();
 
