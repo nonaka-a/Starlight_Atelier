@@ -469,6 +469,7 @@ function chart_onCanvasMouseUp(e) {
 function chart_onKeyDown(e) {
     if (document.getElementById('mode-chart').classList.contains('active') === false) return;
     
+    // 削除 (Delete / Backspace)
     if (e.key === 'Delete' || e.key === 'Backspace') {
         if (chart_selectedIndices.size > 0) {
             const sortedIndices = Array.from(chart_selectedIndices).sort((a, b) => b - a);
@@ -476,6 +477,38 @@ function chart_onKeyDown(e) {
             chart_selectedIndices.clear();
             chart_draw();
         }
+    }
+
+    // 矢印キーでノーツ配置 (左:赤, 右:青)
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault(); // 画面スクロール防止
+
+        // ★追加: 長押し（キーリピート）の場合は無視して終了
+        if (e.repeat) return;
+
+        // 配置する時間を決定 (再生中は現在時刻、停止中は停止位置)
+        let noteTime = 0;
+        if (chart_isPlaying) {
+            noteTime = chart_audioCtx.currentTime - chart_startTime;
+        } else {
+            noteTime = chart_pauseTime;
+        }
+
+        if (noteTime < 0) noteTime = 0;
+
+        // レーン決定
+        const lane = (e.key === 'ArrowLeft') ? 'red' : 'blue';
+
+        // ノーツ追加
+        chart_data.push({
+            time: noteTime,
+            lane: lane,
+            type: 'normal'
+        });
+
+        // ソートして再描画
+        chart_data.sort((a, b) => a.time - b.time);
+        chart_draw();
     }
 }
 
