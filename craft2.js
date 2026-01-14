@@ -1,5 +1,6 @@
 /**
  * --- Craft 2: かた抜き (リニューアル版) ---
+ * 改修版: 外部譜面データ読み込み対応
  */
 const CraftMolding = {
     // 設定
@@ -7,9 +8,10 @@ const CraftMolding = {
         red: { y: 150, color: '#ffcdd2', borderColor: '#ef5350', key: 'ArrowLeft' },
         blue: { y: 250, color: '#bbdefb', borderColor: '#42a5f5', key: 'ArrowRight' }
     },
-    judgeX: 800, 
+    judgeX: 730, 
     spawnX: -150,
-    noteSpeed: 6, // 1フレームあたりの移動距離
+    noteSpeed: 6, // 1フレームあたりの移動距離 (px)
+    // 6px * 60fps = 360px/sec
     
     // BGM設定
     bgmName: 'craft2',
@@ -32,9 +34,16 @@ const CraftMolding = {
     isStarted: false,
     startAnimTimer: 0,
     startTime: 0,      // ゲーム開始時刻
-    chartData: [],     // 譜面データ
+    chartData: [],     // 譜面データ（プレイ用: spawnTime基準）
+    externalChart: null, // ★追加: エディタ等から渡される外部データ（hitTime基準）
     nextNoteIndex: 0,  // 次に生成するノーツのインデックス
     isFinished: false,
+
+    // ★追加: 外部から譜面データをセットするためのメソッド
+    // データ形式: [ { time: 2.5, lane: 'red', type: 'normal' }, { time: 4.0, lane: 'blue', type: 'long', duration: 1.0 }, ... ]
+    setChart: function(data) {
+        this.externalChart = data;
+    },
 
     init: function () {
         this.notes = [];
@@ -58,9 +67,56 @@ const CraftMolding = {
         AudioSys.loadBGM(this.bgmName, this.bgmSrc).then(buffer => {
             if (buffer) {
                 this.bgmDuration = buffer.duration;
-                this.generateChart(buffer.duration);
+
+                // ★変更: 外部データがあればそれをパース、なければランダム生成
+                if (this.externalChart && this.externalChart.length > 0) {
+                    this.parseExternalChart(this.externalChart);
+                    console.log("Loaded external chart:", this.chartData.length, "notes");
+                } else {
+                    this.generateChart(buffer.duration);
+                    console.log("Generated random chart:", this.chartData.length, "notes");
+                }
             }
         });
+    },
+
+    // ★追加: 外部データ(HitTime基準)を内部データ(SpawnTime基準)に変換
+    parseExternalChart: function(data) {
+        this.chartData = [];
+        
+        // 速度 (px/sec)
+        const speedPxPerSec = this.noteSpeed * 60;
+        // 出現から判定ラインまでの距離
+        const travelDistance = this.judgeX - this.spawnX;
+        // 到達にかかる時間 (sec)
+        const travelTime = travelDistance / speedPxPerSec;
+
+        data.forEach(note => {
+            // エディタ上の「叩く時間」から「出現させる時間」を逆算
+            // spawnTime = hitTime - travelTime
+            const spawnTime = note.time - travelTime;
+
+            let lengthPx = 0;
+            // ロングノーツの場合、時間(秒)をピクセル長さに変換
+            if (note.type === 'long') {
+                if (note.duration) {
+                    lengthPx = note.duration * speedPxPerSec;
+                } else {
+                    lengthPx = 250; // durationがない場合のデフォルト
+                }
+            }
+
+            this.chartData.push({
+                spawnTime: spawnTime,
+                lane: note.lane, // 'red' or 'blue'
+                type: note.type, // 'normal' or 'long'
+                length: lengthPx
+            });
+        });
+
+        // 出現時間順にソート
+        this.chartData.sort((a, b) => a.spawnTime - b.spawnTime);
+        this.totalNotes = this.chartData.length;
     },
 
     // 簡易譜面生成（BGM解析はできないため、BPMに合わせて規則的に配置）
@@ -86,11 +142,17 @@ const CraftMolding = {
             const isLong = Math.random() < 0.15;
             const lane = Math.random() < 0.6 ? (laneToggle ? 'red' : 'blue') : (Math.random() < 0.5 ? 'red' : 'blue');
             
+            // ロングノーツの場合は長さをランダム設定 (0.5拍〜2拍分くらい)
+            const noteDuration = isLong ? (beatInterval * (1 + Math.random())) : 0;
+            const speedPxPerSec = this.noteSpeed * 60;
+            const lengthPx = isLong ? noteDuration * speedPxPerSec : 0;
+
             if (spawnTime > 0) {
                 this.chartData.push({
                     spawnTime: spawnTime,
                     lane: lane,
-                    type: isLong ? 'long' : 'normal'
+                    type: isLong ? 'long' : 'normal',
+                    length: lengthPx
                 });
             }
 
@@ -148,11 +210,14 @@ const CraftMolding = {
             const n = this.notes[i];
             n.x += this.noteSpeed; 
 
-            if (n.x > 1100) {
+            // 画面外に出たら削除 (ロングノーツの場合はお尻が出るまで)
+            const tailX = n.x + (n.type === 'long' ? n.length : 0);
+            if (tailX > 1100) {
                 this.notes.splice(i, 1);
                 if (n.active && n.type === 'normal') {
                     this.showFeedback("ミス", "#888");
                 }
+                // ロングノーツの未処理判定はどうするか要検討だが、一旦スルー
             }
         }
 
@@ -164,13 +229,17 @@ const CraftMolding = {
     },
 
     spawnNote: function(chartInfo) {
+        // ★修正: lengthはデータから取得、無ければデフォルト
+        const length = chartInfo.length || (chartInfo.type === 'long' ? 250 : 0);
+        const width = chartInfo.type === 'long' ? length : 60;
+
         const note = {
             lane: chartInfo.lane,
             type: chartInfo.type,
             x: this.spawnX,
             y: this.laneSettings[chartInfo.lane].y,
-            length: chartInfo.type === 'long' ? 250 : 0, 
-            width: chartInfo.type === 'long' ? 250 : 60,
+            length: length, 
+            width: width,
             active: true
         };
         this.notes.push(note);
@@ -241,10 +310,18 @@ const CraftMolding = {
                 }
             } 
             else if (note.type === 'long') {
+                // ロングノーツの頭判定 (簡易実装)
+                // 本来は押し続け判定が必要だが、今回は「押し始め」だけでOKとするか、
+                // あるいは「押している間スコア加算」にするかは仕様次第。
+                // ここでは既存仕様に合わせて「範囲内で押したらOK」とする。
                 if (this.judgeX >= note.x && this.judgeX <= note.x + note.length) {
                     this.processHit(note, 0);
                     hit = true;
                     CraftManager.addParticle(this.judgeX, note.y, '#fff', 5);
+                    // ロングノーツは一度押しても非アクティブにしない（押し続け演出用）
+                    // ただし連打稼ぎを防ぐフラグが必要なら note.hit = true 等を追加する
+                    // 今回は簡易的に一度押したら非アクティブ化してしまう
+                    note.active = false; 
                     break;
                 }
             }
@@ -341,6 +418,7 @@ const CraftMolding = {
                 ctx.stroke();
             } else if (n.type === 'long') {
                 ctx.beginPath();
+                // ★修正: n.lengthを使用
                 ctx.roundRect(nx, ny + laneH/2 - 30, n.length, 60, 10);
                 ctx.fill();
                 ctx.strokeStyle = noteBorder;

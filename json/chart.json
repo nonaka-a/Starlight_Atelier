@@ -1,0 +1,33 @@
+[
+  {
+    "time": 4.4,
+    "lane": "red",
+    "type": "normal"
+  },
+  {
+    "time": 5.47,
+    "lane": "red",
+    "type": "normal"
+  },
+  {
+    "time": 6.36,
+    "lane": "red",
+    "type": "normal"
+  },
+  {
+    "time": 7.2,
+    "lane": "red",
+    "type": "normal"
+  },
+  {
+    "time": 7.75,
+    "lane": "red",
+    "type": "normal"
+  },
+  {
+    "time": 9.36,
+    "lane": "red",
+    "type": "long",
+    "duration": 2.6799999999999997
+  }
+]

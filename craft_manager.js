@@ -1,5 +1,6 @@
 /**
  * --- ほしぞら工房 クラフト統合マネージャー ---
+ * 修正: 外部譜面データの受け渡し機能追加
  */
 const CraftManager = {
     isActive: false,
@@ -14,6 +15,9 @@ const CraftManager = {
     // 共通データ
     craftAmount: 1,
     maxCraftAmount: 1,
+    
+    // ★追加: 外部から読み込んだ譜面データ
+    externalChartData: null,
 
     currentStar: {
         mixProgress: 0,
@@ -41,6 +45,12 @@ const CraftManager = {
             this.ctx = canvas.getContext('2d');
         }
         // 各モジュールの初期化があればここで呼ぶ
+    },
+    
+    // ★追加: 譜面データをセットするメソッド
+    loadChart: function(data) {
+        this.externalChartData = data;
+        console.log("譜面データをロードしました", data.length, "ノーツ");
     },
 
     start: function (maxMaterials) {
@@ -240,7 +250,15 @@ const CraftManager = {
         if (this.state === 'mixing') {
             this.state = 'molding';
             this.camera.targetX = 1000;
-            if (CraftMolding) CraftMolding.init();
+            
+            // ★追加: 譜面データがあればセット
+            if (CraftMolding) {
+                if (this.externalChartData) {
+                    CraftMolding.setChart(this.externalChartData);
+                }
+                CraftMolding.init();
+            }
+            
         } else if (this.state === 'molding') {
             this.state = 'firing';
             this.camera.targetX = 2000;

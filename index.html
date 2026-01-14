@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 
@@ -26,7 +27,7 @@
                 <span id="score-text">0</span>
             </div>
 
-            <!-- ★追加: 星カウンター -->
+            <!-- 星カウンター -->
             <div id="star-counter">
                 <span class="counter-icon">⭐</span>
                 <span id="star-text">0</span>
@@ -41,8 +42,16 @@
                 <div class="modal">
                     <h1>ゲームをはじめる</h1>
                     <p>マップデータが見つかりませんでした。</p>
-                    <label for="file-input" class="file-label">📂 JSONファイルを選択</label>
+                    <label for="file-input" class="file-label">📂 マップ(JSON)を選択</label>
                     <input type="file" id="file-input" accept=".json">
+                    
+                    <!-- 追加: 譜面データ読み込み -->
+                    <div style="margin-top:15px; border-top:1px dashed #aaa; padding-top:10px;">
+                        <p style="font-size:0.9rem; color:#555; margin-bottom:5px;">かた抜きゲーム用譜面 (任意)</p>
+                        <label for="chart-input" class="file-label" style="background:#468; border-color:#57a; font-size:0.9rem;">🎼 譜面(JSON)を選択</label>
+                        <input type="file" id="chart-input" accept=".json">
+                        <div id="chart-status" style="font-size:0.8rem; color:#4a4; margin-top:5px;"></div>
+                    </div>
                 </div>
             </div>
 
@@ -97,13 +106,41 @@
         <script src="engine.js?v=4.1"></script>
         
         <!-- クラフト分割 -->
-        <script src="craft_manager.js?v=4.1"></script>
+        <script src="craft_manager.js?v=4.2"></script>
         <script src="craft1.js?v=4.1"></script>
-        <script src="craft2.js?v=4.1"></script>
+        <script src="craft2.js?v=4.2"></script>
         <script src="craft3.js?v=4.1"></script>
         <script src="craft4.js?v=4.1"></script>
         
         <script src="game.js?v=4.1"></script>
+
+        <script>
+            // 譜面読み込み用スクリプト
+            document.getElementById('chart-input').addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = function(ev) {
+                    try {
+                        const data = JSON.parse(ev.target.result);
+                        if (Array.isArray(data)) {
+                            // CraftManagerにデータを渡す
+                            if (typeof CraftManager !== 'undefined') {
+                                CraftManager.loadChart(data);
+                                document.getElementById('chart-status').textContent = `「${file.name}」を読み込みました`;
+                            }
+                        } else {
+                            alert("譜面データの形式が正しくありません");
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        alert("読み込みに失敗しました");
+                    }
+                };
+                reader.readAsText(file);
+            });
+        </script>
 </body>
 
 </html>

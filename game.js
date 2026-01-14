@@ -1,3 +1,5 @@
+
+
 /**
  * --- ゲームの状態 ---
  */
@@ -83,6 +85,22 @@ window.onload = () => {
         .catch(() => {
             console.warn("アニメーションデータなし");
             tryAutoLoad();
+        });
+
+    // ★追加: 譜面データの自動読み込み
+    fetch('json/chart.json')
+        .then(res => {
+            if (!res.ok) throw new Error("Chart not found");
+            return res.json();
+        })
+        .then(data => {
+            if (typeof CraftManager !== 'undefined') {
+                CraftManager.loadChart(data);
+                console.log("譜面データ(chart.json)を自動読み込みしました");
+            }
+        })
+        .catch(err => {
+            console.log("chart.jsonが見つかりませんでした (ランダム生成モード)");
         });
 };
 

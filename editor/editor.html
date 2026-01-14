@@ -1,10 +1,12 @@
+
+
 <!DOCTYPE html>
 <html lang="ja">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>開発統合エディタ (Map & Anim)</title>
+    <title>開発統合エディタ (Map & Anim & Chart)</title>
     <style>
         body {
             font-family: sans-serif;
@@ -73,7 +75,7 @@
             display: flex;
         }
 
-        /* --- マップエディタ用CSS --- */
+        /* --- 共通UIパーツ --- */
         #toolbar {
             display: flex;
             align-items: center;
@@ -103,13 +105,13 @@
             margin-right: 0;
         }
 
-        input[type="text"] {
+        input[type="text"], input[type="number"] {
             padding: 4px;
             border-radius: 2px;
             border: 1px solid #555;
             background: #222;
             color: #fff;
-            width: 100px;
+            width: 80px;
         }
 
         button,
@@ -151,6 +153,7 @@
             display: none;
         }
 
+        /* --- マップエディタ用CSS --- */
         #main-area {
             display: flex;
             gap: 15px;
@@ -160,15 +163,12 @@
 
         #sidebar {
             width: 400px;
-            /* 横幅を拡張 */
             display: flex;
             flex-direction: column;
             gap: 10px;
             min-width: 320px;
-            /* 最小幅も拡張 */
         }
 
-        /* --- タイルプロパティエリア --- */
         #tile-properties {
             background: #333;
             border: 1px solid #555;
@@ -184,20 +184,12 @@
             flex-direction: column;
             gap: 2px;
         }
-
-        .prop-item label {
-            font-size: 0.75rem;
-            color: #aaa;
-        }
-
-        .prop-item select,
-        .prop-item input[type="text"] {
+        
+        .prop-item select {
             background: #222;
             color: #fff;
             border: 1px solid #555;
             padding: 4px;
-            width: 100%;
-            box-sizing: border-box;
         }
 
         .prop-checkbox {
@@ -208,11 +200,6 @@
             cursor: pointer;
         }
 
-        .prop-checkbox input {
-            cursor: pointer;
-        }
-
-        /* --- パレット（タイルセット画像）エリア --- */
         #palette-container {
             flex: 1;
             background: #333;
@@ -221,26 +208,15 @@
             overflow: auto;
             position: relative;
             padding: 5px;
-            /* 必要であればここにも min-width を設定 */
         }
 
         #palette-canvas {
             display: block;
-            background-image:
-                linear-gradient(45deg, #222 25%, transparent 25%),
-                linear-gradient(-45deg, #222 25%, transparent 25%),
-                linear-gradient(45deg, transparent 75%, #222 75%),
-                linear-gradient(-45deg, transparent 75%, #222 75%);
-            background-size: 20px 20px;
-            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
             background-color: #333;
             cursor: pointer;
             margin: 0 auto;
-            /* 中央寄せ */
             width: 100%;
-            /* 親コンテナ幅に合わせる */
             height: auto;
-            /* アスペクト比を維持 */
         }
 
         #brush-status {
@@ -272,7 +248,7 @@
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
         }
 
-        canvas {
+        #editor-canvas {
             display: block;
             background-color: #000;
             image-rendering: pixelated;
@@ -299,7 +275,6 @@
             overflow: hidden;
         }
 
-        /* 左サイドバー: アニメーションリスト */
         .anim-sidebar {
             width: 200px;
             background: #333;
@@ -332,7 +307,6 @@
             color: #fff;
         }
 
-        /* 中央: ワークスペース */
         .anim-workspace {
             flex: 1;
             display: flex;
@@ -340,13 +314,11 @@
             gap: 10px;
         }
 
-        /* 上部: ソース画像とプレビュー */
         .anim-upper {
             flex: 2;
             display: flex;
             gap: 10px;
             min-height: 0;
-            /* Flexboxのoverflow対策 */
         }
 
         .source-view {
@@ -367,7 +339,6 @@
             justify-content: center;
         }
 
-        /* 下部: タイムライン */
         .timeline-view {
             height: 140px;
             background: #333;
@@ -444,13 +415,49 @@
             color: #ccc;
         }
 
-        .prop-val {
-            width: 50px;
-            padding: 2px;
+        /* --- 譜面エディタ (Chart) 用CSS --- */
+        #chart-workspace {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow: hidden;
             background: #222;
-            border: 1px solid #555;
-            color: #fff;
         }
+
+        #chart-canvas-container {
+            flex: 1;
+            background: #2a2a2a;
+            border: 1px solid #555;
+            overflow-x: auto;
+            overflow-y: hidden;
+            position: relative;
+        }
+
+        #chart-canvas {
+            display: block;
+            height: 100%;
+        }
+
+        .chart-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 10px;
+            background: #333;
+            border: 1px solid #555;
+            border-radius: 4px;
+        }
+        
+        .chart-info-panel {
+            display: flex;
+            justify-content: space-between;
+            background: #333;
+            padding: 5px 10px;
+            color: #aaa;
+            font-size: 0.9rem;
+        }
+
     </style>
 </head>
 
@@ -460,6 +467,7 @@
     <div id="tab-bar">
         <button id="tab-map" class="tab-btn active" onclick="switchMode('map')">🗺️ マップ編集</button>
         <button id="tab-anim" class="tab-btn" onclick="switchMode('anim')">🏃 アニメ編集</button>
+        <button id="tab-chart" class="tab-btn" onclick="switchMode('chart')">🎼 譜面編集</button>
     </div>
 
     <!-- モード1: マップエディタ -->
@@ -625,6 +633,62 @@
         </div>
     </div>
 
+    <!-- モード3: 譜面エディタ (Chart) -->
+    <div id="mode-chart" class="mode-area">
+        <div id="toolbar">
+            <div class="tool-group">
+                <span style="font-size:0.9rem; color:#aaa; margin-right:5px;">BGM:</span>
+                <label class="btn" for="chart-music-input" style="background:#559;">🎵 音楽選択</label>
+                <input type="file" id="chart-music-input" accept="audio/*">
+                <span id="chart-music-name" style="font-size:0.8rem; margin-left:5px; color:#fff;">未選択</span>
+            </div>
+            <div class="tool-group">
+                <button id="btn-chart-play" onclick="chart_togglePlay()">▶ 再生</button>
+                <button onclick="chart_stop()">⏹ 停止</button>
+            </div>
+            <div class="tool-group">
+                <label style="font-size:0.8rem; margin-right:5px; color:#aaa;">BPM:</label>
+                <input type="number" id="chart-bpm" value="110" step="1" onchange="chart_draw()">
+                <label style="font-size:0.8rem; margin:0 5px; color:#aaa;">Offset:</label>
+                <input type="number" id="chart-offset" value="0.0" step="0.1" onchange="chart_draw()">
+                <!-- 修正: 秒数グリッド表示切替 -->
+                <label class="btn" style="margin-left:5px; font-size:0.8rem; padding:2px 5px;">
+                    <input type="checkbox" id="chart-show-sec-grid" checked onchange="chart_draw()"> 秒数Grid
+                </label>
+            </div>
+            <div class="spacer"></div>
+            <div class="tool-group">
+                <input type="text" id="chart-filename" value="chart" placeholder="ファイル名" style="width:120px;">
+                <button onclick="chart_export()">📋 書き出し</button>
+                <label class="btn" for="chart-file-input">📂 読込</label>
+                <input type="file" id="chart-file-input" accept=".json" onchange="chart_loadChartFile(this)">
+                <button onclick="chart_clear()" class="danger">クリア</button>
+            </div>
+        </div>
+
+        <div class="chart-info-panel">
+            <span>Click: ノーツ選択・移動 / 空白Click: 再生位置変更 / Shift+Click: 新規ノーツ(Long) / 右Click: 青ノーツ</span>
+            <span>Time: <span id="chart-time-display">0.00</span>s</span>
+        </div>
+
+        <div id="chart-workspace">
+            <div class="chart-controls">
+                <span>Zoom:</span>
+                <input type="range" id="chart-zoom" min="20" max="300" value="100" oninput="chart_draw()">
+                
+                <span style="margin-left: 20px;">再生位置調整:</span>
+                <button onclick="chart_skip(-5)">⏪ -5s</button>
+                <button onclick="chart_skip(-1)">◀ -1s</button>
+                <button onclick="chart_skip(1)">▶ +1s</button>
+                <button onclick="chart_skip(5)">⏩ +5s</button>
+            </div>
+
+            <div id="chart-canvas-container">
+                <canvas id="chart-canvas"></canvas>
+            </div>
+        </div>
+    </div>
+
     <script>
         function switchMode(mode) {
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -634,6 +698,7 @@
 
             if (mode === 'map' && window.initMapEditor) window.initMapEditor();
             if (mode === 'anim' && window.initAnimEditor) window.initAnimEditor();
+            if (mode === 'chart' && window.initChartEditor) window.initChartEditor();
         }
 
         window.onload = () => {
@@ -643,6 +708,7 @@
 
     <script src="editor_map.js"></script>
     <script src="editor_anim.js"></script>
+    <script src="editor_chart.js"></script> <!-- 新規追加 -->
 </body>
 
 </html>
