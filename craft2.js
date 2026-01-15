@@ -6,27 +6,27 @@
 const CraftMoldingImages = {
     loaded: false,
     path: 'image/craft_image2/',
-
+    
     bgBase: new Image(),
     lanes: [],     // 3枚
-
+    
     noteNormal: new Image(),
     noteDone: new Image(),
     noteLongBody: new Image(),
     noteLongEnd: new Image(),
-
+    
     machineUp: new Image(),
     machineDown: new Image(),
-
+    
     btnRedUp: new Image(),
     btnRedDown: new Image(),
     btnBlueUp: new Image(),
     btnBlueDown: new Image(),
-
+    
     judgePerfect: new Image(),
     judgeGood: new Image(),
     judgeMiss: new Image(),
-
+    
     effects: [],   // 3枚
 
     load: function () {
@@ -34,8 +34,8 @@ const CraftMoldingImages = {
 
         // ロード完了チェック用カウンタ
         let loadedCount = 0;
-        const totalImages = 20;
-
+        const totalImages = 20; 
+        
         const checkLoad = () => {
             loadedCount++;
             if (loadedCount >= totalImages) {
@@ -48,7 +48,7 @@ const CraftMoldingImages = {
             img.onload = checkLoad;
             img.onerror = (e) => {
                 console.error("Image Load Error:", fileName);
-                checkLoad();
+                checkLoad(); 
             };
             img.src = this.path + fileName;
         };
@@ -98,27 +98,27 @@ const CraftMolding = {
         red: { y: 150, key: 'ArrowLeft' },
         blue: { y: 245, key: 'ArrowRight' }
     },
-    judgeX: 730,
+    judgeX: 730, 
     spawnX: -150,
-    noteSpeed: 6,
-
+    noteSpeed: 6, 
+    
     // BGM設定
     bgmName: 'craft2',
     bgmSrc: 'sounds/craft2_BGM1.mp3',
-    bgmDuration: 0,
-
+    bgmDuration: 0, 
+    
     // 状態変数
     notes: [],
     effects: [], // ヒットエフェクト用 {x, y, frame, timer}
-    score: 0,
-    totalNotes: 0,
-    stats: { perfect: 0, good: 0 },
-
+    score: 0, 
+    totalNotes: 0, 
+    stats: { perfect: 0, good: 0 }, 
+    
     machineAnim: { red: 0, blue: 0 },
     feedback: { type: null, timer: 0 }, // type: 'perfect', 'good', 'miss'
-
+    
     prevKeys: { ArrowLeft: false, ArrowRight: false },
-
+    
     // アニメーション用
     laneAnimFrame: 0,
     laneAnimTimer: 0,
@@ -126,41 +126,41 @@ const CraftMolding = {
     // 進行管理
     isStarted: false,
     startAnimTimer: 0,
-    startTime: 0,
-    chartData: [],
-    externalChart: null,
-    nextNoteIndex: 0,
+    startTime: 0,      
+    chartData: [],     
+    externalChart: null, 
+    nextNoteIndex: 0,  
     isFinished: false,
 
-    setChart: function (data) {
+    setChart: function(data) {
         this.externalChart = data;
     },
 
     init: function () {
-        CraftMoldingImages.load();
+        CraftMoldingImages.load(); 
 
         this.notes = [];
         this.effects = [];
         this.score = 0;
         this.stats = { perfect: 0, good: 0 };
         this.totalNotes = 0;
-
+        
         this.machineAnim.red = 0;
         this.machineAnim.blue = 0;
         this.feedback.type = null;
         this.feedback.timer = 0;
-
+        
         this.laneAnimFrame = 0;
         this.laneAnimTimer = 0;
-
+        
         this.prevKeys = { ArrowLeft: false, ArrowRight: false };
-
+        
         this.isStarted = false;
         this.isFinished = false;
         this.startAnimTimer = 0;
         this.chartData = [];
         this.nextNoteIndex = 0;
-
+        
         // BGMロードと譜面生成
         AudioSys.loadBGM(this.bgmName, this.bgmSrc).then(buffer => {
             if (buffer) {
@@ -174,7 +174,7 @@ const CraftMolding = {
         });
     },
 
-    parseExternalChart: function (data) {
+    parseExternalChart: function(data) {
         this.chartData = [];
         const speedPxPerSec = this.noteSpeed * 60;
         const travelDistance = this.judgeX - this.spawnX;
@@ -198,9 +198,9 @@ const CraftMolding = {
         this.totalNotes = this.chartData.length;
     },
 
-    generateChart: function (duration) {
+    generateChart: function(duration) {
         this.chartData = [];
-        const bpm = 110;
+        const bpm = 110; 
         const beatInterval = 60 / bpm;
         const travelTime = (this.judgeX - this.spawnX) / (this.noteSpeed * 60);
 
@@ -223,10 +223,10 @@ const CraftMolding = {
                 });
             }
             const r = Math.random();
-            if (r < 0.6) currentTime += beatInterval;
-            else if (r < 0.9) currentTime += beatInterval * 2;
-            else currentTime += beatInterval / 2;
-
+            if (r < 0.6) currentTime += beatInterval;      
+            else if (r < 0.9) currentTime += beatInterval * 2; 
+            else currentTime += beatInterval / 2;          
+            
             laneToggle = !laneToggle;
         }
         this.chartData.sort((a, b) => a.spawnTime - b.spawnTime);
@@ -238,11 +238,11 @@ const CraftMolding = {
 
         if (!this.isStarted) {
             this.startAnimTimer++;
-            if (this.startAnimTimer > 90) {
+            if (this.startAnimTimer > 90) { 
                 this.isStarted = true;
                 this.startTime = Date.now();
-                AudioSys.stopBGM();
-                AudioSys.playBGM(this.bgmName);
+                AudioSys.stopBGM(); 
+                AudioSys.playBGM(this.bgmName); 
             }
             return;
         }
@@ -251,7 +251,7 @@ const CraftMolding = {
         if (this.laneAnimTimer >= 5) {
             this.laneAnimTimer = 0;
             this.laneAnimFrame = (this.laneAnimFrame + 1) % 3;
-
+            
             for (let i = this.effects.length - 1; i >= 0; i--) {
                 const eff = this.effects[i];
                 eff.frame++;
@@ -279,7 +279,7 @@ const CraftMolding = {
 
         for (let i = this.notes.length - 1; i >= 0; i--) {
             const n = this.notes[i];
-            n.x += this.noteSpeed;
+            n.x += this.noteSpeed; 
 
             const tailX = n.x + (n.type === 'long' ? n.length : 0);
             if (tailX > 1100) {
@@ -297,47 +297,49 @@ const CraftMolding = {
         if (this.feedback.timer > 0) this.feedback.timer--;
     },
 
-    spawnNote: function (chartInfo) {
+    spawnNote: function(chartInfo) {
         const length = chartInfo.length || (chartInfo.type === 'long' ? 250 : 0);
-
+        
         const note = {
             lane: chartInfo.lane,
             type: chartInfo.type,
             x: this.spawnX,
             y: this.laneSettings[chartInfo.lane].y,
-            length: length,
+            length: length, 
             active: true,
-            processed: false
+            processed: false 
         };
         this.notes.push(note);
     },
 
-    finishGame: function () {
+    finishGame: function() {
         this.isFinished = true;
         AudioSys.stopBGM();
         AudioSys.playTone(1000, 'sine', 0.5);
         CraftManager.ui.btnNext.visible = true;
     },
 
-    handleInput: function () {
+    handleInput: function() {
         let touchRed = false;
         let touchBlue = false;
 
-        // マルチタッチ判定
-        for (const touch of Input.touches) {
-            if (touch.isJustPressed) {
-                const mx = touch.x;
-                const my = touch.y;
-                if (my > 360 && my < 600) { // 判定エリアを少し広めに
-                    if (mx >= 0 && mx <= 490) touchRed = true;
-                    else if (mx >= 510 && mx <= 1000) touchBlue = true;
+        // 1. マルチタッチ判定
+        if (Input.touches && Input.touches.length > 0) {
+            for (const t of Input.touches) {
+                if (t.isJustPressed) {
+                    const mx = t.x;
+                    const my = t.y;
+                    if (my > 360 && my < 600) {
+                        if (mx >= 0 && mx <= 490) touchRed = true;
+                        else if (mx >= 510 && mx <= 1000) touchBlue = true;
+                    }
                 }
             }
         }
 
-        // マウス/シングルタッチのフォールバック
-        if (Input.isJustPressed && Input.touches.length === 0) {
-            const mx = Input.x;
+        // 2. マウス/シングルタッチ判定
+        if (Input.isJustPressed) {
+            const mx = Input.x; 
             const my = Input.y;
             if (my > 360 && my < 600) {
                 if (mx >= 0 && mx <= 490) touchRed = true;
@@ -347,10 +349,10 @@ const CraftMolding = {
 
         const keyRed = keys.ArrowLeft;
         const keyBlue = keys.ArrowRight;
-
+        
         const triggerRed = (keyRed && !this.prevKeys.ArrowLeft) || touchRed;
         const triggerBlue = (keyBlue && !this.prevKeys.ArrowRight) || touchBlue;
-
+        
         this.prevKeys.ArrowLeft = keyRed;
         this.prevKeys.ArrowRight = keyBlue;
 
@@ -358,31 +360,31 @@ const CraftMolding = {
         if (triggerBlue) this.checkHit('blue');
     },
 
-    checkHit: function (lane) {
-        this.machineAnim[lane] = 8;
+    checkHit: function(lane) {
+        this.machineAnim[lane] = 8; 
 
         let hit = false;
         const sortedNotes = this.notes.filter(n => n.lane === lane && n.active).sort((a, b) => b.x - a.x);
-
+        
         for (const note of sortedNotes) {
             if (note.type === 'normal') {
-                const center = note.x + 30;
+                const center = note.x + 30; 
                 const dist = Math.abs(center - this.judgeX);
-
+                
                 if (dist < 60) {
                     this.processHit(note, dist);
-                    note.active = false;
-                    note.processed = true;
+                    note.active = false; 
+                    note.processed = true; 
                     hit = true;
                     this.effects.push({ x: this.judgeX, y: note.y + 40, frame: 0 });
                     break;
                 }
-            }
+            } 
             else if (note.type === 'long') {
                 if (this.judgeX >= note.x && this.judgeX <= note.x + note.length) {
                     this.processHit(note, 0);
                     hit = true;
-                    note.active = false;
+                    note.active = false; 
                     this.effects.push({ x: this.judgeX, y: note.y + 40, frame: 0 });
                     break;
                 }
@@ -390,10 +392,10 @@ const CraftMolding = {
         }
     },
 
-    processHit: function (note, dist) {
+    processHit: function(note, dist) {
         let type = 'good';
         let scoreAdd = 1;
-
+        
         if (dist < 20) {
             type = 'perfect';
             scoreAdd = 1;
@@ -407,16 +409,16 @@ const CraftMolding = {
 
         if (note.type === 'long') {
             type = Math.random() < 0.4 ? 'perfect' : 'good';
-            AudioSys.playNoise(0.05, 0.1);
-            if (type === 'perfect') this.stats.perfect++;
+            AudioSys.playNoise(0.05, 0.1); 
+            if(type === 'perfect') this.stats.perfect++;
             else this.stats.good++;
         }
 
         this.score += scoreAdd;
         this.showFeedback(type);
     },
-
-    showFeedback: function (type) {
+    
+    showFeedback: function(type) {
         this.feedback.type = type;
         this.feedback.timer = 20;
     },
@@ -444,13 +446,13 @@ const CraftMolding = {
         const btnY = 380;
         const redImg = (keys.ArrowLeft || this.machineAnim.red > 0) ? imgs.btnRedDown : imgs.btnRedUp;
         if (redImg.complete) ctx.drawImage(redImg, offsetX + 50, btnY, 430, 80);
-
+        
         const blueImg = (keys.ArrowRight || this.machineAnim.blue > 0) ? imgs.btnBlueDown : imgs.btnBlueUp;
         if (blueImg.complete) ctx.drawImage(blueImg, offsetX + 520, btnY, 430, 80);
 
         for (const n of this.notes) {
             const nx = offsetX + n.x;
-            const ny = n.y + 10;
+            const ny = n.y + 10; 
 
             if (n.type === 'normal') {
                 if (n.processed) {
@@ -460,16 +462,16 @@ const CraftMolding = {
                 }
             } else if (n.type === 'long') {
                 const bodyW = n.length;
-                const endW = 20;
-
+                const endW = 20; 
+                
                 if (imgs.noteLongEnd.complete) {
                     ctx.save();
-                    ctx.translate(nx + endW, ny);
-                    ctx.scale(-1, 1);
+                    ctx.translate(nx + endW, ny); 
+                    ctx.scale(-1, 1); 
                     ctx.drawImage(imgs.noteLongEnd, 0, 0, endW, 60);
                     ctx.restore();
                 }
-
+                
                 if (imgs.noteLongBody.complete) {
                     ctx.drawImage(imgs.noteLongBody, nx + endW, ny, bodyW - endW * 2, 60);
                 }
@@ -487,8 +489,8 @@ const CraftMolding = {
             mH = mW * ratio;
         }
 
-        const jx = offsetX + this.judgeX - (mW / 2);
-        const mOffsetY = -45; // サイズ拡大に合わせて再調整
+        const jx = offsetX + this.judgeX - (mW / 2); 
+        const mOffsetY = -45; 
 
         const redMach = this.machineAnim.red > 0 ? imgs.machineDown : imgs.machineUp;
         if (redMach.complete) ctx.drawImage(redMach, jx, this.laneSettings.red.y + mOffsetY, mW, mH);
@@ -504,13 +506,12 @@ const CraftMolding = {
         }
 
         CraftManager.drawTitle(offsetX, "かたぬき");
-        CraftManager.drawSpeechBubble(offsetX, "タイミングよくボタンをおそう！");
-
+        
         ctx.fillStyle = '#fff';
         ctx.font = "bold 24px 'M PLUS Rounded 1c', sans-serif";
         ctx.textAlign = 'right';
-        ctx.fillText(`パーフェクト: ${this.stats.perfect}`, offsetX + 950, 80);
-        ctx.fillText(`グッド: ${this.stats.good}`, offsetX + 950, 110);
+        ctx.fillText(`Perfect: ${this.stats.perfect}`, offsetX + 950, 50);
+        ctx.fillText(`Good: ${this.stats.good}`, offsetX + 950, 80);
 
         if (this.feedback.timer > 0 && this.feedback.type) {
             let fbImg = null;
