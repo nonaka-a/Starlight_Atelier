@@ -3,8 +3,8 @@
  */
 const CraftFiring = {
     // --- 定数 ---
-    TARGET_TEMP_MIN: 55,
-    TARGET_TEMP_MAX: 85,
+    TARGET_TEMP_MIN: 52,
+    TARGET_TEMP_MAX: 88,
     TEMP_MAX_GAUGE: 120,
 
     // 進行速度関連 (60FPS基準)
@@ -29,6 +29,7 @@ const CraftFiring = {
     smokeLevel: 0,      // 0:なし, 1:煙, 2:焦げ小, 3:焦げ大
 
     fuelQueue: [],      // 火力上昇遅延用のキュー
+    woodAnims: [],      // 薪のアニメーション用
 
     // UI定義
     ui: {
@@ -80,6 +81,7 @@ const CraftFiring = {
         this.smokeLevel = 0;
 
         this.fuelQueue = new Array(this.DELAY_QUEUE_SIZE).fill(0);
+        this.woodAnims = [];
 
         this.fireAnimTimer = 0;
         this.doorAnimState = 0;
@@ -114,8 +116,8 @@ const CraftFiring = {
                 AudioSys.playTone(500, 'square', 0.1);
             }
 
-            // 星を入れる (扉が開いている時かつ、まだ入れていない時)
-            if (this.starState === 'none' && this.isDoorOpen && this.ui.btnInsert.visible) {
+            // 星を入れる (窓が開いてなくても入れられる)
+            if (this.starState === 'none' && this.ui.btnInsert.visible) {
                 if (inputX >= this.ui.btnInsert.x && inputX <= this.ui.btnInsert.x + this.ui.btnInsert.w &&
                     inputY >= this.ui.btnInsert.y && inputY <= this.ui.btnInsert.y + this.ui.btnInsert.h) {
                     this.insertStar();
@@ -141,11 +143,12 @@ const CraftFiring = {
         // 2. 温度計算
         // 温度は火力を目指して動く (追従)
         const diff = (this.firePower * 3) - this.ovenTemp; // ベースを20から0に変更
-        this.ovenTemp += diff * 0.02;
+        // 少し早く上昇するように係数をアップ (0.02 -> 0.05)
+        this.ovenTemp += diff * 0.05;
 
         // 扉開放による急速冷却
         if (this.isDoorOpen) {
-            this.ovenTemp -= 0.8; // かなり強く下がる
+            this.ovenTemp -= 0.4; // 今の半分ぐらい (0.8 -> 0.4)
         }
 
         // 温度の下限と上限
@@ -224,6 +227,15 @@ const CraftFiring = {
             this.doorAnimState = Math.max(0, this.doorAnimState - 0.1);
         }
 
+        // 薪アニメ更新
+        for (let i = this.woodAnims.length - 1; i >= 0; i--) {
+            const w = this.woodAnims[i];
+            w.t += 0.08; // アニメ速度
+            if (w.t >= 1) {
+                this.woodAnims.splice(i, 1);
+            }
+        }
+
         // 火の音ループ管理
         if (this.firePower > 0.1) {
             if (!this.fireSoundSource) {
@@ -242,6 +254,15 @@ const CraftFiring = {
         this.fireFuel += 12;
         // 最大燃料制限
         if (this.fireFuel > 100) this.fireFuel = 100;
+
+        // 薪アニメ追加
+        // ボタン(830, 410) -> 窯下部(500, 480)
+        this.woodAnims.push({
+            sx: 830, sy: 410,
+            tx: 500, ty: 480,
+            h: 120, // 高さ
+            t: 0
+        });
 
         // 薪投入パーティクル
         for (let i = 0; i < 5; i++) {
@@ -293,6 +314,9 @@ const CraftFiring = {
         // 1. 窯の描画
         this.drawKiln(offsetX);
 
+        // 薪が飛ぶアニメ
+        this.drawWoodAnims(offsetX);
+
         // 2. UI描画 (ゲージ、ボタン)
         this.drawUI(offsetX);
 
@@ -319,6 +343,25 @@ const CraftFiring = {
             else msg = "いい調子！ そのままキープ！";
         }
         CraftManager.drawSpeechBubble(offsetX, msg);
+    },
+
+    drawWoodAnims: function (offsetX) {
+        const ctx = CraftManager.ctx;
+        if (this.woodAnims.length === 0) return;
+
+        ctx.save();
+        ctx.fillStyle = '#5d4037';
+        for (const w of this.woodAnims) {
+            // 放物線
+            const x = (1 - w.t) * w.sx + w.t * w.tx;
+            const y = (1 - w.t) * w.sy + w.t * w.ty - Math.sin(w.t * Math.PI) * w.h;
+
+            ctx.translate(offsetX + x, y);
+            ctx.rotate(w.t * Math.PI * 4);
+            ctx.fillRect(-20, -10, 40, 20); // 簡易薪
+            ctx.translate(-(offsetX + x), -y); // 戻す (save/restoreコスト削減のため手動戻しもありだが、ここではresetTransformせずtranslateで戻す方が安全)
+        }
+        ctx.restore();
     },
 
     drawKiln: function (offsetX) {
@@ -536,10 +579,10 @@ const CraftFiring = {
             const btnI = this.ui.btnInsert;
             const drawBtnI = { ...btnI, x: offsetX + btnI.x };
 
-            // 窓が開いてないときはグレーアウト
-            if (!this.isDoorOpen) {
-                ctx.globalAlpha = 0.5;
-            }
+            // 窓が開いてないときはグレーアウト => 廃止 (いつでも入れられる)
+            // if (!this.isDoorOpen) {
+            //     ctx.globalAlpha = 0.5;
+            // }
 
             cm.drawBtn(drawBtnI, '#ffca28'); // 黄色いボタン
             ctx.globalAlpha = 1.0;
