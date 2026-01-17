@@ -496,6 +496,15 @@ const CraftMixing = {
         }
     },
 
+    end: function () {
+        // スコア計算 (Max 30)
+        // mixProgress (0-100) を使用
+        const progress = Math.min(100, Math.max(0, CraftManager.currentStar.mixProgress));
+        // 30点満点
+        CraftManager.currentStar.scoreMix = Math.floor(progress * 0.3);
+        console.log("Mix Score:", CraftManager.currentStar.scoreMix);
+    },
+
     drawMixArea: function (offsetX) {
         const ctx = CraftManager.ctx;
         const cx = offsetX + this.baseX;

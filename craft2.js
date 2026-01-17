@@ -140,6 +140,19 @@ const CraftMolding = {
         AudioSys.stopBGM();
         this.isStarted = false;
         this.isFinished = true;
+
+        // スコア計算 (Max 30)
+        // パーフェクト=1, グッド=0.5 として、全ノーツ数に対する割合で計算
+        let rawScore = 0;
+        if (this.totalNotes > 0) {
+            const p = this.stats.perfect;
+            const g = this.stats.good;
+            // 満点スコア比率
+            const ratio = (p * 1.0 + g * 0.5) / this.totalNotes;
+            rawScore = Math.floor(ratio * 30);
+        }
+        CraftManager.currentStar.scoreMold = Math.min(30, rawScore);
+        console.log("Mold Score:", CraftManager.currentStar.scoreMold);
     },
 
     init: function () {

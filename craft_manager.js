@@ -69,7 +69,12 @@ const CraftManager = {
             bakeProgress: 0,
             bakeState: 'raw',
             color: '#FFA500',
-            particles: []
+            particles: [],
+            // 各工程のスコア (Result集計用)
+            scoreMix: 0,
+            scoreMold: 0,
+            scoreFire: 0,
+            scorePolish: 0
         };
 
         this.resetNextBtn();

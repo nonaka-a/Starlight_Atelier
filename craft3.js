@@ -64,6 +64,18 @@ const CraftFiring = {
             try { this.fireSoundSource.stop(); } catch (e) { }
             this.fireSoundSource = null;
         }
+
+        // スコア計算 (Max 30)
+        let s = 0;
+        if (this.starState === 'burnt') {
+            s = 5; // 焦げたら一律5点
+        } else {
+            // 焼き加減 (0-100) -> 30点
+            const progress = Math.min(100, Math.max(0, this.bakeProgress));
+            s = Math.floor(progress * 0.3);
+        }
+        CraftManager.currentStar.scoreFire = s;
+        console.log("Fire Score:", CraftManager.currentStar.scoreFire);
     },
 
     resetParams: function () {
