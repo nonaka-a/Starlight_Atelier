@@ -1,11 +1,11 @@
 /**
  * --- Craft 4: しあげ (Polishing & Result) ---
- * 改修: 磨き修正、リザルト日本語化、カウントアップ演出
+ * 改修: 磨き判定座標(ローカル)修正、OKボタン色修正
  */
 const CraftPolishing = {
     shineLevel: 0,
     lastX: 0,
-    lastY: 0, // ★追加: Y座標の履歴
+    lastY: 0,
 
     // リザルト管理
     isResultMode: false,
@@ -26,8 +26,8 @@ const CraftPolishing = {
 
     init: function () {
         this.shineLevel = 0;
-        this.lastX = 0;
-        this.lastY = 0;
+        this.lastX = Input.x;
+        this.lastY = Input.y;
         this.isResultMode = false;
         this.resultTimer = 0;
         this.displayScores = { mix: -1, mold: -1, fire: -1, polish: -1, total: -1, stars: 0 };
@@ -60,51 +60,49 @@ const CraftPolishing = {
             return;
         }
 
-        const mx = Input.x - cm.camera.x;
-        const my = Input.y;
+        // 座標計算
+        // 星の描画位置: スクリーン中央 (500, 320)
+        // Input.x: スクリーン座標 (Canvas内 0-1000)
+        // よって、そのまま計算すればOK
 
-        if (Input.isJustPressed) {
-            this.lastX = mx;
-            this.lastY = my;
-        }
+        const targetX = 500;
+        const targetY = 320;
 
-        const offsetX = 3000;
-        const sx = offsetX + 500;
-        const sy = 320;
-
+        const dist = Math.sqrt((Input.x - targetX) ** 2 + (Input.y - targetY) ** 2);
         const starRadius = 150;
 
-        // カメラ補正なしの生のInput.xを使うかどうか。
-        // CraftManager.camera.x は 3000 になっているので、
-        // 画面中央(500, 350)の星の位置は、World座標(3500, 350)。
-        // Input.x は World座標のはずなので、
-        // mx = Input.x - 3000 = 500 が中央。これで合ってる。
-        // ただしInputの座標更新が1フレーム遅れなどに影響されないよう、isDown判定とともにチェック
-
-        const distToStar = Math.sqrt((mx - sx) ** 2 + (my - sy) ** 2);
+        if (Input.isJustPressed) {
+            this.lastX = Input.x;
+            this.lastY = Input.y;
+        }
 
         // 磨き操作
         if (Input.isDown) {
-            // 判定を広めに (半径+50)
-            if (distToStar < starRadius + 50) {
-                const moveX = Math.abs(mx - this.lastX);
-                const moveY = Math.abs(my - this.lastY);
+            // 判定: 半径+50px
+            if (dist < starRadius + 50) {
+                const moveX = Math.abs(Input.x - this.lastX);
+                const moveY = Math.abs(Input.y - this.lastY);
                 const move = moveX + moveY;
 
                 // 動いていればOK
                 if (move > 0.5) {
-                    this.shineLevel = Math.min(100, this.shineLevel + 0.5);
+                    this.shineLevel = Math.min(100, this.shineLevel + 1.5);
 
                     if (Math.random() < 0.2) {
-                        const px = mx + cm.camera.x + (Math.random() - 0.5) * 60;
-                        const py = my + (Math.random() - 0.5) * 60;
-                        cm.addParticle(px, py, 'white', 2);
+                        const px = Input.x + (Math.random() - 0.5) * 60;
+                        // addParticleに渡すxは、描画時に this.camera.x を引かれるため、
+                        // 逆に this.camera.x を足してワールド座標に戻して渡す必要がある。
+                        // (CraftManager.addParticleの実装: x を保存 -> 描画時に x - camera.x)
+                        // Input.x はスクリーン座標なので、ワールドX = Input.x + Camera.x
+                        const wx = Input.x + cm.camera.x + (Math.random() - 0.5) * 60;
+                        const wy = Input.y + (Math.random() - 0.5) * 60;
+                        cm.addParticle(wx, wy, 'white', 2);
                     }
                 }
             }
         }
-        this.lastX = mx;
-        this.lastY = my;
+        this.lastX = Input.x;
+        this.lastY = Input.y;
     },
 
     finishPolishing: function () {
@@ -123,14 +121,11 @@ const CraftPolishing = {
         else if (total >= 61) { this.rank = "グッド"; this.bonusRate = 0.1; }
         else { this.rank = "ノーマル"; this.bonusRate = 0.0; }
 
-        console.log(`Total: ${total}, Rank: ${this.rank}`);
-
         this.isResultMode = true;
         this.resultTimer = 0;
         this.starAnimX = 0;
         this.stampScale = 0;
 
-        // 最終的な獲得数を計算して保持
         const base = cm.craftAmount;
         const bonusVal = Math.ceil(base * this.bonusRate);
         this.targetStars = base + (this.rank === "ノーマル" ? 0 : bonusVal);
@@ -187,13 +182,12 @@ const CraftPolishing = {
 
                 // カウントアップ完了でスタンプ演出開始
                 if (this.stampScale === 0) {
-                    this.stampScale = 2.0; // 初期拡大
-                    AudioSys.playTone(600, 'square', 0.2); // ドン！
+                    this.stampScale = 2.0;
+                    AudioSys.playTone(600, 'square', 0.2);
                 }
             }
         }
 
-        // スタンプのアニメーション
         if (this.stampScale > 1.0) {
             this.stampScale += (1.0 - this.stampScale) * 0.2;
         }
@@ -225,7 +219,6 @@ const CraftPolishing = {
     },
 
     drawResultMode: function (offsetX) {
-        // 背景暗転なし
         this.drawPolishingStar(offsetX, this.starAnimX);
         this.drawResultWindow(offsetX);
     },
@@ -317,7 +310,6 @@ const CraftPolishing = {
 
             if (item.val >= 0) {
                 ctx.textAlign = 'right';
-                // 満点なら赤
                 const ratio = item.val / item.max;
                 ctx.fillStyle = ratio === 1 ? '#e91e63' : '#333';
                 ctx.fillText(`${item.val}/${item.max}`, w - 40, item.y);
@@ -334,7 +326,8 @@ const CraftPolishing = {
             ctx.lineTo(w - 30, 210);
             ctx.stroke();
 
-            // Total: シンプルに「86てん」とエクセレントを並列
+            // Total: 左揃え
+            ctx.textAlign = 'left';
             ctx.font = "bold 32px 'M PLUS Rounded 1c', sans-serif";
             const r = this.rank;
             let rColor = '#333';
@@ -344,10 +337,9 @@ const CraftPolishing = {
 
             ctx.fillStyle = rColor;
 
-            // 中央揃えで2行に
-            ctx.fillText(`${this.displayScores.total}てん`, w / 2, 260);
+            ctx.fillText(`${this.displayScores.total}てん`, 40, 260);
             ctx.font = "900 48px 'M PLUS Rounded 1c', sans-serif";
-            ctx.fillText(r, w / 2, 310);
+            ctx.fillText(r, 40, 310);
 
             // ボーナス表記
             if (this.rank !== 'ノーマル') {
@@ -355,34 +347,32 @@ const CraftPolishing = {
                 if (bonusCount > 0) {
                     ctx.font = "bold 20px 'M PLUS Rounded 1c', sans-serif";
                     ctx.fillStyle = '#e91e63';
-                    ctx.textAlign = 'center';
-                    ctx.fillText(`ついかボーナス ほし+${bonusCount}こ`, w / 2, 350);
+                    ctx.fillText(`ついかボーナス ほし+${bonusCount}こ`, 40, 350);
                 }
             }
 
-            // 右下にスタンプ風「ごうけい」
+            // 右下にスタンプ風
             if (this.countUpValue > 0) {
-                // 座布団
-                const badgeX = w - 60;
-                const badgeY = h - 60;
+                const badgeX = w - 80;
+                const badgeY = h - 80;
                 const scale = this.stampScale > 0 ? this.stampScale : 1.0;
 
                 ctx.save();
                 ctx.translate(badgeX, badgeY);
                 ctx.scale(scale, scale);
-                ctx.rotate(0.2); // 少し傾ける
+                ctx.rotate(0.2);
 
                 // 黄色い星
                 ctx.fillStyle = '#ffeb3b';
                 ctx.shadowColor = 'rgba(0,0,0,0.3)';
                 ctx.shadowBlur = 10;
                 ctx.beginPath();
-                CraftManager.drawStarShape(ctx, 0, 0, 60, 30);
+                CraftManager.drawStarShape(ctx, 0, 0, 100, 50);
                 ctx.fill();
 
                 ctx.shadowBlur = 0;
                 ctx.strokeStyle = '#fbc02d';
-                ctx.lineWidth = 3;
+                ctx.lineWidth = 5;
                 ctx.stroke();
 
                 // 文字
@@ -390,11 +380,14 @@ const CraftPolishing = {
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
 
-                ctx.font = "bold 14px 'M PLUS Rounded 1c', sans-serif";
-                ctx.fillText("ごうけい", 0, -20);
+                ctx.font = "bold 18px 'M PLUS Rounded 1c', sans-serif";
+                ctx.fillText("ごうけい", 0, -30);
 
-                ctx.font = "900 32px 'M PLUS Rounded 1c', sans-serif";
-                ctx.fillText(`${this.countUpValue}こ`, 0, 10);
+                ctx.font = "900 56px 'M PLUS Rounded 1c', sans-serif";
+                ctx.fillText(`${this.countUpValue}`, 0, 10);
+
+                ctx.font = "bold 24px 'M PLUS Rounded 1c', sans-serif";
+                ctx.fillText("こ", 60, 40);
 
                 ctx.restore();
             }
@@ -402,13 +395,34 @@ const CraftPolishing = {
 
         ctx.restore();
 
-        // OKボタン
+        // OKボタン (Custom Draw to fix shadow color)
         if (this.btnResultOK.visible) {
             this.btnResultOK.x = 250 - this.btnResultOK.w / 2;
             this.btnResultOK.y = cy + h / 2 - 25;
 
             const btn = { ...this.btnResultOK, x: offsetX + this.btnResultOK.x };
-            CraftManager.drawBtn(btn, '#9c27b0');
+            const color = '#9c27b0';
+            const shadowColor = '#7b1fa2'; // 濃い紫
+
+            // drawBtnを自前で実装して影色を制御
+            ctx.save();
+            // 影
+            ctx.fillStyle = shadowColor;
+            ctx.beginPath();
+            ctx.roundRect(btn.x, btn.y + 5, btn.w, btn.h, 30);
+            ctx.fill();
+            // 本体
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.roundRect(btn.x, btn.y, btn.w, btn.h, 30);
+            ctx.fill();
+            // テキスト
+            ctx.fillStyle = '#fff';
+            ctx.font = "bold 20px 'M PLUS Rounded 1c', sans-serif";
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(btn.text, btn.x + btn.w / 2, btn.y + btn.h / 2);
+            ctx.restore();
         }
     }
 };
