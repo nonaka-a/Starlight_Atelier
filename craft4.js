@@ -87,17 +87,6 @@ const CraftPolishing = {
                 // 動いていればOK
                 if (move > 0.5) {
                     this.shineLevel = Math.min(100, this.shineLevel + 1.5);
-
-                    if (Math.random() < 0.2) {
-                        const px = Input.x + (Math.random() - 0.5) * 60;
-                        // addParticleに渡すxは、描画時に this.camera.x を引かれるため、
-                        // 逆に this.camera.x を足してワールド座標に戻して渡す必要がある。
-                        // (CraftManager.addParticleの実装: x を保存 -> 描画時に x - camera.x)
-                        // Input.x はスクリーン座標なので、ワールドX = Input.x + Camera.x
-                        const wx = Input.x + cm.camera.x + (Math.random() - 0.5) * 60;
-                        const wy = Input.y + (Math.random() - 0.5) * 60;
-                        cm.addParticle(wx, wy, 'white', 2);
-                    }
                 }
             }
         }
