@@ -66,15 +66,15 @@ window.onload = () => {
     setupControls();
     window.addEventListener('resize', fitWindow);
 
-    // デバッグ機能
+    // デバッグ機能 (iPad等の入力モード対策のため e.code で判定)
     window.addEventListener('keydown', (e) => {
         // hキー: 素材増加
-        if (e.key === 'h' || e.key === 'H') {
+        if (e.code === 'KeyH') {
             totalItemCount += 5;
             updateScoreDisplay();
         }
         // sキー: 星増加 (デバッグ用)
-        if (e.key === 's' || e.key === 'S') {
+        if (e.code === 'KeyS') {
             totalStarCount += 10;
             updateScoreDisplay();
         }
