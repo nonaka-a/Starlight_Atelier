@@ -589,7 +589,7 @@ const CraftMixing = {
             CraftManager.drawSpeechBubble(offsetX, "きじをしっかりまぜよう！");
 
             const timeColor = this.timeLeft <= 3 ? '#ff4500' : '#333';
-            CraftManager.drawYellowWindow(offsetX, 850, 300, 120, 100, "のこり", Math.ceil(this.timeLeft), timeColor);
+            CraftManager.drawYellowWindow(offsetX, 850, 300, 150, 100, "のこり", Math.ceil(this.timeLeft), timeColor, "びょう");
 
             if (!this.isMixingStarted) {
                 ctx.save();

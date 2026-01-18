@@ -1,5 +1,3 @@
-
-
 /**
  * --- ゲームの状態 ---
  */
@@ -21,7 +19,7 @@ let gameLoopId = null;
 let totalItemCount = 0; // ほしのもと累計 (ステージ持ち越し分)
 let totalStarCount = 0;
 let isAtelierMode = false;
-let spawnPoint = { x: 0, y: 0 }; // ★追加: 初期位置保存用
+let spawnPoint = { x: 0, y: 0 }; // 初期位置保存用
 
 const player = {
     x: 0, y: 0,
@@ -68,10 +66,16 @@ window.onload = () => {
     setupControls();
     window.addEventListener('resize', fitWindow);
 
-    // デバッグ: hキーで素材増加
+    // デバッグ機能
     window.addEventListener('keydown', (e) => {
+        // hキー: 素材増加
         if (e.key === 'h' || e.key === 'H') {
             totalItemCount += 5;
+            updateScoreDisplay();
+        }
+        // sキー: 星増加 (デバッグ用)
+        if (e.key === 's' || e.key === 'S') {
+            totalStarCount += 10;
             updateScoreDisplay();
         }
     });
@@ -87,7 +91,7 @@ window.onload = () => {
             tryAutoLoad();
         });
 
-    // ★追加: 譜面データの自動読み込み
+    // 譜面データの自動読み込み
     fetch('json/chart.json')
         .then(res => {
             if (!res.ok) throw new Error("Chart not found");
@@ -102,6 +106,11 @@ window.onload = () => {
         .catch(err => {
             console.log("chart.jsonが見つかりませんでした (ランダム生成モード)");
         });
+
+    // SkyManagerの初期化 (ほしを見る機能用)
+    if (typeof SkyManager !== 'undefined') {
+        SkyManager.init();
+    }
 };
 
 function tryAutoLoad() {
@@ -319,7 +328,7 @@ function scanMapAndSetupObjects() {
                 player.x = x * TILE_SIZE + (TILE_SIZE - player.width) / 2;
                 player.y = y * TILE_SIZE;
 
-                // ★追加: スタート位置を保存
+                // スタート位置を保存
                 spawnPoint.x = player.x;
                 spawnPoint.y = player.y;
 
@@ -667,12 +676,24 @@ function checkTileAt(x, y) {
             }
             return;
         }
-        // ★修正: つくる
         if (cell.id === 113) {
             startCraftMode();
             return;
         }
+        
+        // ★追加: うちあげ (ID: 114)
         if (cell.id === 114) {
+            if (typeof LaunchManager !== 'undefined') {
+                LaunchManager.start();
+            }
+            return;
+        }
+
+        // ★追加: ほしを見る (ID: 115)
+        if (cell.id === 115) {
+            if (typeof SkyManager !== 'undefined') {
+                SkyManager.startGazing();
+            }
             return;
         }
 
@@ -709,9 +730,22 @@ function checkInteraction() {
                     }
                     return;
                 }
-                // ★修正: つくる
                 if (st.id === 113) {
                     startCraftMode();
+                    return;
+                }
+                // ★追加: うちあげ
+                if (st.id === 114) {
+                    if (typeof LaunchManager !== 'undefined') {
+                        LaunchManager.start();
+                    }
+                    return;
+                }
+                // ★追加: ほしを見る
+                if (st.id === 115) {
+                    if (typeof SkyManager !== 'undefined') {
+                        SkyManager.startGazing();
+                    }
                     return;
                 }
             }
@@ -1029,7 +1063,7 @@ window.loadStage = function (url, isAtelier = false) {
         });
 };
 
-// --- ★追加機能: クラフト開始 ---
+// --- ★クラフト開始 ---
 function startCraftMode() {
     const currentTotal = totalItemCount + score;
     if (currentTotal < 1) {
@@ -1038,7 +1072,7 @@ function startCraftMode() {
         return;
     }
 
-    // クラフトマネージャ起動 (この時点では消費しない)
+    // クラフトマネージャ起動
     isGameRunning = false;
     if (gameLoopId) cancelAnimationFrame(gameLoopId);
 
@@ -1052,7 +1086,7 @@ function startCraftMode() {
     }
 }
 
-// --- ★追加機能: クラフト消費 ---
+// --- ★クラフト消費 ---
 window.consumeCraftMaterials = function (setAmount) {
     const cost = setAmount * 1;
     if (score >= cost) {
@@ -1066,7 +1100,7 @@ window.consumeCraftMaterials = function (setAmount) {
 };
 
 
-// --- ★追加機能: クラフト終了時の復帰 ---
+// --- ★クラフト終了時の復帰 ---
 window.resetGameFromCraft = function (starRewardAmount) {
     isGameRunning = true;
 
@@ -1080,14 +1114,13 @@ window.resetGameFromCraft = function (starRewardAmount) {
     }
     updateScoreDisplay();
 
-    // ★修正: 完了時も中断時も、常に初期位置(入り口)に戻して作業台への再接触ループを防ぐ
+    // 常に初期位置(入り口)に戻して作業台への再接触ループを防ぐ
     if (spawnPoint) {
         player.x = spawnPoint.x;
         player.y = spawnPoint.y;
     }
     player.vx = 0;
     player.vy = 0;
-    // 即座の誤操作防止のためクールダウンを設定
     player.cooldown = 30;
 
     updateCamera();

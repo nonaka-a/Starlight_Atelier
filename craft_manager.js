@@ -497,7 +497,7 @@ const CraftManager = {
     },
 
     // 情報表示用の黄色枠ウィンドウ
-    drawYellowWindow: function (offsetX, cx, cy, w, h, title, content, contentColor) {
+    drawYellowWindow: function (offsetX, cx, cy, w, h, title, content, contentColor, unitText) {
         const ctx = this.ctx;
         const r = 15;
         const tx = offsetX + cx;
@@ -534,9 +534,36 @@ const CraftManager = {
         // 内容
         if (content !== undefined) {
             ctx.fillStyle = contentColor || "#333";
-            ctx.font = "bold 48px 'M PLUS Rounded 1c', sans-serif";
-            ctx.textAlign = 'center';
-            ctx.fillText(content, w / 2, title ? 65 : h / 2 + 15);
+            const baseY = title ? 65 : h / 2 + 15;
+
+            if (unitText) {
+                // 単位がある場合はサイズ違いで横並び
+                ctx.font = "bold 48px 'M PLUS Rounded 1c', sans-serif";
+                const contentW = ctx.measureText(content).width;
+
+                ctx.font = "bold 24px 'M PLUS Rounded 1c', sans-serif";
+                const unitW = ctx.measureText(unitText).width;
+
+                // 全体の幅から開始位置を計算 (中央揃え)
+                const totalW = contentW + unitW;
+                let currentX = (w - totalW) / 2;
+
+                // 数値描画
+                ctx.fillStyle = contentColor || "#333";
+                ctx.font = "bold 48px 'M PLUS Rounded 1c', sans-serif";
+                ctx.textAlign = 'left';
+                ctx.fillText(content, currentX, baseY);
+
+                // 単位描画
+                ctx.font = "bold 24px 'M PLUS Rounded 1c', sans-serif";
+                ctx.fillText(unitText, currentX + contentW, baseY);
+
+            } else {
+                // 従来通り中央揃え
+                ctx.font = "bold 48px 'M PLUS Rounded 1c', sans-serif";
+                ctx.textAlign = 'center';
+                ctx.fillText(content, w / 2, baseY);
+            }
         }
         ctx.restore();
     },
