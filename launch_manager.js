@@ -1,3 +1,7 @@
+/* ------------------------------------------------------------
+   FILE: launch_manager.js (Dynamic Zoom Ver.)
+   ------------------------------------------------------------ */
+
 /**
  * --- Launch Manager: うちあげミニゲーム ---
  */
@@ -6,7 +10,7 @@ const LaunchManager = {
     state: 'select_type', // select_type, select_pos, animation
 
     // 選択データ
-    stockList: [], // { size: 0-2, color: code, gx: null, gy: null, placed: false }
+    stockList: [], 
     selectedColor: '#ffffff',
     costs: [10, 50, 100],
 
@@ -29,19 +33,20 @@ const LaunchManager = {
         btnLaunch: { x: 800, y: 400, w: 150, h: 60, text: "うちあげ" }
     },
 
-    // マップ選択用
     camera: { x: 0, y: 0 },
-    cursor: { gx: 0, gy: 0 }, // グリッド座標
+    cursor: { gx: 0, gy: 0 }, 
 
-    // 演出用
     animTimer: 0,
     launchIndex: 0,
     launchedItems: [],
 
     start: function () {
         if (typeof SkyManager === 'undefined' || !SkyManager.isLoaded) {
-            SkyManager.init(); // 未ロードなら初期化
+            SkyManager.init(); 
         }
+        
+        // ★修正: うちあげ時はズームアウト (0.5)
+        SkyManager.viewScale = 0.5;
 
         const ui = document.getElementById('ui-container');
         if (ui) ui.style.display = 'none';
@@ -50,8 +55,12 @@ const LaunchManager = {
         this.state = 'select_type';
         this.stockList = [];
         this.selectedColor = '#ffffff';
-        this.camera.x = (SkyManager.worldWidth - 1000) / 2;
-        this.camera.y = (SkyManager.worldHeight - 600) / 2;
+        
+        const visibleW = 1000 / SkyManager.viewScale;
+        const visibleH = 600 / SkyManager.viewScale;
+        this.camera.x = (SkyManager.worldWidth - visibleW) / 2;
+        this.camera.y = (SkyManager.worldHeight - visibleH) / 2;
+        this.clampCamera();
 
         if (typeof isGameRunning !== 'undefined') isGameRunning = false;
         if (typeof gameLoopId !== 'undefined' && gameLoopId) cancelAnimationFrame(gameLoopId);
@@ -65,7 +74,6 @@ const LaunchManager = {
         const ui = document.getElementById('ui-container');
         if (ui) ui.style.display = 'block';
 
-        // 未使用分の払い戻し (キャンセル時・配置前にやめた時)
         if (this.state === 'select_type' || this.state === 'select_pos') {
             let refund = 0;
             this.stockList.forEach(item => {
@@ -91,7 +99,6 @@ const LaunchManager = {
     },
 
     update: function () {
-        // キャンセル共通
         if (this.state !== 'animation') {
             if (this.checkBtn(this.ui.btnCancel)) {
                 this.stop();
@@ -110,7 +117,6 @@ const LaunchManager = {
 
     updateSelectType: function () {
         if (Input.isJustPressed) {
-            // サイズ選択
             for (let i = 0; i < this.ui.sizes.length; i++) {
                 const b = this.ui.sizes[i];
                 if (this.hitTest(b.x, b.y, b.w, b.h)) {
@@ -128,7 +134,6 @@ const LaunchManager = {
                     }
                 }
             }
-            // 色選択
             for (let i = 0; i < this.ui.colors.length; i++) {
                 const c = this.ui.colors[i];
                 const dx = Input.x - c.x;
@@ -139,7 +144,6 @@ const LaunchManager = {
                 }
             }
 
-            // おっけーボタン
             if (this.stockList.length > 0) {
                 if (this.checkBtn(this.ui.btnOk)) {
                     this.state = 'select_pos';
@@ -150,34 +154,29 @@ const LaunchManager = {
     },
 
     updateSelectPos: function () {
-        // ドラッグでカメラ移動
         if (Input.isDown) {
-            const scrollSpeed = 10;
+            const scrollSpeed = 10 / SkyManager.viewScale; 
             if (Input.x < 100) this.camera.x -= scrollSpeed;
             if (Input.x > 900) this.camera.x += scrollSpeed;
             if (Input.y < 100) this.camera.y -= scrollSpeed;
             if (Input.y > 500) this.camera.y += scrollSpeed;
 
-            this.camera.x = Math.max(0, Math.min(SkyManager.worldWidth - 1000, this.camera.x));
-            this.camera.y = Math.max(0, Math.min(SkyManager.worldHeight - 600, this.camera.y));
+            this.clampCamera();
         }
 
-        // カーソル座標の計算
-        const wx = Input.x + this.camera.x;
-        const wy = Input.y + this.camera.y;
+        const wx = (Input.x / SkyManager.viewScale) + this.camera.x;
+        const wy = (Input.y / SkyManager.viewScale) + this.camera.y;
+        
         this.cursor.gx = Math.floor(wx / SkyManager.gridSize);
         this.cursor.gy = Math.floor(wy / SkyManager.gridSize);
 
-        // 決定（クリック）
         if (Input.isJustPressed) {
-            // うちあげボタン
             const placedItems = this.stockList.filter(it => it.placed);
             if (placedItems.length > 0 && this.checkBtn(this.ui.btnLaunch)) {
                 this.startAnimation();
                 return;
             }
 
-            // マスへの配置
             const nextItem = this.stockList.find(it => !it.placed);
             if (nextItem && Input.y < 400) {
                 nextItem.gx = this.cursor.gx;
@@ -186,6 +185,17 @@ const LaunchManager = {
                 AudioSys.playTone(600, 'sine', 0.1);
             }
         }
+    },
+
+    clampCamera: function() {
+        const visibleW = 1000 / SkyManager.viewScale;
+        const visibleH = 600 / SkyManager.viewScale;
+        
+        const maxX = Math.max(0, SkyManager.worldWidth - visibleW);
+        const maxY = Math.max(0, SkyManager.worldHeight - visibleH);
+
+        this.camera.x = Math.max(0, Math.min(maxX, this.camera.x));
+        this.camera.y = Math.max(0, Math.min(maxY, this.camera.y));
     },
 
     startAnimation: function () {
@@ -197,10 +207,9 @@ const LaunchManager = {
 
     updateAnimation: function () {
         this.animTimer++;
-
         const currentItem = this.launchedItems[this.launchIndex];
         if (!currentItem) {
-            if (this.animTimer > 120) { // 2秒の余韻
+            if (this.animTimer > 120) {
                 this.stop();
             }
             return;
@@ -217,7 +226,7 @@ const LaunchManager = {
         if (phase === 99) {
             this.launchIndex++;
             if (this.launchIndex >= this.launchedItems.length) {
-                this.animTimer = 0; // 終了後の余韻用
+                this.animTimer = 0;
             }
         }
     },
@@ -231,7 +240,6 @@ const LaunchManager = {
             this.drawMapMode(ctx);
         }
 
-        // 共通UI
         if (this.state !== 'animation') {
             this.drawBtn(ctx, this.ui.btnCancel, '#ff6b6b');
         }
@@ -248,7 +256,6 @@ const LaunchManager = {
         ctx.font = "bold 20px 'M PLUS Rounded 1c', sans-serif";
         ctx.fillText("左でえらんで、おっけーを押してね", 500, 110);
 
-        // サイズボタン
         this.ui.sizes.forEach((b, i) => {
             const canBuy = (totalStarCount >= b.cost);
             ctx.fillStyle = canBuy ? '#fff' : '#555';
@@ -276,7 +283,6 @@ const LaunchManager = {
             ctx.stroke();
         });
 
-        // 色パレット
         this.ui.colors.forEach((c) => {
             const isSelect = (this.selectedColor === c.code);
             ctx.fillStyle = c.code;
@@ -334,20 +340,45 @@ const LaunchManager = {
 
     drawMapMode: function (ctx) {
         if (SkyManager.canvas) {
-            ctx.drawImage(SkyManager.canvas, this.camera.x, this.camera.y, 1000, 600, 0, 0, 1000, 600);
+            const sScale = SkyManager.resolutionScale; 
+            const vScale = SkyManager.viewScale;       
+            
+            const sWidth = (1000 / vScale) * sScale;
+            const sHeight = (600 / vScale) * sScale;
+            const sX = (this.camera.x) * sScale;
+            const sY = (this.camera.y) * sScale;
+
+            ctx.drawImage(
+                SkyManager.canvas,
+                sX, sY, sWidth, sHeight,
+                0, 0, 1000, 600
+            );
+        } else {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, 1000, 600);
+        }
+
+        if (SkyManager.mountainImage.complete && SkyManager.mountainImage.naturalWidth > 0) {
+            const visibleW = 1000 / SkyManager.viewScale;
+            const visibleH = 600 / SkyManager.viewScale;
+            ctx.drawImage(
+                SkyManager.mountainImage,
+                this.camera.x, this.camera.y, visibleW, visibleH,
+                0, 0, 1000, 600
+            );
         }
 
         if (this.state === 'select_pos') {
-            // 配置済みのプレビュー
             this.stockList.forEach(it => {
                 if (it.placed) {
-                    const px = it.gx * SkyManager.gridSize - this.camera.x;
-                    const py = it.gy * SkyManager.gridSize - this.camera.y;
+                    const px = (it.gx * SkyManager.gridSize - this.camera.x) * SkyManager.viewScale;
+                    const py = (it.gy * SkyManager.gridSize - this.camera.y) * SkyManager.viewScale;
+                    
                     let radius = 1;
                     if (it.size === 1) radius = 2;
                     if (it.size === 2) radius = 4;
-                    const size = (radius * 2 + 1) * SkyManager.gridSize;
-                    const offset = radius * SkyManager.gridSize;
+                    const size = (radius * 2 + 1) * SkyManager.gridSize * SkyManager.viewScale;
+                    const offset = radius * SkyManager.gridSize * SkyManager.viewScale;
 
                     ctx.strokeStyle = it.color;
                     ctx.lineWidth = 2;
@@ -359,13 +390,15 @@ const LaunchManager = {
 
             const nextItem = this.stockList.find(it => !it.placed);
             if (nextItem) {
-                const sx = this.cursor.gx * SkyManager.gridSize - this.camera.x;
-                const sy = this.cursor.gy * SkyManager.gridSize - this.camera.y;
+                const sx = (this.cursor.gx * SkyManager.gridSize - this.camera.x) * SkyManager.viewScale;
+                const sy = (this.cursor.gy * SkyManager.gridSize - this.camera.y) * SkyManager.viewScale;
+                
                 let radius = 1;
                 if (nextItem.size === 1) radius = 2;
                 if (nextItem.size === 2) radius = 4;
-                const size = (radius * 2 + 1) * SkyManager.gridSize;
-                const offset = radius * SkyManager.gridSize;
+                
+                const size = (radius * 2 + 1) * SkyManager.gridSize * SkyManager.viewScale;
+                const offset = radius * SkyManager.gridSize * SkyManager.viewScale;
 
                 ctx.strokeStyle = '#fff';
                 ctx.lineWidth = 2;
@@ -393,8 +426,8 @@ const LaunchManager = {
         if (!currentItem) return;
 
         const phase = this.animTimer % 100;
-        const tx = currentItem.gx * SkyManager.gridSize - this.camera.x + 16;
-        const ty = currentItem.gy * SkyManager.gridSize - this.camera.y + 16;
+        const tx = (currentItem.gx * SkyManager.gridSize - this.camera.x + 16) * SkyManager.viewScale;
+        const ty = (currentItem.gy * SkyManager.gridSize - this.camera.y + 16) * SkyManager.viewScale;
         const sy = 600;
 
         if (phase < 60) {
