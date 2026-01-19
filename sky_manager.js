@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------
-   FILE: sky_manager.js (Star Size Adjustment Ver.)
+   FILE: sky_manager.js (Debug Save/Load Ver.)
    ------------------------------------------------------------ */
 
 /**
@@ -10,10 +10,9 @@ const SkyManager = {
     worldWidth: 2000,
     worldHeight: 1200,
     gridSize: 32,
-    resolutionScale: 1.0, // 軽量化維持
-    viewScale: 0.5,       // デフォルト倍率
+    resolutionScale: 1.0, 
+    viewScale: 0.5,       
 
-    // ★ここに追加：シャドウを使うかどうかのスイッチ[true false]
     useShadow: true,
     
     // 内部変数
@@ -55,9 +54,13 @@ const SkyManager = {
         const checkLoad = () => {
             loadedCount++;
             if (loadedCount >= totalImages) {
+                console.log("SkyManager: Images Loaded.");
                 this.isLoaded = true;
                 this.initBackground();
+                
+                // ロード待ちデータがあれば復元
                 if (this.pendingLoadData) {
+                    console.log("SkyManager: Found pending data, restoring...");
                     this.restoreStarData(this.pendingLoadData);
                     this.pendingLoadData = null;
                 }
@@ -101,25 +104,35 @@ const SkyManager = {
 
     // --- データ保存・読み込み ---
     getStarData: function() {
+        // 現在のリストを返す
         return this.starDataList;
     },
 
     setStarData: function(dataList) {
-        if (!dataList || !Array.isArray(dataList)) return;
+        if (!dataList || !Array.isArray(dataList)) {
+            console.warn("SkyManager: Invalid data set.");
+            return;
+        }
+        console.log(`SkyManager: Received ${dataList.length} stars.`);
+        
         if (this.isLoaded) {
             this.restoreStarData(dataList);
         } else {
+            console.log("SkyManager: Not loaded yet, pending data.");
             this.pendingLoadData = dataList;
         }
     },
 
     restoreStarData: function(dataList) {
-        this.starDataList = dataList; 
-        this.initBackground(); 
+        this.starDataList = dataList; // リストを上書き復元
+        this.initBackground(); // キャンバスを一度クリア（背景のみにする）
+        
+        // 全ての星を再描画
         for (const s of this.starDataList) {
+            // 第8引数 false = 履歴には追加しない(二重追加防止)
             this.drawSingleStamp(this.ctx, s.x, s.y, s.row, s.col, s.color, s.scale, false);
         }
-        console.log(`Restored ${this.starDataList.length} stars.`);
+        console.log(`SkyManager: Restored ${this.starDataList.length} stars on canvas.`);
     },
 
     // --- 描画ロジック ---
@@ -134,7 +147,7 @@ const SkyManager = {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         
-        // ステップ1
+        // ステップ1: 基本エリア
         for (let dy = -radius; dy <= radius; dy++) {
             for (let dx = -radius; dx <= radius; dx++) {
                 const dist = Math.sqrt(dx * dx + dy * dy);
@@ -144,37 +157,46 @@ const SkyManager = {
                 if (dist <= 1.0) densityIndex = 0; 
                 else if (dist <= radius * 0.6) densityIndex = 1; 
 
+                // 密度のダウングレード（確率はそのまま）
                 if (densityIndex === 0 && Math.random() < 0.66) densityIndex = 1;
                 else if (densityIndex === 1 && Math.random() < 0.66) densityIndex = 2;
 
-                if (densityIndex === 2 && Math.random() < 0.4) continue;
-                if (densityIndex === 1 && Math.random() < 0.1) continue;
+                // ★修正: 間引き率を緩和（iPad等でスカスカにならないように）
+                // 低密度: 40%除外 -> 20%除外に変更
+                if (densityIndex === 2 && Math.random() < 0.2) continue;
+                // 中密度: 10%除外 -> 0% (必ず描く)
+                // if (densityIndex === 1 && Math.random() < 0.1) continue; 
 
                 this.drawStampAtGrid(gridX + dx, gridY + dy, densityIndex, color);
 
+                // 重ね打ち（確率はそのまま）
                 if (densityIndex === 0 && Math.random() < 0.5) {
                     this.drawStampAtGrid(gridX + dx, gridY + dy, densityIndex, color);
                 }
             }
         }
 
-        // ステップ2
-        const spikeCount = 2 + Math.floor(Math.random() * 2); 
+        // ステップ2: 拡張 (Spikes)
+        // ★修正: 本数を増やしてボリュームアップ
+        const spikeCount = 3 + Math.floor(Math.random() * 3); // 2~3本 -> 3~5本
         for (let i = 0; i < spikeCount; i++) {
             const angle = Math.random() * Math.PI * 2;
             const spikeLen = radius + 2 + Math.floor(Math.random() * 3);
+            
             for (let d = radius + 1; d <= spikeLen; d++) {
                 const ox = Math.round(Math.cos(angle) * d);
                 const oy = Math.round(Math.sin(angle) * d);
-                if (Math.random() < 0.6) {
+                // ★修正: 描画確率を上げる (0.6 -> 0.8)
+                if (Math.random() < 0.8) {
                     const spikeDensity = (Math.random() < 0.2) ? 1 : 2;
                     this.drawStampAtGrid(gridX + ox, gridY + oy, spikeDensity, color);
                 }
             }
         }
 
-        // ステップ3
-        const strayCount = 2 + Math.floor(Math.random() * 4);
+        // ステップ3: 飛び地 (近距離)
+        // ★修正: 個数を微増
+        const strayCount = 3 + Math.floor(Math.random() * 4); // 2~5 -> 3~6個
         for (let i = 0; i < strayCount; i++) {
             const angle = Math.random() * Math.PI * 2;
             const dist = radius * (1.5 + Math.random() * 0.8);
@@ -183,8 +205,9 @@ const SkyManager = {
             this.drawStampAtGrid(gridX + sx, gridY + sy, 2, color);
         }
 
-        // ステップ4
-        const farStrayCount = 3 + Math.floor(Math.random() * 4);
+        // ステップ4: 遠方飛び地
+        // ★修正: 個数を微増
+        const farStrayCount = 4 + Math.floor(Math.random() * 5); // 3~6 -> 4~8個
         for (let i = 0; i < farStrayCount; i++) {
             const angle = Math.random() * Math.PI * 2;
             const dist = radius * 2.5 + Math.random() * 6.0;
@@ -196,13 +219,13 @@ const SkyManager = {
         ctx.restore();
     },
 
+
     drawStampAtGrid: function (gx, gy, densityIndex, color) {
         const logicalPx = gx * this.gridSize;
         const logicalPy = gy * this.gridSize;
 
         if (logicalPx < 0 || logicalPx >= this.worldWidth || logicalPy < 0 || logicalPy >= this.worldHeight) return;
 
-        // ★修正: 星を大きくするので、位置ズレも少し大きく戻す
         const jitterX = (Math.random() - 0.5) * 20;
         const jitterY = (Math.random() - 0.5) * 20;
         const scale = 0.8 + Math.random() * 0.5;
@@ -220,35 +243,45 @@ const SkyManager = {
         );
     },
 
-    drawSingleStamp: function (ctx, x, y, row, col, color, scale) {
-    const sw = 64; 
-    const sh = 64;
-    const sx = col * sw;
-    const sy = row * sh;
+    drawSingleStamp: function (ctx, x, y, row, col, color, scale, record) {
+        // ★重要: 新規描画時のみリストに追加
+        if (record) {
+            this.starDataList.push({
+                x: x, y: y, row: row, col: col, color: color, scale: scale
+            });
+        }
 
-    const centerOffset = (this.gridSize / 2) * this.resolutionScale;
+        const sw = 64; 
+        const sh = 64;
+        const sx = col * sw;
+        const sy = row * sh;
 
-    ctx.save();
-    ctx.translate(x + centerOffset, y + centerOffset);
-    
-    const angle = Math.floor(Math.random() * 4) * (Math.PI / 2);
-    ctx.rotate(angle);
-    if (Math.random() < 0.5) ctx.scale(-scale, scale);
-    else ctx.scale(scale, scale);
+        const baseScale = 0.8; 
+        const centerOffset = (this.gridSize / 2) * this.resolutionScale;
 
-    ctx.globalCompositeOperation = 'lighter';
+        ctx.save();
+        ctx.translate(x + centerOffset, y + centerOffset);
+        
+        const angle = Math.floor(Math.random() * 4) * (Math.PI / 2);
+        ctx.rotate(angle);
+        
+        const finalScale = scale * baseScale;
 
-    // ★修正：スイッチがONの時だけ影を計算する
-    if (this.useShadow) {
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 15 * this.resolutionScale; 
-    }
+        if (Math.random() < 0.5) ctx.scale(-finalScale, finalScale);
+        else ctx.scale(finalScale, finalScale);
 
-    ctx.globalAlpha = 1.0;
-    ctx.drawImage(this.stampsImage, sx, sy, sw, sh, -sw / 2, -sh / 2, sw, sh);
+        ctx.globalCompositeOperation = 'lighter';
 
-    ctx.restore();
-},
+        if (this.useShadow) {
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 15 * this.resolutionScale; 
+        }
+
+        ctx.globalAlpha = 1.0;
+        ctx.drawImage(this.stampsImage, sx, sy, sw, sh, -sw / 2, -sh / 2, sw, sh);
+
+        ctx.restore();
+    },
 
     // --- モード制御 ---
     startGazing: function () {
