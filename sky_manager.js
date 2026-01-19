@@ -12,6 +12,9 @@ const SkyManager = {
     gridSize: 32,
     resolutionScale: 1.0, // 軽量化維持
     viewScale: 0.5,       // デフォルト倍率
+
+    // ★ここに追加：シャドウを使うかどうかのスイッチ[true false]
+    useShadow: true,
     
     // 内部変数
     canvas: null,
@@ -217,45 +220,35 @@ const SkyManager = {
         );
     },
 
-    drawSingleStamp: function (ctx, x, y, row, col, color, scale, record) {
-        if (record) {
-            this.starDataList.push({
-                x: x, y: y, row: row, col: col, color: color, scale: scale
-            });
-        }
+    drawSingleStamp: function (ctx, x, y, row, col, color, scale) {
+    const sw = 64; 
+    const sh = 64;
+    const sx = col * sw;
+    const sy = row * sh;
 
-        const sw = 64; 
-        const sh = 64;
-        const sx = col * sw;
-        const sy = row * sh;
+    const centerOffset = (this.gridSize / 2) * this.resolutionScale;
 
-        // ★修正: 星のサイズ調整
-        // 0.5だと小さすぎたので 0.8 に変更。
-        // これで 64px * 0.8 = 約51px の大きさで描画され、光の広がりが出ます。
-        const baseScale = 0.8; 
+    ctx.save();
+    ctx.translate(x + centerOffset, y + centerOffset);
+    
+    const angle = Math.floor(Math.random() * 4) * (Math.PI / 2);
+    ctx.rotate(angle);
+    if (Math.random() < 0.5) ctx.scale(-scale, scale);
+    else ctx.scale(scale, scale);
 
-        const centerOffset = (this.gridSize / 2) * this.resolutionScale;
+    ctx.globalCompositeOperation = 'lighter';
 
-        ctx.save();
-        ctx.translate(x + centerOffset, y + centerOffset);
-        
-        const angle = Math.floor(Math.random() * 4) * (Math.PI / 2);
-        ctx.rotate(angle);
-        
-        const finalScale = scale * baseScale;
-
-        if (Math.random() < 0.5) ctx.scale(-finalScale, finalScale);
-        else ctx.scale(finalScale, finalScale);
-
-        ctx.globalCompositeOperation = 'lighter';
+    // ★修正：スイッチがONの時だけ影を計算する
+    if (this.useShadow) {
         ctx.shadowColor = color;
-        ctx.shadowBlur = 15 * this.resolutionScale * 0.8; // ぼかしも少し戻す
-        ctx.globalAlpha = 1.0;
+        ctx.shadowBlur = 15 * this.resolutionScale; 
+    }
 
-        ctx.drawImage(this.stampsImage, sx, sy, sw, sh, -sw / 2, -sh / 2, sw, sh);
+    ctx.globalAlpha = 1.0;
+    ctx.drawImage(this.stampsImage, sx, sy, sw, sh, -sw / 2, -sh / 2, sw, sh);
 
-        ctx.restore();
-    },
+    ctx.restore();
+},
 
     // --- モード制御 ---
     startGazing: function () {
