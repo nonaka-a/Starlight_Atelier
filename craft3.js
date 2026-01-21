@@ -1,7 +1,5 @@
-
-
 /**
- * --- Craft 3: ほし焼き (画像差し替え版) ---
+ * --- Craft 3: ほし焼き (画像差し替え版・5個焼き対応) ---
  */
 
 // 画像リソース管理
@@ -115,6 +113,9 @@ const CraftFiring = {
     animFrameTimer: 0, // 全体のアニメーションフレームカウンタ
     doorAnimFrame: 0,  // 0(閉)～10(開)の11段階
     doorStateIndex: 0, // 0:閉, 1:半, 2:開 (画像切り替え用)
+    
+    // ★追加: 5個の星の個別パラメータ {ox, oy, rot, flip, baseScale}
+    starPieces: [],
 
     // 星の表示切り替え（フェード用）
     starTransition: {
@@ -188,6 +189,7 @@ const CraftFiring = {
         this.animFrameTimer = 0;
         this.doorAnimFrame = 0;
         this.doorStateIndex = 0;
+        this.starPieces = []; // リセット
         this.starTransition = { currentImg: null, prevImg: null, fade: 1.0 };
 
         this.ui.btnInsert.visible = true;
@@ -267,8 +269,18 @@ const CraftFiring = {
                 this.starSize = Math.max(0.6, this.starSize - 0.0003);
             }
 
+            // --- 高温時の処理 ---
             if (isHigh) {
                 this.timeOverheat++;
+
+                // ★追加: 高温ペナルティ (3秒ごとに1点減点)
+                // 180フレーム(3秒)経過するたびに減点
+                if (this.timeOverheat > 0 && this.timeOverheat % 180 === 0) {
+                    this.penaltyScore++;
+                    console.log("Overheat Penalty! Total deduction:", this.penaltyScore);
+                }
+
+                // 煙・焦げの演出処理
                 if (this.timeOverheat > 180) {
                     this.smokeLevel = 1;
                     if (this.timeOverheat % 10 === 0) {
@@ -284,11 +296,12 @@ const CraftFiring = {
                     this.bakeProgress = 100;
                 }
             } else {
+                // 適正温度に戻ったらカウントを徐々に減らす（冷却猶予）
                 this.timeOverheat = Math.max(0, this.timeOverheat - 1);
                 if (this.timeOverheat < 180) this.smokeLevel = 0;
             }
 
-            // 低温ペナルティのカウント (適正温度より低い時)
+            // --- 低温ペナルティ ---
             if (isLow) {
                 this.timeLowTemp++;
                 if (this.timeLowTemp >= 180) { // 3秒(180フレーム)
@@ -297,10 +310,13 @@ const CraftFiring = {
                     console.log("Low Temp Penalty! Total deduction:", this.penaltyScore);
                 }
             } else {
-                // 適正温度以上ならカウントリセットするか、累積するか？
-                // 「3秒経過ごとに」なので、累計ではなく「連続」または「合計」だが、通常は「合計」が分かりやすい
-                // ここでは「合計」でカウントし続けるようにし、リセットはしない（または適正温度なら0に戻す仕様もあるが、指示通り「経過ごとに」なので合計で行く）
-                // ただし、一度適正に戻ったらカウントを止める
+                // 低温は累積させないならここでリセット、させるなら何もしない
+                // 現状はリセットせず（適正に戻ってもカウント維持するならこのelseは空でOK）
+                // 指示通りなら「3秒経過ごとに」なので、一旦リセットしない方が厳しい判定になるが、
+                // 通常のゲームバランス的には「適正に戻ったらリセット」が自然かもしれません。
+                // ここでは既存のコードに合わせて何もしない（累積継続）か、リセットするか選べますが、
+                // 高温側が「徐々に減らす」仕様なので、低温側も合わせるなら以下のようにしても良いです。
+                // this.timeLowTemp = Math.max(0, this.timeLowTemp - 1);
             }
         }
 
@@ -309,7 +325,6 @@ const CraftFiring = {
         }
 
         // 演出: 扉の状態 (0=閉, 1=半, 2=開)
-        // 12fps (60fpsなら5フレームで1コマ移動)
         const targetAnimFrame = this.isDoorOpen ? 10 : 0;
         if (this.doorAnimFrame < targetAnimFrame) this.doorAnimFrame++;
         if (this.doorAnimFrame > targetAnimFrame) this.doorAnimFrame--;
@@ -409,6 +424,24 @@ const CraftFiring = {
         this.starState = 'raw';
         this.ui.btnInsert.visible = false;
         AudioSys.playTone(600, 'sine', 0.1);
+
+        // ★修正: 固定配置パターン（見栄え重視）
+        // 奥から手前の順序で描画されるようにY座標を調整済み
+        this.starPieces = [
+            // 1. 左奥
+            { ox: -100, oy: 20, rot: -0.2, flip: 1, baseScale: 0.55 },
+            // 2. 右奥
+            { ox: 100, oy: 20, rot: 0.2, flip: -1, baseScale: 0.6 },
+            // 3. 中央（少し奥）
+            { ox: 0, oy: 15, rot: 0.05, flip: 1, baseScale: 0.65 },
+            // 4. 左手前
+            { ox: -60, oy: 40, rot: 0.15, flip: -1, baseScale: 0.75 },
+            // 5. 右手前
+            { ox: 60, oy: 45, rot: -0.1, flip: 1, baseScale: 0.78 }
+        ];
+        
+        // 念のため描画順（Y座標昇順）でソート
+        this.starPieces.sort((a, b) => a.oy - b.oy);
     },
 
     finishBaking: function () {
@@ -494,21 +527,45 @@ const CraftFiring = {
 
         // --- 星のオーバーラップ描画 ---
         if (this.starState !== 'none' && this.bakeProgress < 100) {
-            const size = 150 * this.starSize;
+            // フェード状態取得
+            const currentImg = this.starTransition.currentImg;
+            const prevImg = this.starTransition.prevImg;
+            const fade = this.starTransition.fade;
 
-            // 前の画像（フェードアウト）
-            if (this.starTransition.prevImg && this.starTransition.prevImg.complete) {
-                ctx.save();
-                ctx.globalAlpha = 1.0 - this.starTransition.fade;
-                ctx.drawImage(this.starTransition.prevImg, bakeCx - size / 2, bakeCy - size / 2 + 20, size, size);
-                ctx.restore();
-            }
-            // 今の画像（フェードイン）
-            if (this.starTransition.currentImg && this.starTransition.currentImg.complete) {
-                ctx.save();
-                ctx.globalAlpha = this.starTransition.fade;
-                ctx.drawImage(this.starTransition.currentImg, bakeCx - size / 2, bakeCy - size / 2 + 20, size, size);
-                ctx.restore();
+            // 5個の星を順番に描画
+            if (this.starPieces.length > 0) {
+                for(const piece of this.starPieces) {
+                    const px = bakeCx + piece.ox;
+                    const py = bakeCy + piece.oy;
+                    
+                    // starSize (低温縮小ペナルティ) も適用
+                    const size = 150 * piece.baseScale * this.starSize; 
+                    
+                    ctx.save();
+                    ctx.translate(px, py);
+                    ctx.rotate(piece.rot);
+                    ctx.scale(piece.flip, 1); // 左右反転
+
+                    // 前の画像（フェードアウト）
+                    if (prevImg && prevImg.complete) {
+                        ctx.save();
+                        ctx.globalAlpha = 1.0 - fade;
+                        ctx.drawImage(prevImg, -size / 2, -size / 2, size, size);
+                        ctx.restore();
+                    }
+                    // 今の画像（フェードイン）
+                    if (currentImg && currentImg.complete) {
+                        ctx.save();
+                        ctx.globalAlpha = fade;
+                        ctx.drawImage(currentImg, -size / 2, -size / 2, size, size);
+                        ctx.restore();
+                    }
+                    
+                    ctx.restore();
+                }
+            } else {
+                // 万が一 starPieces がない場合（リセット直後など）のフォールバック
+                // 通常は insertStar で入る
             }
 
             // 煙エフェクト (ぼかし・歪み版)
@@ -535,11 +592,7 @@ const CraftFiring = {
         }
 
         // 4. 扉の描画
-        // 開閉アニメは2枚の中割りを使うか、stateIndexで切り替える
-        // ここでは単純に doorStateIndex (0, 2) を使用。中割りを入れるならupdateで制御。
         let doorImg = imgs.door[this.doorStateIndex];
-        // 半開きを入れるロジック例: isDoorOpenが切り替わった直後数フレームだけ1にする等
-        // 今回はシンプルに開閉のみ
 
         if (doorImg && doorImg.complete) {
             // そのままのサイズで描画 (少し下へ +10px)
@@ -548,7 +601,7 @@ const CraftFiring = {
             if (this.doorStateIndex === 2) dx += 260; // 開いている時は260px右へ
             ctx.drawImage(doorImg, dx, dy);
         } else {
-            // 画像がない場合の代替 (既存のdrawKilnの一部ロジックは削除済みなので枠だけ)
+            // 画像がない場合の代替
             if (!this.isDoorOpen) {
                 ctx.fillStyle = 'rgba(100, 50, 0, 0.5)';
                 ctx.fillRect(bakeCx - 170, bakeCy - 90, 340, 180);
@@ -576,7 +629,7 @@ const CraftFiring = {
         // 5. UI (ボタン等)
         this.drawUI(offsetX);
 
-        // 6. 焼き上がり拡大表示
+        // 6. 焼き上がり拡大表示 (ここだけ星1つに戻す)
         if (this.bakeProgress >= 100) {
             this.drawFinishedStar(offsetX);
         }
@@ -607,7 +660,7 @@ const CraftFiring = {
         ctx.textBaseline = 'middle';
         ctx.fillText("まき", offsetX + btnF.x + btnF.w / 2 - 10, btnF.y + btnF.h / 2 - 10); // さらに10px上、10px左へ
 
-        // -- 入れるボタン (生星画像 + テキスト) --
+        // -- 入れるボタン (生星画像1個 + テキスト) --
         if (this.ui.btnInsert.visible) {
             const btnI = this.ui.btnInsert;
             if (imgs.star.raw.complete) {
