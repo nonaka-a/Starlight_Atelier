@@ -487,23 +487,6 @@ const CraftFiring = {
             }
         }
 
-        // 投げ込まれる薪
-        for (const w of this.thrownWoods) {
-            const x = (1 - w.t) * w.sx + w.t * w.tx;
-            const y = (1 - w.t) * w.sy + w.t * w.ty - Math.sin(w.t * Math.PI) * w.h;
-
-            ctx.save();
-            ctx.translate(offsetX + x, y);
-            ctx.rotate(w.t * Math.PI); // 回転量を1/4へ (元は 4 * PI)
-            if (imgs.wood.thrown.complete) {
-                // そのままのサイズ
-                ctx.drawImage(imgs.wood.thrown, -imgs.wood.thrown.width / 2, -imgs.wood.thrown.height / 2);
-            } else {
-                ctx.fillStyle = '#5d4037';
-                ctx.fillRect(-20, -10, 40, 20);
-            }
-            ctx.restore();
-        }
 
         // 3. 窯の中身 (星)
         const bakeCx = offsetX + 500;
@@ -570,6 +553,24 @@ const CraftFiring = {
                 ctx.fillStyle = 'rgba(100, 50, 0, 0.5)';
                 ctx.fillRect(bakeCx - 170, bakeCy - 90, 340, 180);
             }
+        }
+
+        // 投げ込まれる薪
+        for (const w of this.thrownWoods) {
+            const x = (1 - w.t) * w.sx + w.t * w.tx;
+            const y = (1 - w.t) * w.sy + w.t * w.ty - Math.sin(w.t * Math.PI) * w.h;
+
+            ctx.save();
+            ctx.translate(offsetX + x, y);
+            ctx.rotate(w.t * Math.PI); // 回転量を1/4へ (元は 4 * PI)
+            if (imgs.wood.thrown.complete) {
+                // そのままのサイズ
+                ctx.drawImage(imgs.wood.thrown, -imgs.wood.thrown.width / 2, -imgs.wood.thrown.height / 2);
+            } else {
+                ctx.fillStyle = '#5d4037';
+                ctx.fillRect(-20, -10, 40, 20);
+            }
+            ctx.restore();
         }
 
         // 5. UI (ボタン等)
