@@ -129,7 +129,6 @@ window.onload = () => {
 
     document.getElementById('file-input').addEventListener('change', manualLoadMap);
 
-    // ★修正: リセットボタンイベント (存在確認を追加してエラー回避)
     const btnSettings = document.getElementById('btn-settings');
     if (btnSettings) {
         btnSettings.addEventListener('click', () => {
@@ -154,7 +153,6 @@ window.onload = () => {
     setupControls();
     window.addEventListener('resize', fitWindow);
 
-    // デバッグ機能 (iPad等の入力モード対策のため e.code で判定)
     window.addEventListener('keydown', (e) => {
         if (e.code === 'KeyH') {
             totalItemCount += 5;
@@ -177,7 +175,6 @@ window.onload = () => {
             tryAutoLoad();
         });
 
-    // 譜面データの自動読み込み
     fetch('json/chart.json')
         .then(res => {
             if (!res.ok) throw new Error("Chart not found");
@@ -193,14 +190,220 @@ window.onload = () => {
             console.log("chart.jsonが見つかりませんでした (ランダム生成モード)");
         });
 
-    // SkyManagerの初期化
     if (typeof SkyManager !== 'undefined') {
         SkyManager.init();
     }
 
-    // ★データロード
     DataManager.load();
 };
+
+function setupControls() {
+    // 既存のsetupControlsの中身... (省略せずに記述します)
+    window.addEventListener('keydown', (e) => {
+        AudioSys.init();
+        if (typeof AudioSys.playBGM === 'function' && !AudioSys.bgmSource && !AudioSys.isMuted) {
+            const bgmName = (typeof isAtelierMode !== 'undefined' && isAtelierMode) ? 'atelier' : 'forest';
+            AudioSys.playBGM(bgmName, 0.3);
+        }
+
+        if (e.code === 'Space') keys.Space = true;
+        if (e.code === 'ArrowLeft') keys.ArrowLeft = true;
+        if (e.code === 'ArrowRight') keys.ArrowRight = true;
+        if (e.code === 'ArrowDown') keys.ArrowDown = true;
+        if (e.code === 'KeyB' || e.code === 'KeyZ') keys.KeyB = true;
+        if (e.code === 'KeyC') keys.KeyC = true;
+    });
+
+    window.addEventListener('keyup', (e) => {
+        if (e.code === 'Space') keys.Space = false;
+        if (e.code === 'ArrowLeft') keys.ArrowLeft = false;
+        if (e.code === 'ArrowRight') keys.ArrowRight = false;
+        if (e.code === 'ArrowDown') keys.ArrowDown = false;
+        if (e.code === 'KeyB' || e.code === 'KeyZ') keys.KeyB = false;
+        if (e.code === 'KeyC') keys.KeyC = false;
+    });
+
+    window.addEventListener('mousedown', (e) => {
+        Input.isDown = true;
+        Input._pressedThisFrame = true;
+        const pos = Input.updatePosition(e.clientX, e.clientY);
+        Input.x = pos.x;
+        Input.y = pos.y;
+        if (typeof AudioSys !== 'undefined') AudioSys.init();
+    });
+    window.addEventListener('mousemove', (e) => {
+        const pos = Input.updatePosition(e.clientX, e.clientY);
+        Input.x = pos.x;
+        Input.y = pos.y;
+    });
+    window.addEventListener('mouseup', () => {
+        Input.isDown = false;
+    });
+
+    const onTouchStart = (e) => {
+        if (e.cancelable) e.preventDefault();
+        if (typeof AudioSys !== 'undefined') AudioSys.init();
+
+        Input.isDown = true;
+        Input._pressedThisFrame = true;
+
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const t = e.changedTouches[i];
+            const pos = Input.updatePosition(t.clientX, t.clientY);
+            Input.touches.push({
+                id: t.identifier,
+                x: pos.x,
+                y: pos.y,
+                isJustPressed: true
+            });
+            if (i === 0) {
+                Input.x = pos.x;
+                Input.y = pos.y;
+            }
+        }
+    };
+
+    const onTouchMove = (e) => {
+        if (e.cancelable) e.preventDefault();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const t = e.changedTouches[i];
+            const pos = Input.updatePosition(t.clientX, t.clientY);
+            const found = Input.touches.find(it => it.id === t.identifier);
+            if (found) {
+                found.x = pos.x;
+                found.y = pos.y;
+            }
+            Input.x = pos.x;
+            Input.y = pos.y;
+        }
+    };
+
+    const onTouchEnd = (e) => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const t = e.changedTouches[i];
+            const idx = Input.touches.findIndex(it => it.id === t.identifier);
+            if (idx !== -1) {
+                Input.touches.splice(idx, 1);
+            }
+        }
+        if (Input.touches.length === 0) {
+            Input.isDown = false;
+        }
+    };
+
+    setTimeout(() => {
+        if (canvas) {
+            canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+            canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+            canvas.addEventListener('touchend', onTouchEnd);
+            canvas.addEventListener('touchcancel', onTouchEnd);
+        }
+    }, 500);
+
+    // ★追加: タブレット・スマホ用 データ消失対策
+    // アプリがバックグラウンドに行った時などに強制保存
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            DataManager.save();
+        }
+    });
+    window.addEventListener('pagehide', () => {
+        DataManager.save();
+    });
+
+    setupTouchControls();
+}
+
+// ... 以降、既存の関数群 (changeZoom以降) は変更なしのため省略せず記述 ...
+
+function setupTouchControls() {
+    const bindTouch = (id, code) => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+
+        const down = (e) => {
+            if (e.cancelable) e.preventDefault();
+            AudioSys.init();
+            if (typeof AudioSys.playBGM === 'function' && !AudioSys.bgmSource && !AudioSys.isMuted) {
+                const bgmName = (typeof isAtelierMode !== 'undefined' && isAtelierMode) ? 'atelier' : 'forest';
+                AudioSys.playBGM(bgmName, 0.3);
+            }
+            keys[code] = true;
+            btn.classList.add('active');
+        };
+
+        const up = (e) => {
+            if (e.cancelable) e.preventDefault();
+            keys[code] = false;
+            btn.classList.remove('active');
+        };
+
+        btn.addEventListener('touchstart', down, { passive: false });
+        btn.addEventListener('touchend', up);
+        btn.addEventListener('mousedown', down);
+        btn.addEventListener('mouseup', up);
+        btn.addEventListener('mouseleave', up);
+    };
+
+    bindTouch('btn-left', 'ArrowLeft');
+    bindTouch('btn-right', 'ArrowRight');
+    bindTouch('btn-down', 'ArrowDown');
+    bindTouch('btn-jump', 'Space');
+    bindTouch('btn-attack', 'KeyB');
+
+
+    document.getElementById('btn-fullscreen')?.addEventListener('click', toggleFullScreen);
+    document.getElementById('btn-mute')?.addEventListener('click', toggleMute);
+}
+
+function changeZoom(delta) {
+    ZOOM_LEVEL = Math.max(0.5, Math.min(3.0, ZOOM_LEVEL + delta));
+    if (typeof updateCamera === 'function') updateCamera();
+}
+
+function toggleFullScreen() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+    } else {
+        if (document.exitFullscreen) document.exitFullscreen();
+    }
+}
+
+function toggleMute() {
+    AudioSys.isMuted = !AudioSys.isMuted;
+    if (AudioSys.ctx) {
+        if (AudioSys.isMuted) {
+            AudioSys.ctx.suspend();
+        } else {
+            AudioSys.ctx.resume();
+            if (typeof AudioSys.playBGM === 'function' && !AudioSys.bgmSource) {
+                const bgmName = (typeof isAtelierMode !== 'undefined' && isAtelierMode) ? 'atelier' : 'forest';
+                AudioSys.playBGM(bgmName, 0.3);
+            }
+        }
+    }
+    const btn = document.getElementById('btn-mute');
+    if (btn) btn.textContent = AudioSys.isMuted ? "🔇" : "🔊";
+}
+
+function fitWindow() {
+    const wrapper = document.getElementById('main-wrapper');
+    const totalHeight = CANVAS_HEIGHT;
+    const totalWidth = CANVAS_WIDTH;
+
+    const scaleX = window.innerWidth / totalWidth;
+    const scaleY = window.innerHeight / totalHeight;
+    const scale = Math.min(scaleX, scaleY);
+
+    wrapper.style.transform = `scale(${scale})`;
+}
+
+function checkRectCollision(r1, r2) {
+    return r1.x < r2.x + r2.width &&
+        r1.x + r1.width > r2.x &&
+        r1.y < r2.y + r2.height &&
+        r1.y + r1.height > r2.y;
+}
 
 function tryAutoLoad() {
     loadStage(ATELIER_MAP_SRC, true);

@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------
-   FILE: sky_manager.js (Debug Save/Load Ver.)
+   FILE: sky_manager.js (Fix Data Loss Ver.)
    ------------------------------------------------------------ */
 
 /**
@@ -104,6 +104,11 @@ const SkyManager = {
 
     // --- データ保存・読み込み ---
     getStarData: function() {
+        // ★修正: 画像ロード待ちのデータがある場合はそれを返す (データ消失防止)
+        // これにより、ロード中にセーブが走っても空データで上書きされるのを防ぎます
+        if (this.pendingLoadData) {
+            return this.pendingLoadData;
+        }
         // 現在のリストを返す
         return this.starDataList;
     },
