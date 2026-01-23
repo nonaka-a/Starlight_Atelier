@@ -258,8 +258,23 @@ const LaunchManager = {
 
         if (Input.isJustPressed) {
             const placedItems = this.stockList.filter(it => it.placed);
+
+            // うちあげボタン
             if (placedItems.length > 0 && this.checkBtn(this.ui.btnLaunch)) {
                 this.startAnimation();
+                return;
+            }
+
+            // 1つもどるボタン (配置済みを1つキャンセル)
+            if (placedItems.length > 0 && this.checkBtn(this.ui.btnBack)) {
+                // 最後に配置したものを探す
+                const lastPlaced = [...this.stockList].reverse().find(it => it.placed);
+                if (lastPlaced) {
+                    lastPlaced.placed = false;
+                    lastPlaced.gx = null;
+                    lastPlaced.gy = null;
+                    AudioSys.playTone(400, 'sine', 0.1);
+                }
                 return;
             }
 
@@ -533,6 +548,16 @@ const LaunchManager = {
             );
         }
 
+        if (SkyManager.woodsImage.complete && SkyManager.woodsImage.naturalWidth > 0) {
+            const visibleW = 1000 / SkyManager.viewScale;
+            const visibleH = 600 / SkyManager.viewScale;
+            ctx.drawImage(
+                SkyManager.woodsImage,
+                this.camera.x, this.camera.y, visibleW, visibleH,
+                0, 0, 1000, 600
+            );
+        }
+
         if (this.state === 'select_pos') {
             this.stockList.forEach(it => {
                 if (it.placed) {
@@ -545,11 +570,13 @@ const LaunchManager = {
                     const size = (radius * 2 + 1) * SkyManager.gridSize * SkyManager.viewScale;
                     const offset = radius * SkyManager.gridSize * SkyManager.viewScale;
 
-                    ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
-                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = it.color;
+                    ctx.lineWidth = 4;
                     ctx.strokeRect(px - offset, py - offset, size, size);
-                    ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
+                    ctx.fillStyle = it.color;
+                    ctx.globalAlpha = 0.3;
                     ctx.fillRect(px - offset, py - offset, size, size);
+                    ctx.globalAlpha = 1.0;
                 }
             });
 
@@ -565,11 +592,13 @@ const LaunchManager = {
                 const size = (radius * 2 + 1) * SkyManager.gridSize * SkyManager.viewScale;
                 const offset = radius * SkyManager.gridSize * SkyManager.viewScale;
 
-                ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
-                ctx.lineWidth = 2;
+                ctx.strokeStyle = nextItem.color;
+                ctx.lineWidth = 4;
                 ctx.strokeRect(sx - offset, sy - offset, size, size);
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.fillStyle = nextItem.color;
+                ctx.globalAlpha = 0.3;
                 ctx.fillRect(sx - offset, sy - offset, size, size);
+                ctx.globalAlpha = 1.0;
 
                 this.drawSpeechBubble(ctx, "どこにうちあげよう？");
             } else {
@@ -578,6 +607,7 @@ const LaunchManager = {
 
             if (this.stockList.some(it => it.placed)) {
                 this.drawBtn(ctx, this.ui.btnLaunch, '#4ecdc4');
+                this.drawBtn(ctx, this.ui.btnBack, '#ffaa00');
             }
         }
 
