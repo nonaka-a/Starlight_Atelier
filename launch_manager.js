@@ -92,10 +92,10 @@ const LaunchManager = {
             { code: '#e040fb', x: 340, y: 460, r: 25 }, // 紫
             { code: '#69f0ae', x: 420, y: 460, r: 25 }  // 緑
         ],
-        btnCancel: { x: 800, y: 480, w: 150, h: 60, text: "やめる" },
-        btnOk: { x: 800, y: 400, w: 150, h: 60, text: "おっけー" },
-        btnBack: { x: 630, y: 400, w: 150, h: 60, text: "1つもどる" },
-        btnLaunch: { x: 800, y: 400, w: 150, h: 60, text: "うちあげ" }
+        btnCancel: { x: 800, y: 510, w: 150, h: 60, text: "やめる" },
+        btnOk: { x: 800, y: 430, w: 150, h: 60, text: "おっけー" },
+        btnBack: { x: 630, y: 430, w: 150, h: 60, text: "1つもどる" },
+        btnLaunch: { x: 800, y: 430, w: 150, h: 60, text: "うちあげ" }
     },
 
     camera: { x: 0, y: 0 },
