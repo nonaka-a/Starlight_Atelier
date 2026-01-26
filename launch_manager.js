@@ -362,7 +362,8 @@ const LaunchManager = {
 
         const currentShotTime = this.animTimer % Math.ceil(oneShotDur);
 
-        if (currentShotTime === 0 && this.launchIndex < this.launchedItems.length) {
+        // 鳴るタイミングを約0.2秒（12フレーム）早くする (35 - 12 = 23)
+        if (currentShotTime === 23 && this.launchIndex < this.launchedItems.length) {
             AudioSys.playSE('se_launch', 0.6);
         }
 
@@ -443,7 +444,7 @@ const LaunchManager = {
             if (!this.hasDrawnStar && this.animSubTimer >= frameDur * 1) {
                 // 1回呼び出しに戻す（SkyManager側で生成量を調整済み）
                 SkyManager.drawCluster(currentItem.gx, currentItem.gy, currentItem.size, currentItem.color);
-                
+
                 this.hasDrawnStar = true;
                 this.flashAlpha = 0.8;
                 AudioSys.playSE('se_firework', 0.7);
@@ -782,8 +783,12 @@ const LaunchManager = {
 
                 const img = fwImgs[frameIndex];
                 if (img && img.complete) {
-                    const w = img.naturalWidth * 0.5;
-                    const h = img.naturalHeight * 0.5;
+                    let fwScale = 0.5;
+                    if (currentItem.size === 1) fwScale = 0.42; // 中サイズを少し小さく
+                    if (currentItem.size === 2) fwScale = 0.38; // 大サイズを少し小さく
+
+                    const w = img.naturalWidth * fwScale;
+                    const h = img.naturalHeight * fwScale;
                     ctx.drawImage(img, tx - w / 2, ty - h / 2, w, h);
                 }
             }
