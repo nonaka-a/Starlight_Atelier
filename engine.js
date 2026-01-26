@@ -163,8 +163,25 @@ function setupTouchControls() {
         const btn = document.getElementById(id);
         if (!btn) return;
 
+        // ブラウザのジェスチャー（スクロール、ズーム）を完全に無効化
+        btn.style.touchAction = 'none';
+        btn.style.userSelect = 'none';
+        btn.style.webkitUserSelect = 'none';
+
+        // タッチIDを追跡するための変数
+        let activeTouchId = null;
+
         const down = (e) => {
             if (e.cancelable) e.preventDefault();
+            
+            // すでにこのボタンが別の指で押されている場合は無視
+            if (activeTouchId !== null) return;
+
+            // 新しく触れた指のIDを記憶
+            if (e.changedTouches) {
+                activeTouchId = e.changedTouches[0].identifier;
+            }
+
             AudioSys.init();
             if (typeof AudioSys.playBGM === 'function' && !AudioSys.bgmSource && !AudioSys.isMuted) {
                 const bgmName = (typeof isAtelierMode !== 'undefined' && isAtelierMode) ? 'atelier' : 'forest';
@@ -176,15 +193,41 @@ function setupTouchControls() {
 
         const up = (e) => {
             if (e.cancelable) e.preventDefault();
+
+            if (e.changedTouches) {
+                // 離れた指が、このボタンを押し始めた指と同じか確認
+                let match = false;
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === activeTouchId) {
+                        match = true;
+                        break;
+                    }
+                }
+                if (!match) return; // 別の指が離れただけなら無視
+            }
+
+            activeTouchId = null;
             keys[code] = false;
             btn.classList.remove('active');
         };
 
+        // タッチイベント
         btn.addEventListener('touchstart', down, { passive: false });
-        btn.addEventListener('touchend', up);
-        btn.addEventListener('mousedown', down);
-        btn.addEventListener('mouseup', up);
-        btn.addEventListener('mouseleave', up);
+        btn.addEventListener('touchend', up, { passive: false });
+        btn.addEventListener('touchcancel', up, { passive: false }); // iPadでの中断対策
+
+        // マウスイベント（PC用）
+        btn.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return; // 左クリック以外除外
+            keys[code] = true;
+            btn.classList.add('active');
+        });
+        const mouseUp = () => {
+            keys[code] = false;
+            btn.classList.remove('active');
+        };
+        btn.addEventListener('mouseup', mouseUp);
+        btn.addEventListener('mouseleave', mouseUp);
     };
 
     bindTouch('btn-left', 'ArrowLeft');
@@ -192,7 +235,6 @@ function setupTouchControls() {
     bindTouch('btn-down', 'ArrowDown');
     bindTouch('btn-jump', 'Space');
     bindTouch('btn-attack', 'KeyB');
-
 
     document.getElementById('btn-fullscreen')?.addEventListener('click', toggleFullScreen);
     document.getElementById('btn-mute')?.addEventListener('click', toggleMute);

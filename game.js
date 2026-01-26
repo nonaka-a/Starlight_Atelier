@@ -132,6 +132,18 @@ window.onload = () => {
 
     document.getElementById('file-input').addEventListener('change', manualLoadMap);
 
+    const btnStart = document.getElementById('btn-start');
+    if (btnStart) {
+        btnStart.addEventListener('click', () => {
+            document.getElementById('screen-title').style.display = 'none';
+            if (typeof AudioSys !== 'undefined') {
+                AudioSys.init();
+                AudioSys.playBGM('atelier', 0.3);
+            }
+            tryAutoLoad();
+        });
+    }
+
     const btnSettings = document.getElementById('btn-settings');
     if (btnSettings) {
         btnSettings.addEventListener('click', () => {
@@ -171,11 +183,9 @@ window.onload = () => {
         .then(res => res.json())
         .then(data => {
             animData = data;
-            tryAutoLoad();
         })
         .catch(() => {
             console.warn("アニメーションデータなし");
-            tryAutoLoad();
         });
 
     fetch('json/chart.json')

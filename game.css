@@ -444,7 +444,7 @@ input[type="file"] {
     transform: translateX(-50%);
     display: flex;
     gap: 15px;
-    z-index: 100;
+    z-index: 6000;
     pointer-events: auto;
 }
 
@@ -493,11 +493,40 @@ input[type="file"] {
     }
 }
 
-/* --- 追加CSS --- */
-#btn-settings {
-    font-size: 24px; /* 歯車を見やすく */
+/* --- タイトル画面 --- */
+#screen-title {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1000px;
+    height: 600px;
+    background: url('image/title.jpg') no-repeat center center;
+    background-size: cover;
+    z-index: 5000;
 }
 
-#screen-reset-confirm .modal {
-    border: 4px solid #ff6b6b; /* 注意喚起の赤枠 */
+.start-btn {
+    position: absolute;
+    bottom: 100px;
+    right: 140px;
+    padding: 10px 40px;
+    font-size: 1.2rem;
+    background-color: #ff6b6b;
+    color: white;
+    border: none;
+    border-radius: 40px;
+    cursor: pointer;
+    box-shadow: 0 5px 0 #d64545;
+    font-family: 'M PLUS Rounded 1c', sans-serif;
+    font-weight: 800;
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.start-btn:hover {
+    transform: scale(1.05);
+}
+
+.start-btn:active {
+    transform: translateY(5px) scale(1.05);
+    box-shadow: 0 0 0 #d64545;
 }

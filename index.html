@@ -15,6 +15,11 @@
         <div id="game-container">
             <canvas id="game-canvas"></canvas>
 
+            <!-- タイトル画面 -->
+            <div id="screen-title" class="overlay" style="display: flex;">
+                <button id="btn-start" class="start-btn">はじめる</button>
+            </div>
+
             <!-- ステージ遷移演出 -->
             <div id="screen-transition">
                 <div id="location-name">ほしあかりの森</div>
@@ -43,11 +48,12 @@
                     <p>マップデータが見つかりませんでした。</p>
                     <label for="file-input" class="file-label">📂 マップ(JSON)を選択</label>
                     <input type="file" id="file-input" accept=".json">
-                    
+
                     <!-- 譜面データ読み込み -->
                     <div style="margin-top:15px; border-top:1px dashed #aaa; padding-top:10px;">
                         <p style="font-size:0.9rem; color:#555; margin-bottom:5px;">かた抜きゲーム用譜面 (任意)</p>
-                        <label for="chart-input" class="file-label" style="background:#468; border-color:#57a; font-size:0.9rem;">🎼 譜面(JSON)を選択</label>
+                        <label for="chart-input" class="file-label"
+                            style="background:#468; border-color:#57a; font-size:0.9rem;">🎼 譜面(JSON)を選択</label>
                         <input type="file" id="chart-input" accept=".json">
                         <div id="chart-status" style="font-size:0.8rem; color:#4a4; margin-top:5px;"></div>
                     </div>
@@ -117,18 +123,18 @@
         <script src="audio.js?v=4.0"></script>
         <script src="constants.js?v=4.0"></script>
         <script src="engine.js?v=4.1"></script>
-        
+
         <!-- クラフト分割 -->
         <script src="craft_manager.js?v=4.2"></script>
         <script src="craft1.js?v=4.1"></script>
         <script src="craft2.js?v=4.2"></script>
         <script src="craft3.js?v=4.1"></script>
         <script src="craft4.js?v=4.1"></script>
-        
+
         <!-- 新機能 -->
         <script src="sky_manager.js?v=2.0"></script>
         <script src="launch_manager.js?v=2.0"></script>
-        
+
         <script src="game.js?v=5.0"></script>
 
         <script>
