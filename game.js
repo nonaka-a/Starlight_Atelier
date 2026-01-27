@@ -128,6 +128,8 @@ window.onload = () => {
     if (typeof AudioSys !== 'undefined' && AudioSys.loadBGM) {
         AudioSys.loadBGM('forest', FOREST_BGM_SRC);
         AudioSys.loadBGM('atelier', ATELIER_BGM_SRC);
+        AudioSys.loadBGM('se_jump', JUMP_SE_SRC);
+        AudioSys.loadBGM('se_jump2', JUMP2_SE_SRC);
     }
 
     document.getElementById('file-input').addEventListener('change', manualLoadMap);
@@ -811,7 +813,7 @@ function update() {
     if (keys.Space && player.onGround) {
         if (keys.ArrowDown) {
             player.vy = JUMP_POWER * 1.4;
-            AudioSys.playTone(400, 'square', 0.15, 0.1);
+            AudioSys.seHighJump();
         } else {
             player.vy = JUMP_POWER;
             AudioSys.seJump();
@@ -1177,9 +1179,15 @@ function draw() {
         drawTile(e.x, e.y, { id: e.tileId, rot: e.rot, fx: e.fx, fy: e.fy });
     }
     ctx.fillStyle = '#ffec47';
+    ctx.save();
+    if (ctx.filter) ctx.filter = 'blur(2px)'; // 少しぼかしを入れる
     for (const b of bullets) {
-        ctx.fillRect(b.x, b.y, b.width, b.height);
+        ctx.beginPath();
+        const r = b.width / 2;
+        ctx.arc(b.x + r, b.y + r, r, 0, Math.PI * 2);
+        ctx.fill();
     }
+    ctx.restore();
     drawPlayer();
 
     drawLayer(2);

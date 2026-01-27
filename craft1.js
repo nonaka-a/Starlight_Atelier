@@ -39,6 +39,9 @@ const CraftImages = {
         });
 
         this.loaded = true;
+        // SEの先行読み込み
+        AudioSys.loadBGM('se_mix', 'sounds/Mix_candies.mp3');
+        AudioSys.loadBGM('se_knead', 'sounds/Knead.mp3');
     }
 };
 
@@ -79,6 +82,9 @@ const CraftMixing = {
     // アニメーション用
     animFrameTimer: 0,
     currentAnimFrame: 0,
+    mixSoundCooldown: 0,
+    kneadSoundCooldown: 0,
+    activeSounds: [], // ★再生中の音源を追跡するリスト
 
     // --- State: Select ---
     updateSelect: function () {
@@ -392,6 +398,9 @@ const CraftMixing = {
             this.timeLeft = 0;
             this.isTimeUp = true;
             AudioSys.playTone(600, 'sawtooth', 0.5);
+            // ★タイムアップ時に全てのSE（混ぜる音）を停止
+            this.activeSounds.forEach(s => AudioSys.stopSE(s));
+            this.activeSounds = [];
         }
 
         const mx = Input.x - cm.camera.x;
@@ -401,6 +410,9 @@ const CraftMixing = {
         const mvy = my - this.lastMy;
         this.lastMx = mx;
         this.lastMy = my;
+
+        if (this.mixSoundCooldown > 0) this.mixSoundCooldown--;
+        if (this.kneadSoundCooldown > 0) this.kneadSoundCooldown--;
 
         if (Input.isDown) {
             // ★ドラッグ中のみアニメーション進行
@@ -420,6 +432,23 @@ const CraftMixing = {
 
                 if (cm.currentStar.mixProgress < 100) {
                     cm.currentStar.mixProgress = Math.min(100, this.dragDistance / 150);
+                }
+
+                // ★音の再生 (進捗0~50%未満 & 3秒間隔 & 実際に動いている時)
+                if (cm.currentStar.mixProgress > 0 && cm.currentStar.mixProgress < 50) {
+                    if (this.mixSoundCooldown <= 0 && moveDist > 1.0) {
+                        const s = AudioSys.playSE('se_mix', 0.6);
+                        if (s) this.activeSounds.push(s);
+                        this.mixSoundCooldown = 180; // 3秒 (60fps * 3)
+                    }
+                }
+                // ★音の再生 (進捗50%~ & 2秒間隔 & 実際に動いている時)
+                if (cm.currentStar.mixProgress >= 50) {
+                    if (this.kneadSoundCooldown <= 0 && moveDist > 1.0) {
+                        const s = AudioSys.playSE('se_knead', 0.6);
+                        if (s) this.activeSounds.push(s);
+                        this.kneadSoundCooldown = 120; // 2秒 (60fps * 2)
+                    }
                 }
 
                 for (const p of particles) {

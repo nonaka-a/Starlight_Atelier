@@ -60,6 +60,8 @@ const CraftPolishing = {
     // UI
     btnResultOK: { x: 0, y: 0, w: 160, h: 50, text: "OK!", visible: false },
 
+    kiraPlayed: false, // ★追加: kira.mp3再生済みフラグ
+
     init: function () {
         CraftPolishingImages.load();
 
@@ -76,6 +78,7 @@ const CraftPolishing = {
         this.btnResultOK.visible = false;
         this.sparkleParticles = [];
         this.seCooldown = 0;
+        this.kiraPlayed = false; // ★リセット
 
         // マスク用Canvasの初期化 (汚れ画像を描画しておく)
         if (!this.maskCanvas) {
@@ -93,6 +96,7 @@ const CraftPolishing = {
         CraftManager.ui.btnNext.text = "かんせい！";
 
         AudioSys.loadBGM('se_polish', 'sounds/se_polish.mp3');
+        AudioSys.loadBGM('se_kira', 'sounds/kira.mp3');
     },
 
     end: function () {
@@ -209,6 +213,13 @@ const CraftPolishing = {
             }
         }
         if (this.seCooldown > 0) this.seCooldown--;
+
+        // ★全て磨き終えた合図 (100%になった瞬間)
+        if (this.shineLevel >= 100 && !this.kiraPlayed) {
+            AudioSys.playSE('se_kira', 0.6);
+            this.kiraPlayed = true;
+        }
+
         this.lastX = Input.x;
         this.lastY = Input.y;
 

@@ -102,7 +102,8 @@ const AudioSys = {
         noise.start();
     },
 
-    seJump: function () { this.playTone(300, 'square', 0.1, 0.1); },
+    seJump: function () { this.playSE('se_jump', 0.4); },
+    seHighJump: function () { this.playSE('se_jump2', 0.4); },
     seShoot: function () { this.playNoise(0.1, 0.1); },
     seExplosion: function () { this.playNoise(0.3, 0.2); },
     seClear: function () {
@@ -124,6 +125,7 @@ const AudioSys = {
         source.connect(gain);
         gain.connect(this.ctx.destination);
         source.start(0);
+        return source;
     },
     startLoop: function (name, vol = 0.5) {
         if (!this.ctx || !this.buffers[name]) return null;
@@ -136,5 +138,10 @@ const AudioSys = {
         gain.connect(this.ctx.destination);
         source.start(0);
         return source;
+    },
+    stopSE: function (source) {
+        if (source) {
+            try { source.stop(); } catch (e) { }
+        }
     }
 };

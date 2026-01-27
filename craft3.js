@@ -149,6 +149,7 @@ const CraftFiring = {
         });
         AudioSys.loadBGM('se_fire', 'sounds/fire.mp3');
         AudioSys.loadBGM('se_open', 'sounds/open.mp3');
+        AudioSys.loadBGM('se_firewood', 'sounds/firewood.mp3');
     },
 
     end: function () {
@@ -209,7 +210,7 @@ const CraftFiring = {
             // 判定エリアはボタン画像サイズに合わせる
             if (this.hitTestCircle(inputX, inputY, this.ui.btnFuel.x + 60, this.ui.btnFuel.y + 60, 60)) {
                 this.addFuel();
-                AudioSys.playTone(200, 'square', 0.15);
+                AudioSys.playSE('se_firewood', 0.5);
             }
 
             // 扉の開閉
