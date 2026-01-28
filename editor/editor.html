@@ -1,12 +1,10 @@
-
-
 <!DOCTYPE html>
 <html lang="ja">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>開発統合エディタ (Map & Anim & Chart)</title>
+    <title>開発統合エディタ (Map & Anim & Chart & Event)</title>
     <style>
         body {
             font-family: sans-serif;
@@ -468,6 +466,7 @@
         <button id="tab-map" class="tab-btn active" onclick="switchMode('map')">🗺️ マップ編集</button>
         <button id="tab-anim" class="tab-btn" onclick="switchMode('anim')">🏃 アニメ編集</button>
         <button id="tab-chart" class="tab-btn" onclick="switchMode('chart')">🎼 譜面編集</button>
+        <button id="tab-event" class="tab-btn" onclick="switchMode('event')">🎬 イベント編集</button>
     </div>
 
     <!-- モード1: マップエディタ -->
@@ -689,6 +688,78 @@
         </div>
     </div>
 
+    <!-- モード4: イベントエディタ (Event) -->
+    <div id="mode-event" class="mode-area">
+        <div id="toolbar">
+            <div class="tool-group">
+                <button onclick="event_openCompSettings()">⚙️ 設定</button>
+            </div>
+            <div class="tool-group">
+                <button id="btn-event-play" onclick="event_togglePlay()">▶ 再生</button>
+                <button onclick="event_stop()">⏹ 停止</button>
+            </div>
+            <div class="spacer"></div>
+        </div>
+
+        <div id="event-workspace" style="flex: 1; display: flex; flex-direction: column; gap: 0; overflow: hidden;">
+            <!-- プレビュー画面 -->
+            <div id="event-preview-container" style="height: 55%; min-height: 100px; background: #111; border: 1px solid #555; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                <!-- Canvas -->
+                <canvas id="event-preview-canvas" style="background: #000; box-shadow: 0 0 10px rgba(0,0,0,0.5);"></canvas>
+                
+                <!-- 追加: プレビュー用ズームコントロール (左下) -->
+                <div style="position: absolute; bottom: 5px; left: 5px; background: rgba(0,0,0,0.7); padding: 5px; border-radius: 4px; display: flex; gap: 5px; align-items: center;">
+                    <select id="event-preview-zoom-mode" onchange="event_updatePreviewZoomUI()" style="background:#333; color:#fff; border:1px solid #555; font-size:0.8rem;">
+                        <option value="fit">Fit</option>
+                        <option value="0.5">50%</option>
+                        <option value="1.0">100%</option>
+                        <option value="2.0">200%</option>
+                    </select>
+                    <input type="range" id="event-preview-zoom-slider" min="10" max="400" value="100" style="width: 80px;" oninput="event_onPreviewZoomSlider()">
+                    <span id="event-preview-zoom-text" style="font-size:0.8rem; color:#aaa; width:40px; text-align:right;">Fit</span>
+                </div>
+            </div>
+
+            <!-- リサイズハンドル -->
+            <div id="event-resize-handle" style="height: 8px; background: #333; cursor: row-resize; border-top: 1px solid #555; border-bottom: 1px solid #555; display: flex; justify-content: center; align-items: center;">
+                <div style="width: 40px; height: 2px; background: #666; border-radius: 1px;"></div>
+            </div>
+
+            <!-- タイムラインパネル -->
+            <div id="event-timeline-panel" style="flex: 1; min-height: 100px; background: #2a2a2a; border: 1px solid #555; display: flex; flex-direction: column;">
+                <div id="event-timeline-container" style="flex: 1; overflow-x: scroll; overflow-y: auto; position: relative;">
+                    <canvas id="event-timeline-canvas"></canvas>
+                </div>
+                
+                <div style="height: 30px; background: #333; border-top: 1px solid #444; display: flex; align-items: center; padding: 0 10px; gap: 10px;">
+                    <span style="font-size: 0.8rem; color: #aaa;">TL Zoom:</span>
+                    <input type="range" id="event-zoom" min="10" max="200" value="50" style="width: 150px;" oninput="event_draw()">
+                    <span style="font-size: 0.8rem; color: #666; margin-left: auto;">Key: Delete to remove keyframe</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- コンポジション設定モーダル (変更なし) -->
+        <div id="event-comp-modal" class="overlay" style="display: none;">
+            <!-- ...中略... -->
+             <div class="modal" style="width: 300px;">
+                <h2>コンポジション設定</h2>
+                <div style="display: flex; flex-direction: column; gap: 10px; text-align: left;">
+                    <div><label style="font-size: 0.8rem;">名前</label><input type="text" id="inp-comp-name" style="width: 100%;"></div>
+                    <div style="display: flex; gap: 10px;">
+                        <div style="flex: 1;"><label style="font-size: 0.8rem;">幅 (px)</label><input type="number" id="inp-comp-w" style="width: 100%;"></div>
+                        <div style="flex: 1;"><label style="font-size: 0.8rem;">高さ (px)</label><input type="number" id="inp-comp-h" style="width: 100%;"></div>
+                    </div>
+                    <div><label style="font-size: 0.8rem;">尺 (秒)</label><input type="number" id="inp-comp-duration" style="width: 100%;"></div>
+                </div>
+                <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+                    <button class="danger" onclick="document.getElementById('event-comp-modal').style.display='none'">キャンセル</button>
+                    <button class="active" onclick="event_applyCompSettings()">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         function switchMode(mode) {
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -699,6 +770,7 @@
             if (mode === 'map' && window.initMapEditor) window.initMapEditor();
             if (mode === 'anim' && window.initAnimEditor) window.initAnimEditor();
             if (mode === 'chart' && window.initChartEditor) window.initChartEditor();
+            if (mode === 'event' && window.initEventEditor) window.initEventEditor();
         }
 
         window.onload = () => {
@@ -708,7 +780,8 @@
 
     <script src="editor_map.js"></script>
     <script src="editor_anim.js"></script>
-    <script src="editor_chart.js"></script> <!-- 新規追加 -->
+    <script src="editor_chart.js"></script>
+    <script src="editor_event.js"></script> <!-- 新規追加 -->
 </body>
 
 </html>
