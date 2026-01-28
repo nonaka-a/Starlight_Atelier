@@ -111,6 +111,14 @@
                 </div>
             </div>
 
+            <!-- 会話ウィンドウ (最前面レイヤー) -->
+            <div id="dialogue-wrap">
+                <div class="html-dialogue-box">
+                    <div class="html-dialogue-name">しろまいまい</div>
+                    <div id="dialogue-text-html" class="html-dialogue-text"></div>
+                </div>
+            </div>
+
             <!-- コントロールパネル -->
             <div id="control-panel">
                 <div id="btn-fullscreen" class="func-btn" title="フルスクリーン">⛶</div>
@@ -134,17 +142,18 @@
         <!-- 新機能 -->
         <script src="sky_manager.js?v=2.0"></script>
         <script src="launch_manager.js?v=2.0"></script>
+        <script src="data.js?v=1.0"></script>
 
         <script src="game.js?v=5.0"></script>
 
         <script>
             // 譜面読み込み用スクリプト
-            document.getElementById('chart-input').addEventListener('change', function(e) {
+            document.getElementById('chart-input').addEventListener('change', function (e) {
                 const file = e.target.files[0];
                 if (!file) return;
 
                 const reader = new FileReader();
-                reader.onload = function(ev) {
+                reader.onload = function (ev) {
                     try {
                         const data = JSON.parse(ev.target.result);
                         if (Array.isArray(data)) {

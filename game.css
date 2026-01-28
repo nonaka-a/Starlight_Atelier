@@ -536,9 +536,89 @@ input[type="file"] {
 
 .start-btn:hover {
     transform: scale(1.05);
+    transform: translateY(0);
+    opacity: 1;
 }
 
 .start-btn:active {
     transform: translateY(5px) scale(1.05);
     box-shadow: 0 0 0 #d64545;
+}
+
+/* --- 会話ウィンドウ (HTML) --- */
+#dialogue-wrap {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1000px;
+    height: 600px;
+    z-index: 2000;
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 30px;
+    pointer-events: none;
+    font-family: 'M PLUS Rounded 1c', sans-serif;
+}
+
+.html-dialogue-box {
+    width: 940px;
+    height: 180px;
+    background: rgba(255, 249, 238, 0.95);
+    border: 6px solid #ffaa00;
+    border-radius: 15px;
+    box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.3);
+    position: relative;
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 0 60px;
+    box-sizing: border-box;
+    cursor: pointer;
+    animation: dialoguePopIn 0.25s ease-out;
+}
+
+@keyframes dialoguePopIn {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.html-dialogue-name {
+    position: absolute;
+    top: -20px;
+    left: 20px;
+    background: #ffaa00;
+    color: #fff;
+    padding: 2px 20px;
+    /* テキストを若干下に調整 */
+    padding-top: 6px;
+    border-radius: 10px;
+    font-weight: 800;
+    font-size: 20px;
+    box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+.html-dialogue-text {
+    color: #333;
+    font-size: 28px;
+    font-weight: 800;
+    text-align: left;
+    white-space: pre-wrap;
+    line-height: 1.4;
+}
+
+.html-dialogue-guide {
+    position: absolute;
+    bottom: 15px;
+    color: #888;
+    font-size: 16px;
 }

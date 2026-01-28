@@ -10,7 +10,15 @@ const BG_SRC = 'image/BG01.jpg';
 
 let tilesetImage = new Image();
 let charImage = new Image();
+let npcImages = [];
+let bubbleImage = new Image();
 let bgImage = new Image();
+let dialogueWindow = {
+    show: false,
+    text: "",
+    alpha: 0,
+    openedFrame: 0
+};
 let animData = {};
 
 let currentLevelData = null;
@@ -37,11 +45,13 @@ const player = {
     hp: 3,
     maxHp: 3,
     invincible: 0,
-    downPressTime: 0
+    downPressTime: 0,
+    isTalking: false
 };
 
 let enemies = [];
 let bullets = [];
+let npcs = [];
 let atelierStations = [];
 let score = 0; // 現在のステージ内での「ほしのもと」取得数
 
@@ -123,6 +133,15 @@ window.onload = () => {
 
     tilesetImage.src = TILESET_SRC;
     charImage.src = CHAR_SRC;
+
+    npcImages = [];
+    for (let i = 1; i <= 3; i++) {
+        const img = new Image();
+        img.src = `image/siro_maimai_${i}.png`;
+        npcImages.push(img);
+    }
+    bubbleImage.src = 'image/fukidasi.png';
+
     bgImage.src = BG_SRC;
 
     if (typeof AudioSys !== 'undefined' && AudioSys.loadBGM) {
@@ -144,6 +163,21 @@ window.onload = () => {
             }
             tryAutoLoad();
         });
+    }
+
+    // 会話ウィンドウのタップ/クリックイベントを明示的に追加 (iPad/スマホ用)
+    const dialogueWrap = document.getElementById('dialogue-wrap');
+    if (dialogueWrap) {
+        const handleDialogueClose = (e) => {
+            if (dialogueWindow.show && Date.now() - dialogueWindow.openedFrame > 200) {
+                closeDialogue();
+            }
+        };
+        dialogueWrap.addEventListener('mousedown', handleDialogueClose);
+        dialogueWrap.addEventListener('touchstart', (e) => {
+            if (e.cancelable) e.preventDefault();
+            handleDialogueClose();
+        }, { passive: false });
     }
 
     const btnSettings = document.getElementById('btn-settings');
@@ -669,6 +703,7 @@ function setupGame() {
 
     enemies = [];
     bullets = [];
+    npcs = [];
     scanMapAndSetupObjects();
 
     isGameRunning = true;
@@ -709,6 +744,16 @@ function scanMapAndSetupObjects() {
                     rot: cell.rot,
                     fx: cell.fx,
                     fy: cell.fy
+                });
+                cell.id = 0;
+            }
+            else if (cell.id === 117) {
+                npcs.push({
+                    x: x * TILE_SIZE,
+                    y: y * TILE_SIZE,
+                    w: TILE_SIZE,
+                    h: TILE_SIZE,
+                    bubbleAlpha: 0
                 });
                 cell.id = 0;
             }
@@ -831,6 +876,12 @@ function update() {
         player.frameIndex = 0;
     }
 
+    if (player.isTalking) {
+        player.vx = 0;
+        newState = "idle";
+        player.state = "idle";
+    }
+
     if (animData[player.state]) {
         const anim = animData[player.state];
         player.animTimer++;
@@ -852,6 +903,9 @@ function update() {
         if (!isAtelierMode) {
             shootBullet();
             player.cooldown = 20;
+        } else {
+            // 工房モードでのBボタン: NPCとの会話チェック
+            checkNpcDialogue();
         }
     }
     if (player.cooldown > 0) player.cooldown--;
@@ -871,7 +925,79 @@ function update() {
 
     updateBullets();
     updateEnemies();
+    updateNpcs();
     checkInteraction();
+}
+
+function updateNpcs() {
+    const cx = player.x + player.width / 2;
+    const cy = player.y + player.height / 2;
+
+    for (const n of npcs) {
+        // 接触判定 (タイル1.5個分程度の距離)
+        const dx = cx - (n.x + n.w / 2);
+        const dy = cy - (n.y + n.h / 2);
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < 72 && !player.isTalking) { // 接触判定距離
+            n.bubbleAlpha = Math.min(1.0, n.bubbleAlpha + 0.1);
+        } else {
+            n.bubbleAlpha = Math.max(0, n.bubbleAlpha - 0.1);
+        }
+    }
+
+    // 会話ウィンドウのフェード
+    if (dialogueWindow.show) {
+        dialogueWindow.alpha = Math.min(1.0, dialogueWindow.alpha + 0.1);
+    } else {
+        dialogueWindow.alpha = Math.max(0, dialogueWindow.alpha - 0.1);
+    }
+}
+
+function checkNpcDialogue() {
+    if (player.isTalking) return;
+
+    for (const n of npcs) {
+        if (n.bubbleAlpha > 0.8) {
+            const msg = (typeof GameData !== 'undefined') ? GameData.getRandomDialogue('siro_maimai') : "ほしをつくって、うちあげるのじゃ";
+            startDialogue(msg);
+            break;
+        }
+    }
+}
+
+function startDialogue(text) {
+    dialogueWindow.text = text;
+    dialogueWindow.show = true;
+    dialogueWindow.openedFrame = Date.now();
+    player.isTalking = true;
+    player.vx = 0;
+
+    const wrap = document.getElementById('dialogue-wrap');
+    const textElem = document.getElementById('dialogue-text-html');
+    const uiContainer = document.getElementById('ui-container');
+    const controlPanel = document.getElementById('control-panel');
+    if (wrap && textElem) {
+        textElem.textContent = text;
+        wrap.style.display = 'flex';
+    }
+    if (uiContainer) {
+        uiContainer.style.display = 'none';
+    }
+    if (controlPanel) {
+        controlPanel.style.display = 'none';
+    }
+}
+
+function closeDialogue() {
+    dialogueWindow.show = false;
+    player.isTalking = false;
+    const wrap = document.getElementById('dialogue-wrap');
+    const uiContainer = document.getElementById('ui-container');
+    const controlPanel = document.getElementById('control-panel');
+    if (wrap) wrap.style.display = 'none';
+    if (uiContainer) uiContainer.style.display = 'block';
+    if (controlPanel) controlPanel.style.display = 'flex';
 }
 
 function shootBullet() {
@@ -1173,6 +1299,32 @@ function draw() {
     drawLayer(0);
     drawLayer(1);
 
+    for (const n of npcs) {
+        // 6FPSでアニメーション (1000ms / 6fps = 166.6ms間隔)
+        const frameIndex = Math.floor(Date.now() / 166.6) % npcImages.length;
+        const currentImg = npcImages[frameIndex];
+
+        if (currentImg && currentImg.complete && currentImg.naturalWidth > 0) {
+            const scale = 1.0;
+            const nw = currentImg.naturalWidth * scale;
+            const nh = currentImg.naturalHeight * scale;
+            // 足元をタイルの下端からさらに5px下にずらして調整
+            ctx.drawImage(currentImg, n.x + (TILE_SIZE - nw) / 2, n.y + TILE_SIZE - nh + 5, nw, nh);
+
+            // 吹き出しマークの表示
+            if (n.bubbleAlpha > 0 && bubbleImage.complete) {
+                ctx.save();
+                ctx.globalAlpha = n.bubbleAlpha;
+                const bw = 54;
+                const bh = 54;
+                // NPCの頭上 (少し上に浮かせ、ふわふわさせる)
+                const floatY = Math.sin(Date.now() / 200) * 5;
+                ctx.drawImage(bubbleImage, n.x + (TILE_SIZE - bw) / 2, n.y - bh - 5 + floatY, bw, bh);
+                ctx.restore();
+            }
+        }
+    }
+
     drawAtelierWindows();
 
     for (const e of enemies) {
@@ -1367,6 +1519,7 @@ window.loadStage = function (url, isAtelier = false) {
     const layer = document.getElementById('world-ui-layer');
     if (layer) layer.innerHTML = '';
     atelierStations = [];
+    npcs = [];
 
     const startTime = Date.now();
     const transition = document.getElementById('screen-transition');
