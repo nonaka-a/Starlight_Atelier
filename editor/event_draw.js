@@ -1,6 +1,6 @@
 /**
  * イベントエディタ: 描画関連
- * Step 11: Scale描画ロジック修正
+ * Step 15: 選択色変更、時間表示変更、ゴミ箱ボタン
  */
 
 // 値フォーマット
@@ -120,8 +120,11 @@ window.event_draw = function () {
     event_ctxPreview.lineTo(event_data.composition.width, event_data.composition.height / 2);
     event_ctxPreview.stroke();
 
-    event_data.layers.forEach((layer, idx) => {
-        if (drawTime < layer.inPoint || drawTime > layer.outPoint) return;
+    // レイヤー描画 (後ろから前へ = 配列の末尾から先頭へ)
+    for (let i = event_data.layers.length - 1; i >= 0; i--) {
+        const idx = i;
+        const layer = event_data.layers[idx];
+        if (drawTime < layer.inPoint || drawTime > layer.outPoint) continue;
 
         const pos = event_getInterpolatedValue(idx, "position", drawTime);
         const lScale = event_getInterpolatedValue(idx, "scale", drawTime);
@@ -132,10 +135,8 @@ window.event_draw = function () {
         event_ctxPreview.translate(pos.x, pos.y);
         event_ctxPreview.rotate(rot * Math.PI / 180);
         
-        // 修正: 100ベースから倍率へ変換
         const finalScale = lScale / 100;
         event_ctxPreview.scale(finalScale, finalScale);
-        
         event_ctxPreview.globalAlpha = opacity / 100;
 
         if (layer.imgObj && layer.imgObj.complete && layer.imgObj.naturalWidth > 0) {
@@ -152,10 +153,10 @@ window.event_draw = function () {
             event_ctxPreview.fillRect(-32, -32, 64, 64);
         }
         event_ctxPreview.restore();
-    });
+    }
     event_ctxPreview.restore();
 
-    // --- タイムライン描画 (以下変更なし) ---
+    // --- タイムライン描画 ---
     
     // ヘッダー背景
     ctx.save();
@@ -194,16 +195,61 @@ window.event_draw = function () {
     ctx.lineWidth = 1;
     ctx.restore();
 
-    // トラック
+    // トラック (上から順に描画)
     let currentY = EVENT_HEADER_HEIGHT;
     event_data.layers.forEach((layer, layerIdx) => {
         // レイヤー行
-        ctx.fillStyle = (layerIdx === event_selectedLayerIndex) ? '#444' : '#3a3a3a';
+        ctx.fillStyle = (layerIdx === event_selectedLayerIndex) ? '#556' : '#3a3a3a'; // 選択色変更
         ctx.fillRect(0, currentY, w, EVENT_TRACK_HEIGHT);
-        ctx.strokeStyle = '#222'; ctx.strokeRect(0, currentY, w, EVENT_TRACK_HEIGHT);
-        ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif';
+        
+        // 選択枠
+        if (layerIdx === event_selectedLayerIndex) {
+            ctx.strokeStyle = '#88a';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(1, currentY + 1, EVENT_LEFT_PANEL_WIDTH - 2, EVENT_TRACK_HEIGHT - 2);
+            ctx.lineWidth = 1;
+        } else {
+            ctx.strokeStyle = '#222';
+            ctx.strokeRect(0, currentY, w, EVENT_TRACK_HEIGHT);
+        }
+        
+        // 展開マーク
+        ctx.fillStyle = '#aaa';
+        ctx.font = '10px sans-serif';
         const expandMark = layer.expanded ? "▼" : "▶";
-        ctx.fillText(`${expandMark} 📁 ${layer.name}`, 10, currentY + 20);
+        ctx.fillText(expandMark, 5, currentY + 18);
+
+        // サムネイル
+        const iconSize = 20;
+        const iconX = 25;
+        const iconY = currentY + 5;
+        if (layer.imgObj && layer.imgObj.complete) {
+            try {
+                const aspect = layer.imgObj.width / layer.imgObj.height;
+                let dw = iconSize;
+                let dh = iconSize;
+                if (aspect > 1) dh = iconSize / aspect;
+                else dw = iconSize * aspect;
+                ctx.drawImage(layer.imgObj, iconX + (iconSize-dw)/2, iconY + (iconSize-dh)/2, dw, dh);
+            } catch(e) {
+                ctx.fillText("🖼️", iconX, currentY + 20);
+            }
+        } else {
+            ctx.fillText("📄", iconX, currentY + 20);
+        }
+        
+        // レイヤー名
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillText(`${layer.name}`, iconX + iconSize + 5, currentY + 20);
+
+        // ゴミ箱ボタン
+        const trashX = EVENT_LEFT_PANEL_WIDTH - 25;
+        const trashY = currentY + 5;
+        ctx.fillStyle = '#d44';
+        ctx.fillRect(trashX, trashY, 20, 20);
+        ctx.fillStyle = '#fff';
+        ctx.fillText("×", trashX + 6, trashY + 14);
         
         // レイヤーバー
         const inX = EVENT_LEFT_PANEL_WIDTH + (layer.inPoint - event_viewStartTime) * event_pixelsPerSec;
@@ -269,9 +315,19 @@ window.event_draw = function () {
         ctx.beginPath(); ctx.moveTo(headX, EVENT_HEADER_HEIGHT); ctx.lineTo(headX - 6, EVENT_HEADER_HEIGHT - 10); ctx.lineTo(headX + 6, EVENT_HEADER_HEIGHT - 10); ctx.fill();
     }
 
+    // パネル蓋 & 時間表示 (秒 + フレーム)
     ctx.clearRect(0, 0, EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT);
     ctx.fillStyle = '#444'; ctx.fillRect(0, 0, EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT);
     ctx.strokeStyle = '#555'; ctx.strokeRect(0, 0, EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT);
-    ctx.fillStyle = '#48f'; ctx.font = 'bold 16px monospace'; ctx.textAlign = 'left';
-    ctx.fillText(event_currentTime.toFixed(2) + "s", 10, 19);
+    
+    ctx.fillStyle = '#48f';
+    ctx.font = 'bold 14px monospace';
+    ctx.textAlign = 'left';
+    
+    const fps = event_data.composition.fps || 30;
+    const sec = Math.floor(event_currentTime);
+    // 0.001足して浮動小数点誤差対策
+    const frame = Math.floor(((event_currentTime + 0.0001) % 1) * fps);
+    const timeText = `${event_currentTime.toFixed(2)}s (${sec}s ${frame}f)`;
+    ctx.fillText(timeText, 10, 18);
 };
