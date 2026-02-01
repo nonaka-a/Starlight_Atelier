@@ -298,34 +298,34 @@ window.event_onTimelineMouseDown = function (e) {
                         if (track.type === 'vector2') {
                             if (prop === 'scale') {
                                 const cx = EVENT_LEFT_PANEL_WIDTH - 220;
-                                if (x >= cx && x <= cx+25) { event_pushHistory(); event_updateKeyframe(i, prop, event_currentTime, {...curVal, x: curVal.x*-1}); event_draw(); return; }
-                                if (x >= cx+30 && x <= cx+55) { event_pushHistory(); event_updateKeyframe(i, prop, event_currentTime, {...curVal, y: curVal.y*-1}); event_draw(); return; }
-                                if (x >= EVENT_LEFT_PANEL_WIDTH-113 && x <= EVENT_LEFT_PANEL_WIDTH-103) { track.linked = !track.linked; event_draw(); return; }
+                                if (x >= cx && x <= cx + 25) { event_pushHistory(); event_updateKeyframe(i, prop, event_currentTime, { ...curVal, x: curVal.x * -1 }); event_draw(); return; }
+                                if (x >= cx + 30 && x <= cx + 55) { event_pushHistory(); event_updateKeyframe(i, prop, event_currentTime, { ...curVal, y: curVal.y * -1 }); event_draw(); return; }
+                                if (x >= EVENT_LEFT_PANEL_WIDTH - 113 && x <= EVENT_LEFT_PANEL_WIDTH - 103) { track.linked = !track.linked; event_draw(); return; }
                             }
                             // X値判定
                             if (fromRight >= UI_LAYOUT.VAL_VEC_X_RIGHT - UI_LAYOUT.VAL_VEC_WIDTH && fromRight <= UI_LAYOUT.VAL_VEC_X_RIGHT) {
                                 event_pushHistory(); event_state = 'check-value-edit'; event_dragStartPos = { x: e.clientX, y: e.clientY };
-                                event_dragTarget = { type:'value', layerIdx:i, prop:prop, subProp:'x', startVal:curVal.x, step:track.step, trackType:'vector2', originX:x, originY:clickY, min:track.min, max:track.max, currentRatio: (curVal.x!==0?curVal.y/curVal.x:1) };
+                                event_dragTarget = { type: 'value', layerIdx: i, prop: prop, subProp: 'x', startVal: curVal.x, step: track.step, trackType: 'vector2', originX: x, originY: clickY, min: track.min, max: track.max, currentRatio: (curVal.x !== 0 ? curVal.y / curVal.x : 1) };
                                 return;
                             }
                             // Y値判定
                             if (fromRight >= UI_LAYOUT.VAL_VEC_Y_RIGHT - UI_LAYOUT.VAL_VEC_WIDTH && fromRight <= UI_LAYOUT.VAL_VEC_Y_RIGHT) {
                                 event_pushHistory(); event_state = 'check-value-edit'; event_dragStartPos = { x: e.clientX, y: e.clientY };
-                                event_dragTarget = { type:'value', layerIdx:i, prop:prop, subProp:'y', startVal:curVal.y, step:track.step, trackType:'vector2', originX:x, originY:clickY, min:track.min, max:track.max, currentRatio: (curVal.y!==0?curVal.x/curVal.y:1) };
+                                event_dragTarget = { type: 'value', layerIdx: i, prop: prop, subProp: 'y', startVal: curVal.y, step: track.step, trackType: 'vector2', originX: x, originY: clickY, min: track.min, max: track.max, currentRatio: (curVal.y !== 0 ? curVal.x / curVal.y : 1) };
                                 return;
                             }
                         } else {
                             if (fromRight >= UI_LAYOUT.VAL_SINGLE_RIGHT - UI_LAYOUT.VAL_SINGLE_WIDTH && fromRight <= UI_LAYOUT.VAL_SINGLE_RIGHT) {
                                 event_pushHistory(); event_state = 'check-value-edit'; event_dragStartPos = { x: e.clientX, y: e.clientY };
-                                event_dragTarget = { type:'value', layerIdx:i, prop:prop, startVal:curVal, step:track.step, trackType:track.type, originX:x, originY:clickY, min:track.min, max:track.max };
+                                event_dragTarget = { type: 'value', layerIdx: i, prop: prop, startVal: curVal, step: track.step, trackType: track.type, originX: x, originY: clickY, min: track.min, max: track.max };
                                 return;
                             }
                         }
                         // キー追加
-                        if (fromRight >= UI_LAYOUT.KEY_ADD_RIGHT-10 && fromRight <= UI_LAYOUT.KEY_ADD_RIGHT+10) {
+                        if (fromRight >= UI_LAYOUT.KEY_ADD_RIGHT - 10 && fromRight <= UI_LAYOUT.KEY_ADD_RIGHT + 10) {
                             event_pushHistory(); const v = event_getInterpolatedValue(i, prop, event_currentTime);
                             const nk = event_updateKeyframe(i, prop, event_currentTime, v);
-                            event_selectedKey = { layerIdx:i, prop, keyObj:nk }; event_draw(); return;
+                            event_selectedKey = { layerIdx: i, prop, keyObj: nk }; event_draw(); return;
                         }
                     } else {
                         // キー選択
@@ -333,8 +333,8 @@ window.event_onTimelineMouseDown = function (e) {
                             for (let key of track.keys) {
                                 const kx = EVENT_LEFT_PANEL_WIDTH + (key.time - event_viewStartTime) * event_pixelsPerSec;
                                 if (Math.abs(x - kx) <= EVENT_KEYFRAME_HIT_RADIUS) {
-                                    event_pushHistory(); event_state = 'drag-key'; event_dragTarget = { type:'key', obj:key, layerIdx:i, prop };
-                                    event_selectedKey = { layerIdx:i, prop, keyObj:key }; event_draw(); return;
+                                    event_pushHistory(); event_state = 'drag-key'; event_dragTarget = { type: 'key', obj: key, layerIdx: i, prop };
+                                    event_selectedKey = { layerIdx: i, prop, keyObj: key }; event_draw(); return;
                                 }
                             }
                         }
@@ -383,6 +383,7 @@ window.event_onGlobalMouseMove = function (e) {
     } else if (event_state === 'scrub-value') {
         const delta = e.clientX - event_dragStartPos.x;
         const t = event_dragTarget;
+        if (t.prop === 'motion') return; // 文字列プロパティはスクラブ不可
         const layer = event_data.layers[t.layerIdx];
         const track = layer.tracks[t.prop];
         let newVal;
@@ -423,6 +424,21 @@ window.event_onGlobalMouseMove = function (e) {
         }
     } else if (event_state === 'check-value-edit') {
         if (Math.abs(e.clientX - event_dragStartPos.x) > 3) event_state = 'scrub-value';
+    } else if (event_state === 'resize-project') {
+        const projectPanel = document.getElementById('event-project-panel');
+        const newW = Math.max(50, Math.min(600, e.clientX));
+        projectPanel.style.width = newW + 'px';
+        event_draw();
+    } else if (event_state === 'resize-panel') {
+        const workspace = document.getElementById('event-workspace');
+        const workspaceRect = workspace.getBoundingClientRect();
+        const relativeY = e.clientY - workspaceRect.top;
+        const percentage = (relativeY / workspaceRect.height) * 100;
+        if (percentage > 10 && percentage < 90) {
+            const tlHeight = 100 - percentage;
+            event_timelinePanel.style.height = `${tlHeight}%`;
+            event_draw();
+        }
     } else if (event_state === 'drag-layer-in' || event_state === 'drag-layer-out' || event_state === 'drag-layer-move') {
         const dt = (e.clientX - event_dragStartPos.x) / event_pixelsPerSec;
         const layer = event_data.layers[event_dragTarget.layerIdx];
@@ -454,23 +470,32 @@ window.event_onGlobalMouseUp = function (e) {
         event_pickWhipSourceLayerIdx = -1;
     } else if (event_state === 'check-value-edit') {
         const t = event_dragTarget;
-        const initVal = (t.trackType === 'vector2') ? Math.abs(t.startVal).toFixed(1) : t.startVal.toString();
-        event_showInlineInput(t.originX - 40, t.originY, initVal, t.trackType, (val) => {
-            event_pushHistory();
-            if (t.trackType === 'vector2') {
-                const vec = { ...event_getInterpolatedValue(t.layerIdx, t.prop, event_currentTime) };
-                const f = parseFloat(val);
-                if (!isNaN(f)) {
-                    vec[t.subProp] = Math.abs(f) * (vec[t.subProp] < 0 ? -1 : 1);
-                    if (t.prop === 'scale' && event_data.layers[t.layerIdx].tracks[t.prop].linked) {
-                        const ratio = (vec[t.subProp] !== 0) ? Math.abs(vec[t.subProp==='x'?'y':'x'] / vec[t.subProp]) : 1;
-                        vec[t.subProp==='x'?'y':'x'] = Math.abs(vec[t.subProp]) * ratio * (vec[t.subProp==='x'?'y':'x'] < 0 ? -1 : 1);
+        if (t.prop === 'motion') {
+            const options = event_getLayerAnimationNames(t.layerIdx);
+            event_showEnumSelect(t.originX - 40, t.originY, t.startVal, options, (val) => {
+                event_pushHistory();
+                event_updateKeyframe(t.layerIdx, t.prop, event_currentTime, val);
+                event_draw();
+            });
+        } else {
+            const initVal = (t.trackType === 'vector2') ? Math.abs(t.startVal).toFixed(1) : t.startVal.toString();
+            event_showInlineInput(t.originX - 40, t.originY, initVal, t.trackType, (val) => {
+                event_pushHistory();
+                if (t.trackType === 'vector2') {
+                    const vec = { ...event_getInterpolatedValue(t.layerIdx, t.prop, event_currentTime) };
+                    const f = parseFloat(val);
+                    if (!isNaN(f)) {
+                        vec[t.subProp] = Math.abs(f) * (vec[t.subProp] < 0 ? -1 : 1);
+                        if (t.prop === 'scale' && event_data.layers[t.layerIdx].tracks[t.prop].linked) {
+                            const ratio = (vec[t.subProp] !== 0) ? Math.abs(vec[t.subProp === 'x' ? 'y' : 'x'] / vec[t.subProp]) : 1;
+                            vec[t.subProp === 'x' ? 'y' : 'x'] = Math.abs(vec[t.subProp]) * ratio * (vec[t.subProp === 'x' ? 'y' : 'x'] < 0 ? -1 : 1);
+                        }
+                        event_updateKeyframe(t.layerIdx, t.prop, event_currentTime, vec);
                     }
-                    event_updateKeyframe(t.layerIdx, t.prop, event_currentTime, vec);
-                }
-            } else event_updateKeyframe(t.layerIdx, t.prop, event_currentTime, val);
-            event_draw();
-        });
+                } else event_updateKeyframe(t.layerIdx, t.prop, event_currentTime, val);
+                event_draw();
+            });
+        }
     }
     event_state = 'idle'; event_dragTarget = null; event_draw();
 };
@@ -485,7 +510,7 @@ window.event_onPreviewMouseDown = function (e) {
         if (event_currentTime < layer.inPoint || event_currentTime > layer.outPoint || !layer.imgObj) continue;
         const pos = event_getInterpolatedValue(i, "position", event_currentTime);
         const iw = layer.imgObj.naturalWidth || 64, ih = layer.imgObj.naturalHeight || 64;
-        if (mx >= pos.x - iw/2 && mx <= pos.x + iw/2 && my >= pos.y - ih/2 && my <= pos.y + ih/2) {
+        if (mx >= pos.x - iw / 2 && mx <= pos.x + iw / 2 && my >= pos.y - ih / 2 && my <= pos.y + ih / 2) {
             event_pushHistory(); event_selectedLayerIndex = i; event_state = 'drag-preview';
             event_dragStartPos = { x: e.clientX, y: e.clientY };
             event_dragTarget = { layerIdx: i, startX: pos.x, startY: pos.y };
@@ -512,7 +537,7 @@ window.event_onKeyDown = function (e) {
 window.event_showInlineInput = function (x, y, initialValue, trackType, callback) {
     const input = document.createElement('input');
     input.type = 'text'; input.value = initialValue;
-    input.style.position = 'absolute'; 
+    input.style.position = 'absolute';
     const rect = event_canvasTimeline.getBoundingClientRect();
     input.style.left = (rect.left + x) + 'px';
     // y は absoluteY なので、rect.top + y で正しいビューポートY座標になる
