@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Yusei+Magic&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap');
 
 html,
 body {
@@ -18,7 +18,7 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    font-family: 'Yusei Magic', sans-serif;
+    font-family: 'M PLUS Rounded 1c', sans-serif;
     touch-action: none;
     /* iPadでの長押し中断対策 */
     -webkit-touch-callout: none;
@@ -321,7 +321,7 @@ input[type="file"] {
     box-shadow: 0 4px 0 rgba(0, 0, 0, 0.2);
     border: 3px solid #ffaa00;
     color: #d35400;
-    font-family: 'Mochiy Pop One', sans-serif;
+    font-family: 'M PLUS Rounded 1c', sans-serif;
     font-weight: 800;
     font-size: 20px;
     z-index: 150;
@@ -341,7 +341,7 @@ input[type="file"] {
     box-shadow: 0 4px 0 rgba(0, 0, 0, 0.2);
     border: 3px solid #8233ff;
     color: #6622dd;
-    font-family: 'Mochiy Pop One', sans-serif;
+    font-family: 'M PLUS Rounded 1c', sans-serif;
     font-weight: 800;
     font-size: 20px;
     z-index: 150;
@@ -401,7 +401,7 @@ input[type="file"] {
 
 #location-name {
     color: #fff;
-    font-family: 'Mochiy Pop One', sans-serif;
+    font-family: 'M PLUS Rounded 1c', sans-serif;
     font-size: 64px;
     font-weight: 900;
     text-shadow: 0 0 20px rgba(255, 255, 255, 0.5), 0 0 40px rgba(255, 255, 0, 0.3);
@@ -529,7 +529,7 @@ input[type="file"] {
     border-radius: 40px;
     cursor: pointer;
     box-shadow: 0 5px 0 #d64545;
-    font-family: 'Mochiy Pop One', sans-serif;
+    font-family: 'M PLUS Rounded 1c', sans-serif;
     font-weight: 800;
     transition: transform 0.1s, box-shadow 0.1s;
 }
@@ -558,7 +558,7 @@ input[type="file"] {
     justify-content: center;
     padding-bottom: 30px;
     pointer-events: none;
-    font-family: 'Mochiy Pop One', sans-serif;
+    font-family: 'M PLUS Rounded 1c', sans-serif;
 }
 
 .html-dialogue-box {

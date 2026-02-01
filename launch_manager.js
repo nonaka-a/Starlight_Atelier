@@ -153,10 +153,11 @@ const LaunchManager = {
             SkyManager.init();
         }
 
-        // SEロード
+        // SEとBGMロード
         if (typeof AudioSys !== 'undefined') {
             AudioSys.loadBGM('se_launch', 'sounds/firework_launch.mp3');
             AudioSys.loadBGM('se_firework', 'sounds/firework.mp3');
+            AudioSys.loadBGM('suzumuai', 'sounds/suzumuai.mp3');
         }
 
         // うちあげ時はズームアウト
@@ -209,6 +210,11 @@ const LaunchManager = {
             }
         }
 
+        // BGMをatelier_bgm1に戻す
+        if (typeof AudioSys !== 'undefined') {
+            AudioSys.playBGM('atelier_bgm1', 0.5);
+        }
+
         if (typeof resetGameFromCraft === 'function') {
             resetGameFromCraft(0);
         }
@@ -233,7 +239,23 @@ const LaunchManager = {
 
         // フラッシュフェードアウト
         if (this.flashAlpha > 0) {
-            this.flashAlpha = Math.max(0, this.flashAlpha - 0.05); // 約20フレームで消える
+            this.flashAlpha = Math.max(0, this.flashAlpha - 0.01); // 約80フレームで消える
+        }
+
+        // ズームアニメーション (打ち上げ中のみ)
+        if (this.state === 'animation' && this.zoomTimer < this.zoomDuration) {
+            this.zoomTimer++;
+            const progress = Math.min(1.0, this.zoomTimer / this.zoomDuration);
+
+            // easeOutQuad で減速しながらズームアウト
+            const eased = 1 - Math.pow(1 - progress, 2);
+            const oldScale = SkyManager.viewScale;
+            SkyManager.viewScale = this.zoomStartScale + (this.zoomEndScale - this.zoomStartScale) * eased;
+
+            // カメラ位置を中央基準で再計算
+            this.camera.x = this.zoomCenterX - (1000 / SkyManager.viewScale) / 2;
+            this.camera.y = this.zoomCenterY - (600 / SkyManager.viewScale) / 2;
+            this.clampCamera();
         }
 
         if (this.state === 'select_type') {
@@ -319,6 +341,14 @@ const LaunchManager = {
 
             // うちあげボタン
             if (placedItems.length > 0 && this.checkBtn(this.ui.btnLaunch)) {
+                // atelier_bgm1をフェードアウト
+                if (typeof AudioSys !== 'undefined') {
+                    AudioSys.fadeOutBGM(2.0); // 2秒かけてフェードアウト
+                    // フェードアウト後にsuzumuaiを再生
+                    setTimeout(() => {
+                        AudioSys.playBGM('suzumuai', 0.5);
+                    }, 2000);
+                }
                 this.startLaunchPadAnim();
                 return;
             }
@@ -398,6 +428,28 @@ const LaunchManager = {
         this.animY = 0;
         this.hasDrawnStar = false;
         this.flashAlpha = 0;
+
+        // ズームアニメーション用
+        this.zoomTimer = 0;
+        this.zoomStartScale = 0.55; // 最初はズームイン (0.55倍)
+        this.zoomEndScale = 0.5;   // 最終的なズーム
+        this.zoomDuration = 300;   // 5秒 (60fps × 5)
+
+        // 画面中央の座標を記録
+        const centerWorldX = this.camera.x + (1000 / SkyManager.viewScale) / 2;
+        const centerWorldY = this.camera.y + (600 / SkyManager.viewScale) / 2;
+        this.zoomCenterX = centerWorldX;
+        this.zoomCenterY = centerWorldY;
+
+        SkyManager.viewScale = this.zoomStartScale;
+
+        // カメラ位置を中央基準で再計算
+        this.camera.x = this.zoomCenterX - (1000 / SkyManager.viewScale) / 2;
+        this.camera.y = this.zoomCenterY - (600 / SkyManager.viewScale) / 2;
+        this.clampCamera();
+
+        // BGMフェードアウトフラグをリセット
+        this.bgmFadedOut = false;
     },
 
     updateAnimation: function () {
@@ -405,7 +457,14 @@ const LaunchManager = {
         if (!currentItem) {
             this.animTimer++;
             if (this.animTimer > 60) {
-                this.stop();
+                // 打ち上げ終了時にsuzumuaiをフェードアウト
+                if (typeof AudioSys !== 'undefined' && !this.bgmFadedOut) {
+                    AudioSys.fadeOutBGM(2.0);
+                    this.bgmFadedOut = true;
+                }
+                if (this.animTimer > 180) { // フェードアウト後、少し待って終了
+                    this.stop();
+                }
             }
             return;
         }
@@ -416,18 +475,33 @@ const LaunchManager = {
         // フェーズ0: 初期化
         if (this.animPhase === 0) {
             const visibleH = 600 / SkyManager.viewScale;
-            this.animY = this.camera.y + visibleH + 100;
+            this.animStartY = this.camera.y + visibleH + 100;
+            this.animY = this.animStartY;
+            this.animTargetY = targetY;
+            this.animProgress = 0;
             this.animPhase = 1;
             this.hasDrawnStar = false;
         }
 
-        // フェーズ1: 上昇
+        // フェーズ1: 上昇 (減速イージング付き)
         if (this.animPhase === 1) {
-            const speed = 15;
-            this.animY -= speed;
+            // 進行度を更新 (0.0 ~ 1.0)
+            const progressSpeed = 0.015; // 進行速度を遅く調整
+            this.animProgress += progressSpeed;
 
-            // 目標到達
-            if (this.animY <= targetY) {
+            if (this.animProgress >= 1.0) {
+                this.animProgress = 1.0;
+            }
+
+            // イージング関数: easeOutSine (なだらかな減速カーブ)
+            // 最後まで速度が0にならず、滑らかに減速
+            const eased = Math.sin((this.animProgress * Math.PI) / 2);
+
+            // イージングを適用した位置を計算
+            this.animY = this.animStartY + (this.animTargetY - this.animStartY) * eased;
+
+            // 目標地点の95%に到達したら花火を開く（速度を保ったまま）
+            if (this.animProgress >= 0.95) {
                 this.animY = targetY;
                 this.animPhase = 2;
                 this.animSubTimer = 0;

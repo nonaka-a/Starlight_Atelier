@@ -51,6 +51,7 @@ const AudioSys = {
 
         source.start(0);
         this.bgmSource = source;
+        this.bgmGain = gain; // GainNodeを保持
         this.currentBgmName = name;
     },
 
@@ -60,8 +61,26 @@ const AudioSys = {
                 this.bgmSource.stop();
             } catch (e) { }
             this.bgmSource = null;
+            this.bgmGain = null;
             this.currentBgmName = null;
         }
+    },
+
+    // BGMをフェードアウトして停止
+    fadeOutBGM: function (duration = 2.0) {
+        if (!this.bgmSource || !this.bgmGain || !this.ctx) return;
+
+        const currentTime = this.ctx.currentTime;
+        const currentVolume = this.bgmGain.gain.value;
+
+        // 現在のボリュームから0まで減衰
+        this.bgmGain.gain.setValueAtTime(currentVolume, currentTime);
+        this.bgmGain.gain.linearRampToValueAtTime(0.001, currentTime + duration);
+
+        // フェードアウト完了後に停止
+        setTimeout(() => {
+            this.stopBGM();
+        }, duration * 1000);
     },
 
     playTone: function (freq, type, duration, vol = 0.1) {
