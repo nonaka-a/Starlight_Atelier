@@ -157,6 +157,8 @@ const LaunchManager = {
         if (typeof AudioSys !== 'undefined') {
             AudioSys.loadBGM('se_launch', 'sounds/firework_launch.mp3');
             AudioSys.loadBGM('se_firework', 'sounds/firework.mp3');
+            AudioSys.loadBGM('se_firework_s', 'sounds/firework_s.mp3');
+            AudioSys.loadBGM('se_firework_m', 'sounds/firework_m.mp3');
             AudioSys.loadBGM('suzumuai', 'sounds/suzumuai.mp3');
         }
 
@@ -180,6 +182,8 @@ const LaunchManager = {
         this.selectedColor = '#ffffff';
         this.launchedItems = [];
         this.flashAlpha = 0;
+        this.fadeAlpha = 0; // 暗転用
+        this.toggleHtmlUi(true); // 初期状態は表示
 
         const visibleW = 1000 / SkyManager.viewScale;
         const visibleH = 600 / SkyManager.viewScale;
@@ -214,6 +218,8 @@ const LaunchManager = {
         if (typeof AudioSys !== 'undefined') {
             AudioSys.playBGM('atelier_bgm1', 0.5);
         }
+
+        this.toggleHtmlUi(true); // UIを戻す
 
         if (typeof resetGameFromCraft === 'function') {
             resetGameFromCraft(0);
@@ -266,6 +272,16 @@ const LaunchManager = {
             this.updateSelectPos();
         } else if (this.state === 'animation') {
             this.updateAnimation();
+        } else if (this.state === 'fade_out') {
+            this.updateFadeOut();
+        }
+    },
+
+    updateFadeOut: function () {
+        this.fadeAlpha += 0.02; // フェードアウト速度
+        if (this.fadeAlpha >= 1.0) {
+            this.fadeAlpha = 1.0;
+            this.stop();
         }
     },
 
@@ -304,6 +320,7 @@ const LaunchManager = {
                 // OKボタン
                 if (this.checkBtn(this.ui.btnOk)) {
                     this.state = 'select_pos';
+                    this.toggleHtmlUi(false); // 場所選択モードに入ったらUIを隠す
                     AudioSys.playTone(1200, 'sine', 0.1);
                 }
                 // 1つもどるボタン
@@ -462,8 +479,8 @@ const LaunchManager = {
                     AudioSys.fadeOutBGM(2.0);
                     this.bgmFadedOut = true;
                 }
-                if (this.animTimer > 180) { // フェードアウト後、少し待って終了
-                    this.stop();
+                if (this.animTimer > 180) { // フェードアウト後、少し待って暗転開始
+                    this.state = 'fade_out';
                 }
             }
             return;
@@ -521,7 +538,12 @@ const LaunchManager = {
 
                 this.hasDrawnStar = true;
                 this.flashAlpha = 0.8;
-                AudioSys.playSE('se_firework', 0.7);
+
+                let seName = 'se_firework'; // デフォルト (大: size=2)
+                if (currentItem.size === 0) seName = 'se_firework_s'; // 小
+                else if (currentItem.size === 1) seName = 'se_firework_m'; // 中
+
+                AudioSys.playSE(seName, 0.7);
             }
 
             // 花火アニメ終了
@@ -540,7 +562,7 @@ const LaunchManager = {
             this.drawSelectType(ctx);
         } else if (this.state === 'launch_pad_anim') {
             this.drawLaunchPadAnim(ctx);
-        } else if (this.state === 'select_pos' || this.state === 'animation') {
+        } else if (this.state === 'select_pos' || this.state === 'animation' || this.state === 'fade_out') {
             this.drawMapMode(ctx);
         }
 
@@ -550,7 +572,13 @@ const LaunchManager = {
             ctx.fillRect(0, 0, 1000, 600);
         }
 
-        if (this.state !== 'animation' && this.state !== 'launch_pad_anim') {
+        // 暗転描画 (最前面)
+        if (this.fadeAlpha > 0) {
+            ctx.fillStyle = `rgba(0, 0, 0, ${this.fadeAlpha})`;
+            ctx.fillRect(0, 0, 1000, 600);
+        }
+
+        if (this.state !== 'animation' && this.state !== 'launch_pad_anim' && this.state !== 'fade_out') {
             this.drawBtn(ctx, this.ui.btnCancel, '#ff6b6b');
         }
     },
@@ -934,5 +962,14 @@ const LaunchManager = {
         ctx.textBaseline = 'middle';
         ctx.fillText(text, w / 2, h / 2 + 2);
         ctx.restore();
+    },
+
+    toggleHtmlUi: function (visible) {
+        const ids = ['item-counter', 'star-counter', 'hp-counter'];
+        const disp = visible ? '' : 'none'; // '' ならCSSの指定(flex等)が適用される
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = disp;
+        });
     }
 };

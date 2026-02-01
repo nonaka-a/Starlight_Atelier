@@ -1,13 +1,12 @@
 /**
  * イベントエディタ: 描画関連
  * Step 16 (Fix): UI位置調整、Vector2個別操作対応、スケール連動UI
+ * 固定ヘッダー対応: スクロールしても時間目盛りとヘッダー情報を最上部に固定
  */
 
-// UI定数のオーバーライド (Vector2の値を表示する幅と位置を調整)
-// 元のUI_LAYOUT = { TRASH_RIGHT: 30, PICK_RIGHT: 55, PARENT_RIGHT: 145, KEY_ADD_RIGHT: 30, VAL_SINGLE_RIGHT: 120, VAL_SINGLE_WIDTH: 80, VAL_VEC_Y_RIGHT: 100, VAL_VEC_X_RIGHT: 170, VAL_VEC_WIDTH: 60 };
-// X値の右端を左にずらし(175)、間にスペースを作る
+// UI定数のオーバーライド
 Object.assign(UI_LAYOUT, {
-    VAL_VEC_X_RIGHT: 175, // 185 -> 175 (さらに右に寄せた)
+    VAL_VEC_X_RIGHT: 175,
     VAL_VEC_Y_RIGHT: 100
 });
 
@@ -87,17 +86,25 @@ function event_applyLayerTransform(ctx, layerIdx, time) {
 
     ctx.translate(pos.x, pos.y);
     ctx.rotate(rot * Math.PI / 180);
-    
-    // スケール値の正負によって反転を表現
+
     const sx = lScale.x / 100;
     const sy = lScale.y / 100;
     ctx.scale(sx, sy);
 }
 
+let event_offscreenCanvas = null;
+let event_offscreenCtx = null;
+
 // --- 描画メイン ---
 window.event_draw = function () {
     if (!event_canvasTimeline || !event_canvasPreview) return;
 
+    if (!event_offscreenCanvas) {
+        event_offscreenCanvas = document.createElement('canvas');
+        event_offscreenCtx = event_offscreenCanvas.getContext('2d');
+    }
+
+    const scrollY = event_timelineContainer.scrollTop;
     const zoomInput = document.getElementById('event-zoom');
     if (zoomInput) {
         event_pixelsPerSec = parseInt(zoomInput.value);
@@ -137,33 +144,32 @@ window.event_draw = function () {
         event_canvasPreview.height = pH;
     }
 
+    if (event_offscreenCanvas.width !== event_data.composition.width || event_offscreenCanvas.height !== event_data.composition.height) {
+        event_offscreenCanvas.width = event_data.composition.width;
+        event_offscreenCanvas.height = event_data.composition.height;
+    }
+
     event_ctxPreview.fillStyle = '#000';
     event_ctxPreview.fillRect(0, 0, pW, pH);
 
     event_ctxPreview.save();
     event_ctxPreview.scale(scale, scale);
 
-    // コンポジション枠
-    event_ctxPreview.strokeStyle = '#333';
-    event_ctxPreview.lineWidth = 1;
-    event_ctxPreview.beginPath();
-    event_ctxPreview.moveTo(event_data.composition.width / 2, 0);
-    event_ctxPreview.lineTo(event_data.composition.width / 2, event_data.composition.height);
-    event_ctxPreview.moveTo(0, event_data.composition.height / 2);
-    event_ctxPreview.lineTo(event_data.composition.width, event_data.composition.height / 2);
-    event_ctxPreview.stroke();
+    const osCtx = event_offscreenCtx;
+    const cw = event_data.composition.width;
+    const ch = event_data.composition.height;
 
-    // レイヤー描画
     for (let i = event_data.layers.length - 1; i >= 0; i--) {
         const idx = i;
         const layer = event_data.layers[idx];
         if (drawTime < layer.inPoint || drawTime > layer.outPoint) continue;
 
-        event_ctxPreview.save();
-        event_applyLayerTransform(event_ctxPreview, idx, drawTime);
+        osCtx.clearRect(0, 0, cw, ch);
+        osCtx.save();
+        event_applyLayerTransform(osCtx, idx, drawTime);
 
-        const opacity = event_getInterpolatedValue(idx, "opacity", drawTime);
-        event_ctxPreview.globalAlpha = opacity / 100;
+        let drawW = 0, drawH = 0;
+        let drawAnchorX = 0, drawAnchorY = 0;
 
         if (layer.type === 'animated_layer') {
             const asset = event_findAssetById(layer.animAssetId);
@@ -176,85 +182,90 @@ window.event_draw = function () {
                     const actualIdx = layer.loop ? (frameIdx % anim.frames.length) : Math.min(frameIdx, anim.frames.length - 1);
                     const frame = anim.frames[actualIdx];
                     if (frame) {
-                        event_ctxPreview.drawImage(layer.imgObj, frame.x, frame.y, frame.w, frame.h, -frame.w / 2, -frame.h / 2, frame.w, frame.h);
-                        // 選択枠
-                        if (event_selectedLayerIndex === idx) {
-                            const currentTransform = event_ctxPreview.getTransform();
-                            const pixelRatio = 1 / Math.sqrt(currentTransform.a * currentTransform.a + currentTransform.b * currentTransform.b);
-                            event_ctxPreview.strokeStyle = '#0ff';
-                            event_ctxPreview.lineWidth = 2 * pixelRatio;
-                            event_ctxPreview.strokeRect(-frame.w / 2, -frame.h / 2, frame.w, frame.h);
-                        }
+                        osCtx.drawImage(layer.imgObj, frame.x, frame.y, frame.w, frame.h, -frame.w / 2, -frame.h / 2, frame.w, frame.h);
+                        drawW = frame.w; drawH = frame.h;
+                        drawAnchorX = -frame.w / 2; drawAnchorY = -frame.h / 2;
                     }
                 }
             }
         } else if (layer.imgObj && layer.imgObj.complete && layer.imgObj.naturalWidth > 0) {
             const iw = layer.imgObj.naturalWidth;
             const ih = layer.imgObj.naturalHeight;
-            event_ctxPreview.drawImage(layer.imgObj, -iw / 2, -ih / 2);
-
-            if (event_selectedLayerIndex === idx) {
-                const currentTransform = event_ctxPreview.getTransform();
-                const pixelRatio = 1 / Math.sqrt(currentTransform.a * currentTransform.a + currentTransform.b * currentTransform.b);
-                event_ctxPreview.strokeStyle = '#0ff';
-                event_ctxPreview.lineWidth = 2 * pixelRatio;
-                event_ctxPreview.strokeRect(-iw / 2, -ih / 2, iw, ih);
-            }
+            osCtx.drawImage(layer.imgObj, -iw / 2, -ih / 2);
+            drawW = iw; drawH = ih;
+            drawAnchorX = -iw / 2; drawAnchorY = -ih / 2;
         } else {
-            event_ctxPreview.fillStyle = '#48f';
-            event_ctxPreview.fillRect(-32, -32, 64, 64);
+            osCtx.fillStyle = '#48f';
+            osCtx.fillRect(-32, -32, 64, 64);
+            drawW = 64; drawH = 64;
+            drawAnchorX = -32; drawAnchorY = -32;
+        }
+        osCtx.restore();
+
+        event_ctxPreview.save();
+        const opacity = event_getInterpolatedValue(idx, "opacity", drawTime);
+        event_ctxPreview.globalAlpha = opacity / 100;
+
+        let filterStr = "";
+        if (layer.effects) {
+            layer.effects.forEach(fx => {
+                if (fx.type === 'blur') {
+                    let val = 0;
+                    if (fx.trackName && layer.tracks[fx.trackName]) {
+                        val = event_getInterpolatedValue(idx, fx.trackName, drawTime);
+                    } else {
+                        val = fx.blur || 0;
+                    }
+                    filterStr += ` blur(${val}px)`;
+                }
+            });
+        }
+        if (event_ctxPreview.filter !== undefined) {
+            event_ctxPreview.filter = filterStr.trim() || 'none';
+        }
+
+        event_ctxPreview.drawImage(event_offscreenCanvas, 0, 0);
+
+        if (event_ctxPreview.filter !== undefined) {
+            event_ctxPreview.filter = 'none';
+        }
+
+        if (idx === event_selectedLayerIndex) {
+            event_applyLayerTransform(event_ctxPreview, idx, drawTime);
+            const currentTransform = event_ctxPreview.getTransform();
+            const pixelRatio = 1 / Math.sqrt(currentTransform.a * currentTransform.a + currentTransform.b * currentTransform.b);
+            event_ctxPreview.strokeStyle = '#0ff';
+            event_ctxPreview.lineWidth = 2 * pixelRatio;
+            event_ctxPreview.strokeRect(drawAnchorX, drawAnchorY, drawW, drawH);
         }
         event_ctxPreview.restore();
     }
     event_ctxPreview.restore();
 
-    // --- タイムライン描画 ---
-
-    // ヘッダー背景
-    ctx.save();
-    ctx.fillStyle = '#333';
-    ctx.fillRect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT);
-    ctx.strokeStyle = '#555';
-    ctx.beginPath(); ctx.moveTo(0, EVENT_HEADER_HEIGHT); ctx.lineTo(w, EVENT_HEADER_HEIGHT); ctx.stroke();
-
+    // --- タイムライン描画 (コンテンツ部分) ---
     const viewEndTime = event_viewStartTime + ((w - EVENT_LEFT_PANEL_WIDTH) / event_pixelsPerSec);
     const secStep = event_pixelsPerSec > 100 ? 0.5 : 1.0;
 
-    // 尺外の背景
-    const compDurationX = EVENT_LEFT_PANEL_WIDTH + (event_data.composition.duration - event_viewStartTime) * event_pixelsPerSec;
+    ctx.save();
     ctx.beginPath(); ctx.rect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, h); ctx.clip();
-
+    const compDurationX = EVENT_LEFT_PANEL_WIDTH + (event_data.composition.duration - event_viewStartTime) * event_pixelsPerSec;
     ctx.fillStyle = '#111';
     ctx.fillRect(compDurationX, 0, w - compDurationX, h);
 
-    // グリッド
     for (let t = Math.floor(event_viewStartTime); t <= viewEndTime; t += secStep) {
         if (t < 0) continue;
         if (t > event_data.composition.duration) break;
-
         const x = EVENT_LEFT_PANEL_WIDTH + (t - event_viewStartTime) * event_pixelsPerSec;
-        ctx.strokeStyle = '#444'; ctx.beginPath(); ctx.moveTo(x, EVENT_HEADER_HEIGHT); ctx.lineTo(x, h); ctx.stroke();
-        ctx.strokeStyle = '#888'; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, EVENT_HEADER_HEIGHT); ctx.stroke();
-        if (Math.floor(t) === t) {
-            ctx.fillStyle = '#aaa';
-            ctx.fillText(t + 's', x + 3, 14);
-        }
+        ctx.strokeStyle = '#333'; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
     }
-
-    // 尺終了ライン
-    ctx.strokeStyle = '#666'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(compDurationX, 0); ctx.lineTo(compDurationX, h); ctx.stroke();
-    ctx.lineWidth = 1;
     ctx.restore();
 
-    // トラック (上から順に描画)
+    // トラック描画
     let currentY = EVENT_HEADER_HEIGHT;
     event_data.layers.forEach((layer, layerIdx) => {
-        // レイヤー行
         ctx.fillStyle = (layerIdx === event_selectedLayerIndex) ? '#556' : '#3a3a3a';
         ctx.fillRect(0, currentY, w, EVENT_TRACK_HEIGHT);
 
-        // 選択枠
         if (layerIdx === event_selectedLayerIndex) {
             ctx.strokeStyle = '#88a';
             ctx.lineWidth = 2;
@@ -265,13 +276,11 @@ window.event_draw = function () {
             ctx.strokeRect(0, currentY, w, EVENT_TRACK_HEIGHT);
         }
 
-        // 展開マーク
         ctx.fillStyle = '#aaa';
         ctx.font = '10px sans-serif';
         const expandMark = layer.expanded ? "▼" : "▶";
         ctx.fillText(expandMark, 5, currentY + 18);
 
-        // サムネイル
         const iconSize = 20;
         const iconX = 25;
         const iconY = currentY + 5;
@@ -290,13 +299,11 @@ window.event_draw = function () {
             ctx.fillText("📄", iconX, currentY + 20);
         }
 
-        // レイヤー名
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 12px sans-serif';
         const nameRightLimit = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PARENT_RIGHT - 10;
         const nameStart = iconX + iconSize + 5;
         const maxNameW = Math.max(10, nameRightLimit - nameStart);
-
         let dName = layer.name;
         if (ctx.measureText(dName).width > maxNameW) {
             while (ctx.measureText(dName + '...').width > maxNameW && dName.length > 0) dName = dName.slice(0, -1);
@@ -304,12 +311,10 @@ window.event_draw = function () {
         }
         ctx.fillText(dName, nameStart, currentY + 20);
 
-        // --- 親選択UI ---
         const pickWhipX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PICK_RIGHT;
         const parentSelX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PARENT_RIGHT;
         const parentSelW = UI_LAYOUT.PARENT_RIGHT - UI_LAYOUT.PICK_RIGHT - 5;
 
-        // Pick Whip ◎
         ctx.strokeStyle = '#aaa';
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -319,7 +324,6 @@ window.event_draw = function () {
         ctx.arc(pickWhipX + 8, currentY + EVENT_TRACK_HEIGHT / 2, 2, 0, Math.PI * 2);
         ctx.fill();
 
-        // 親プルダウン (擬似表示)
         ctx.fillStyle = '#222';
         ctx.fillRect(parentSelX, currentY + 4, parentSelW, EVENT_TRACK_HEIGHT - 8);
         ctx.fillStyle = '#ccc';
@@ -328,16 +332,12 @@ window.event_draw = function () {
         if (layer.parent) {
             const p = event_data.layers.find(l => l.id === layer.parent);
             if (p) parentName = p.name;
-            else parentName = "(不明)";
         }
-        if (ctx.measureText(parentName).width > parentSelW - 15) {
-            parentName = parentName.substring(0, 5) + '..';
-        }
+        if (ctx.measureText(parentName).width > parentSelW - 15) parentName = parentName.substring(0, 5) + '..';
         ctx.fillText(parentName, parentSelX + 4, currentY + 18);
         ctx.fillStyle = '#666';
         ctx.fillText("▼", parentSelX + parentSelW - 12, currentY + 18);
 
-        // ゴミ箱ボタン
         const trashX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.TRASH_RIGHT;
         const trashY = currentY + 5;
         ctx.fillStyle = '#d44';
@@ -345,7 +345,6 @@ window.event_draw = function () {
         ctx.fillStyle = '#fff';
         ctx.fillText("×", trashX + 6, trashY + 14);
 
-        // レイヤーバー
         const inX = EVENT_LEFT_PANEL_WIDTH + (layer.inPoint - event_viewStartTime) * event_pixelsPerSec;
         const outX = EVENT_LEFT_PANEL_WIDTH + (layer.outPoint - event_viewStartTime) * event_pixelsPerSec;
         const barX = Math.max(EVENT_LEFT_PANEL_WIDTH, inX);
@@ -363,7 +362,6 @@ window.event_draw = function () {
         ctx.restore();
         currentY += EVENT_TRACK_HEIGHT;
 
-        // プロパティトラック
         if (layer.expanded) {
             Object.keys(layer.tracks).forEach(propName => {
                 const track = layer.tracks[propName];
@@ -371,70 +369,60 @@ window.event_draw = function () {
                 ctx.strokeStyle = '#222'; ctx.beginPath(); ctx.moveTo(0, currentY + EVENT_TRACK_HEIGHT); ctx.lineTo(w, currentY + EVENT_TRACK_HEIGHT); ctx.stroke();
                 ctx.fillStyle = '#ddd'; ctx.font = '11px sans-serif'; ctx.fillText(track.label, 30, currentY + 19);
 
+                if (propName.startsWith('fx_')) {
+                    const delBtnX = 15;
+                    const delBtnY = currentY + 10;
+                    ctx.fillStyle = '#d44';
+                    ctx.fillRect(delBtnX, delBtnY, 12, 12);
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 10px sans-serif';
+                    ctx.fillText('×', delBtnX + 2, delBtnY + 9);
+                }
+
                 const val = event_getInterpolatedValue(layerIdx, propName, drawTime);
 
-                // --- 値表示 & ドラッグUI ---
                 if (track.type === 'vector2') {
-                    // Scale プロパティの場合のみチェックボックスを表示
                     if (propName === 'scale') {
-                        const checkX = EVENT_LEFT_PANEL_WIDTH - 220;
-                        ctx.font = '10px sans-serif';
-                        
-                        // X反転チェック (塗りつぶしでON状態を表現)
+                        const checkXStart = EVENT_LEFT_PANEL_WIDTH - 220;
                         ctx.fillStyle = (val.x < 0) ? '#0ff' : '#444';
-                        ctx.fillRect(checkX, currentY + 8, 12, 12);
+                        ctx.fillRect(checkXStart, currentY + 8, 12, 12);
                         ctx.strokeStyle = '#888';
-                        ctx.strokeRect(checkX, currentY + 8, 12, 12);
+                        ctx.strokeRect(checkXStart, currentY + 8, 12, 12);
                         ctx.fillStyle = '#aaa';
-                        ctx.fillText("x", checkX + 15, currentY + 18);
+                        ctx.fillText("x", checkXStart + 15, currentY + 18);
 
-                        // Y反転チェック
                         ctx.fillStyle = (val.y < 0) ? '#0ff' : '#444';
-                        ctx.fillRect(checkX + 30, currentY + 8, 12, 12);
+                        ctx.fillRect(checkXStart + 30, currentY + 8, 12, 12);
                         ctx.strokeStyle = '#888';
-                        ctx.strokeRect(checkX + 30, currentY + 8, 12, 12);
+                        ctx.strokeRect(checkXStart + 30, currentY + 8, 12, 12);
                         ctx.fillStyle = '#aaa';
-                        ctx.fillText("y", checkX + 45, currentY + 18);
+                        ctx.fillText("y", checkXStart + 45, currentY + 18);
 
-                        // ★追加: リンクボタン (XとYの間)
-                        // VAL_VEC_X_RIGHT: 175 -> X_END: L-115
-                        // VAL_VEC_Y_RIGHT: 100 -> Y_START: L-100
-                        // 隙間: L-115 ~ L-100 (15px)
-                        const linkBtnX = EVENT_LEFT_PANEL_WIDTH - 113; // 隙間の中央
+                        const linkBtnX = EVENT_LEFT_PANEL_WIDTH - 113;
                         const linkBtnY = currentY + 8;
-                        const linkBtnW = 10;
-                        
-                        ctx.fillStyle = '#444';
-                        if (track.linked) ctx.fillStyle = '#666'; // ON時は少し明るく
-                        ctx.fillRect(linkBtnX, linkBtnY, linkBtnW, 12);
+                        ctx.fillStyle = track.linked ? '#666' : '#444';
+                        ctx.fillRect(linkBtnX, linkBtnY, 10, 12);
                         ctx.strokeStyle = '#888';
-                        ctx.strokeRect(linkBtnX, linkBtnY, linkBtnW, 12);
-                        
-                        // 鎖アイコンの代わりに「-」や「∞」っぽい記号
+                        ctx.strokeRect(linkBtnX, linkBtnY, 10, 12);
                         ctx.fillStyle = track.linked ? '#fff' : '#888';
                         ctx.fillText(track.linked ? "∞" : "-", linkBtnX + 1, currentY + 17);
                     }
 
-                    // X値
                     const valX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.VAL_VEC_X_RIGHT;
-                    ctx.fillStyle = '#3a2a2a'; // 赤っぽい背景
+                    ctx.fillStyle = '#3a2a2a';
                     ctx.fillRect(valX, currentY + 4, UI_LAYOUT.VAL_VEC_WIDTH, EVENT_TRACK_HEIGHT - 8);
                     ctx.fillStyle = '#f88';
                     ctx.textAlign = 'right';
-                    // UI上は絶対値を表示
                     ctx.fillText(Math.abs(val.x).toFixed(1), valX + UI_LAYOUT.VAL_VEC_WIDTH - 4, currentY + 19);
 
-                    // Y値
                     const valY = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.VAL_VEC_Y_RIGHT;
-                    ctx.fillStyle = '#2a3a2a'; // 緑っぽい背景
+                    ctx.fillStyle = '#2a3a2a';
                     ctx.fillRect(valY, currentY + 4, UI_LAYOUT.VAL_VEC_WIDTH, EVENT_TRACK_HEIGHT - 8);
                     ctx.fillStyle = '#8f8';
                     ctx.textAlign = 'right';
                     ctx.fillText(Math.abs(val.y).toFixed(1), valY + UI_LAYOUT.VAL_VEC_WIDTH - 4, currentY + 19);
-
                     ctx.textAlign = 'left';
                 } else {
-                    // Single Value
                     const valText = event_formatValue(val, track.type);
                     const valX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.VAL_SINGLE_RIGHT;
                     ctx.fillStyle = '#3a3a3a';
@@ -445,12 +433,9 @@ window.event_draw = function () {
                     ctx.textAlign = 'left';
                 }
 
-                // キーフレーム追加ボタン
                 const btnX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.KEY_ADD_RIGHT;
                 const btnY = currentY + EVENT_TRACK_HEIGHT / 2;
                 ctx.strokeStyle = '#aaa'; ctx.beginPath(); ctx.moveTo(btnX, btnY - 5); ctx.lineTo(btnX + 5, btnY); ctx.lineTo(btnX, btnY + 5); ctx.lineTo(btnX - 5, btnY); ctx.closePath(); ctx.stroke();
-                
-                // 現在時刻にキーフレームがあるかチェック
                 const hasKey = track.keys && track.keys.some(k => Math.abs(k.time - drawTime) < 0.001);
                 if (hasKey) { ctx.fillStyle = '#48f'; ctx.fill(); }
 
@@ -462,7 +447,6 @@ window.event_draw = function () {
                         const ky = currentY + EVENT_TRACK_HEIGHT / 2;
                         const isSelected = (event_selectedKey && event_selectedKey.keyObj === key);
                         const isDragging = (event_dragTarget && event_dragTarget.type === 'key' && event_dragTarget.obj === key);
-                        
                         const isHold = (key.interpolation === 'Hold');
                         const isEase = (key.easeIn || key.easeOut);
 
@@ -470,18 +454,13 @@ window.event_draw = function () {
                         else { ctx.fillStyle = isHold ? '#f88' : '#ddd'; ctx.strokeStyle = '#000'; }
 
                         ctx.beginPath();
-                        if (isHold) {
-                            // 停止キーフレームは四角形
-                            ctx.rect(kx - 4, ky - 4, 8, 8);
-                        } else if (isEase) {
-                            // イージングありは円形
-                            ctx.arc(kx, ky, EVENT_KEYFRAME_SIZE, 0, Math.PI * 2);
-                        } else {
-                            // リニアはひし形
-                            ctx.moveTo(kx, ky - EVENT_KEYFRAME_SIZE); 
-                            ctx.lineTo(kx + EVENT_KEYFRAME_SIZE, ky); 
-                            ctx.lineTo(kx, ky + EVENT_KEYFRAME_SIZE); 
-                            ctx.lineTo(kx - EVENT_KEYFRAME_SIZE, ky); 
+                        if (isHold) ctx.rect(kx - 4, ky - 4, 8, 8);
+                        else if (isEase) ctx.arc(kx, ky, EVENT_KEYFRAME_SIZE, 0, Math.PI * 2);
+                        else {
+                            ctx.moveTo(kx, ky - EVENT_KEYFRAME_SIZE);
+                            ctx.lineTo(kx + EVENT_KEYFRAME_SIZE, ky);
+                            ctx.lineTo(kx, ky + EVENT_KEYFRAME_SIZE);
+                            ctx.lineTo(kx - EVENT_KEYFRAME_SIZE, ky);
                             ctx.closePath();
                         }
                         ctx.fill(); ctx.stroke();
@@ -493,53 +472,60 @@ window.event_draw = function () {
         }
     });
 
-    const headX = EVENT_LEFT_PANEL_WIDTH + (drawTime - event_viewStartTime) * event_pixelsPerSec;
-    if (headX >= EVENT_LEFT_PANEL_WIDTH && headX <= w) {
-        ctx.strokeStyle = '#f00'; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(headX, EVENT_HEADER_HEIGHT); ctx.lineTo(headX, h); ctx.stroke();
-        ctx.fillStyle = '#f00';
-        ctx.beginPath(); ctx.moveTo(headX, EVENT_HEADER_HEIGHT); ctx.lineTo(headX - 6, EVENT_HEADER_HEIGHT - 10); ctx.lineTo(headX + 6, EVENT_HEADER_HEIGHT - 10); ctx.fill();
+    // --- 固定ヘッダーの描画 ---
+    ctx.save();
+    ctx.translate(0, scrollY);
+
+    // ヘッダー背景
+    ctx.fillStyle = '#333';
+    ctx.fillRect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT);
+    ctx.fillStyle = '#444';
+    ctx.fillRect(0, 0, EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT);
+    ctx.strokeStyle = '#555';
+    ctx.beginPath(); ctx.moveTo(0, EVENT_HEADER_HEIGHT); ctx.lineTo(w, EVENT_HEADER_HEIGHT); ctx.stroke();
+
+    // 時間目盛り
+    ctx.save();
+    ctx.beginPath(); ctx.rect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT); ctx.clip();
+    for (let t = Math.floor(event_viewStartTime); t <= viewEndTime; t += secStep) {
+        if (t < 0 || t > event_data.composition.duration) continue;
+        const x = EVENT_LEFT_PANEL_WIDTH + (t - event_viewStartTime) * event_pixelsPerSec;
+        ctx.strokeStyle = '#888'; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, EVENT_HEADER_HEIGHT); ctx.stroke();
+        if (Math.floor(t) === t) {
+            ctx.fillStyle = '#aaa'; ctx.font = '10px sans-serif';
+            ctx.fillText(t + 's', x + 3, 14);
+        }
     }
+    ctx.restore();
 
-    // パネル蓋 & ヘッダー情報
-    ctx.clearRect(0, 0, EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT);
-    ctx.fillStyle = '#444'; ctx.fillRect(0, 0, EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT);
-    ctx.strokeStyle = '#555'; ctx.strokeRect(0, 0, EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT);
-
+    // ヘッダーラベルと現在時刻
     ctx.fillStyle = '#aaa'; ctx.font = '10px sans-serif';
+    ctx.textAlign = 'left';
     ctx.fillText("親", EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PARENT_RIGHT + 5, 18);
     ctx.fillText("Link", EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PICK_RIGHT - 10, 18);
-
-    ctx.fillStyle = '#0ff';
-    ctx.font = 'bold 14px monospace';
-    ctx.textAlign = 'left';
 
     const fps = event_data.composition.fps || 30;
     const sec = Math.floor(event_currentTime);
     const frame = Math.floor(((event_currentTime + 0.0001) % 1) * fps);
-    const timeText = `${event_currentTime.toFixed(2)}s (${sec}s ${frame}f)`;
-    ctx.fillText(timeText, 10, 20);
+    ctx.fillStyle = '#0ff'; ctx.font = 'bold 14px monospace';
+    ctx.fillText(`${event_currentTime.toFixed(2)}s (${sec}s ${frame}f)`, 10, 20);
 
-    if (event_state === 'drag-pickwhip' && event_pickWhipSourceLayerIdx !== -1 && window.event_currentMouseX !== undefined) {
-        let srcY = EVENT_HEADER_HEIGHT;
-        for (let i = 0; i < event_pickWhipSourceLayerIdx; i++) {
-            srcY += EVENT_TRACK_HEIGHT;
-            if (event_data.layers[i].expanded) srcY += Object.keys(event_data.layers[i].tracks).length * EVENT_TRACK_HEIGHT;
-        }
-        srcY += EVENT_TRACK_HEIGHT / 2;
-        const srcX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PICK_RIGHT + 8;
-
-        const rect = event_canvasTimeline.getBoundingClientRect();
-        const mouseX = window.event_currentMouseX - rect.left;
-        const mouseY = window.event_currentMouseY - rect.top + event_timelineContainer.scrollTop;
-
-        ctx.strokeStyle = '#aaa';
-        ctx.lineWidth = 2;
+    // 再生ヘッド (三角形)
+    const headX = EVENT_LEFT_PANEL_WIDTH + (drawTime - event_viewStartTime) * event_pixelsPerSec;
+    if (headX >= EVENT_LEFT_PANEL_WIDTH && headX <= w) {
+        ctx.fillStyle = '#f00';
         ctx.beginPath();
-        ctx.moveTo(srcX, srcY);
-        const cp1x = srcX + (mouseX - srcX) / 2;
-        const cp2x = mouseX - (mouseX - srcX) / 2;
-        ctx.bezierCurveTo(cp1x, srcY, cp2x, mouseY, mouseX, mouseY);
-        ctx.stroke();
+        ctx.moveTo(headX, EVENT_HEADER_HEIGHT);
+        ctx.lineTo(headX - 6, EVENT_HEADER_HEIGHT - 10);
+        ctx.lineTo(headX + 6, EVENT_HEADER_HEIGHT - 10);
+        ctx.fill();
+    }
+    ctx.restore();
+
+    // 再生ヘッド (線)
+    const lineX = EVENT_LEFT_PANEL_WIDTH + (drawTime - event_viewStartTime) * event_pixelsPerSec;
+    if (lineX >= EVENT_LEFT_PANEL_WIDTH && lineX <= w) {
+        ctx.strokeStyle = '#f00'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(lineX, scrollY + EVENT_HEADER_HEIGHT); ctx.lineTo(lineX, h); ctx.stroke();
     }
 };
