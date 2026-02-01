@@ -457,7 +457,7 @@ const CraftMolding = {
 
         if (!imgs.loaded) {
             ctx.fillStyle = '#fff';
-            ctx.font = "20px 'M PLUS Rounded 1c', sans-serif";
+            ctx.font = "bold 20px 'M PLUS Rounded 1c', sans-serif";
             ctx.fillText("Loading Assets...", offsetX + 500, 300);
             return;
         }
@@ -537,7 +537,7 @@ const CraftMolding = {
         CraftManager.drawSpeechBubble(offsetX, "タイミングよくボタンをおそう！");
 
         ctx.fillStyle = '#fff';
-        ctx.font = "bold 24px 'M PLUS Rounded 1c', sans-serif";
+        ctx.font = "900 24px 'M PLUS Rounded 1c', sans-serif";
         ctx.textAlign = 'right';
         ctx.fillText(`パーフェクト: ${this.stats.perfect}`, offsetX + 950, 80);
         ctx.fillText(`グッド: ${this.stats.good}`, offsetX + 950, 110);
@@ -560,7 +560,7 @@ const CraftMolding = {
             ctx.fillStyle = '#ff4500';
             ctx.strokeStyle = '#fff';
             ctx.lineWidth = 8;
-            ctx.font = "bold 80px 'M PLUS Rounded 1c', sans-serif";
+            ctx.font = "900 80px 'M PLUS Rounded 1c', sans-serif";
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             const scale = 1 + Math.sin(this.startAnimTimer * 0.2) * 0.1;

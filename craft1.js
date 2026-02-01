@@ -179,7 +179,7 @@ const CraftMixing = {
         ctx.stroke();
 
         ctx.fillStyle = '#ff6b6b';
-        ctx.font = "bold 32px 'M PLUS Rounded 1c', sans-serif";
+        ctx.font = "900 32px 'M PLUS Rounded 1c', sans-serif";
         ctx.textAlign = 'center';
         ctx.fillText("ほし づくり", cx, cy - 110);
 
@@ -218,7 +218,7 @@ const CraftMixing = {
                 ctx.globalAlpha = Math.max(0, 1.0 - dist * 0.85);
                 const fontSize = Math.max(20, 64 - dist * 25);
                 ctx.fillStyle = '#333';
-                ctx.font = `bold ${fontSize}px 'M PLUS Rounded 1c', sans-serif`;
+                ctx.font = `900 ${fontSize}px 'M PLUS Rounded 1c', sans-serif`;
                 ctx.fillText(drawVal, sx + slot.w / 2, sy + slot.h / 2 + (d * spacing) + offY);
             }
             ctx.restore();
@@ -625,7 +625,7 @@ const CraftMixing = {
                 ctx.fillStyle = '#ff4500';
                 ctx.strokeStyle = '#fff';
                 ctx.lineWidth = 8;
-                ctx.font = "bold 80px 'M PLUS Rounded 1c', sans-serif";
+                ctx.font = "900 80px 'M PLUS Rounded 1c', sans-serif";
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 const scale = 1 + Math.sin(this.startAnimTimer * 0.2) * 0.1;

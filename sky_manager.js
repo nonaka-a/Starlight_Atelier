@@ -451,7 +451,7 @@ const SkyManager = {
             ctx.roundRect(860, 520, 120, 60, 30);
             ctx.fill();
             ctx.fillStyle = '#fff';
-            ctx.font = "bold 20px 'M PLUS Rounded 1c', sans-serif";
+            ctx.font = "800 20px 'M PLUS Rounded 1c', sans-serif";
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText("もどる", 920, 550);

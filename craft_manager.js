@@ -403,7 +403,7 @@ const CraftManager = {
         ctx.fill();
 
         ctx.fillStyle = '#fff';
-        ctx.font = "bold 20px 'M PLUS Rounded 1c', sans-serif";
+        ctx.font = "800 20px 'M PLUS Rounded 1c', sans-serif";
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(btn.text, btn.x + btn.w / 2, btn.y + btn.h / 2);
@@ -443,7 +443,7 @@ const CraftManager = {
         ctx.fillStyle = '#c0a070';
         ctx.fillRect(offsetX + 100, 550, 800, 20);
         ctx.fillStyle = '#8b4513';
-        ctx.font = "bold 32px 'M PLUS Rounded 1c', sans-serif";
+        ctx.font = "900 32px 'M PLUS Rounded 1c', sans-serif";
         ctx.textAlign = 'center';
         ctx.fillText(title, offsetX + 500, 100);
     },
@@ -503,7 +503,7 @@ const CraftManager = {
         ctx.stroke();
 
         ctx.fillStyle = '#555';
-        ctx.font = "bold 22px 'M PLUS Rounded 1c', sans-serif";
+        ctx.font = "800 22px 'M PLUS Rounded 1c', sans-serif";
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(text, w / 2, h / 2 + 2);
@@ -552,7 +552,7 @@ const CraftManager = {
 
             if (unitText) {
                 // 単位がある場合はサイズ違いで横並び
-                ctx.font = "bold 48px 'M PLUS Rounded 1c', sans-serif";
+                ctx.font = "900 48px 'M PLUS Rounded 1c', sans-serif";
                 const contentW = ctx.measureText(content).width;
 
                 ctx.font = "bold 24px 'M PLUS Rounded 1c', sans-serif";
@@ -564,7 +564,7 @@ const CraftManager = {
 
                 // 数値描画
                 ctx.fillStyle = contentColor || "#333";
-                ctx.font = "bold 48px 'M PLUS Rounded 1c', sans-serif";
+                ctx.font = "900 48px 'M PLUS Rounded 1c', sans-serif";
                 ctx.textAlign = 'left';
                 ctx.fillText(content, currentX, baseY);
 
@@ -574,7 +574,7 @@ const CraftManager = {
 
             } else {
                 // 従来通り中央揃え
-                ctx.font = "bold 48px 'M PLUS Rounded 1c', sans-serif";
+                ctx.font = "900 48px 'M PLUS Rounded 1c', sans-serif";
                 ctx.textAlign = 'center';
                 ctx.fillText(content, w / 2, baseY);
             }

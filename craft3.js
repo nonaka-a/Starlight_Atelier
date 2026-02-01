@@ -657,7 +657,7 @@ const CraftFiring = {
             ctx.beginPath(); ctx.arc(offsetX + btnF.x + 60, btnF.y + 60, 60, 0, Math.PI * 2); ctx.fill();
         }
         ctx.fillStyle = '#fff';
-        ctx.font = "bold 40px 'M PLUS Rounded 1c', sans-serif";
+        ctx.font = "800 40px 'M PLUS Rounded 1c', sans-serif";
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText("まき", offsetX + btnF.x + btnF.w / 2 - 10, btnF.y + btnF.h / 2 - 10); // さらに10px上、10px左へ
@@ -670,7 +670,7 @@ const CraftFiring = {
             }
             // テキストのみオーバーレイ (黒枠なし)
             ctx.fillStyle = '#fff';
-            ctx.font = "bold 40px 'M PLUS Rounded 1c', sans-serif";
+            ctx.font = "800 40px 'M PLUS Rounded 1c', sans-serif";
             ctx.fillText("入れる", offsetX + btnI.x + btnI.w / 2, btnI.y + btnI.h / 2);
         }
 

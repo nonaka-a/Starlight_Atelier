@@ -1370,7 +1370,7 @@ function drawAtelierWindows() {
     ctx.save();
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.font = "bold 28px 'M PLUS Rounded 1c', sans-serif";
+    ctx.font = "800 28px 'M PLUS Rounded 1c', sans-serif";
 
     for (const st of atelierStations) {
         const x = st.x;

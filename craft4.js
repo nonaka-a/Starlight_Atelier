@@ -445,7 +445,7 @@ const CraftPolishing = {
 
         // タイトル
         ctx.fillStyle = '#7b1fa2';
-        ctx.font = "bold 26px 'M PLUS Rounded 1c', sans-serif";
+        ctx.font = "900 26px 'M PLUS Rounded 1c', sans-serif";
         ctx.textAlign = 'center';
         ctx.fillText("けっか はっぴょう", w / 2, 40);
 
@@ -457,7 +457,7 @@ const CraftPolishing = {
             { txt: "しあげ", val: this.displayScores.polish, max: 5, y: 190 },
         ];
 
-        ctx.font = "bold 20px 'M PLUS Rounded 1c', sans-serif";
+        ctx.font = "900 20px 'M PLUS Rounded 1c', sans-serif";
         labels.forEach(item => {
             ctx.fillStyle = '#555';
             ctx.textAlign = 'left';
@@ -477,7 +477,7 @@ const CraftPolishing = {
             ctx.beginPath(); ctx.moveTo(30, 210); ctx.lineTo(w - 30, 210); ctx.stroke();
 
             ctx.textAlign = 'left';
-            ctx.font = "bold 32px 'M PLUS Rounded 1c', sans-serif";
+            ctx.font = "900 32px 'M PLUS Rounded 1c', sans-serif";
             const r = this.rank;
             let rColor = '#333';
             if (r === 'パーフェクト') rColor = '#ffd700';
@@ -530,7 +530,7 @@ const CraftPolishing = {
                 ctx.fillText("ごうけい", 0, -30);
                 ctx.font = "900 56px 'M PLUS Rounded 1c', sans-serif";
                 ctx.fillText(`${this.countUpValue}`, 0, 10);
-                ctx.font = "bold 24px 'M PLUS Rounded 1c', sans-serif";
+                ctx.font = "900 24px 'M PLUS Rounded 1c', sans-serif";
                 ctx.fillText("こ", 60, 40);
 
                 ctx.restore();

@@ -598,7 +598,7 @@ const LaunchManager = {
 
         ctx.fillStyle = '#fff';
         ctx.textAlign = 'center';
-        ctx.font = "bold 20px 'M PLUS Rounded 1c', sans-serif";
+        ctx.font = "900 20px 'M PLUS Rounded 1c', sans-serif";
         ctx.fillText("うちあげたい星玉をえらんで　おっけーを押そう", 500, 135);
 
         this.ui.sizes.forEach((b, i) => {
@@ -624,9 +624,9 @@ const LaunchManager = {
             }
 
             ctx.fillStyle = canBuy ? '#5d4037' : '#888';
-            ctx.font = "bold 32px 'M PLUS Rounded 1c', sans-serif";
+            ctx.font = "900 32px 'M PLUS Rounded 1c', sans-serif";
             ctx.fillText(b.label, b.x + b.w / 2, b.y + 35);
-            ctx.font = "bold 24px 'M PLUS Rounded 1c', sans-serif";
+            ctx.font = "900 24px 'M PLUS Rounded 1c', sans-serif";
             ctx.fillText(`星 ${b.cost}個`, b.x + b.w / 2, b.y + 175);
 
             const ballSize = 140;
@@ -707,7 +707,7 @@ const LaunchManager = {
 
         ctx.fillStyle = '#fff';
         ctx.textAlign = 'left';
-        ctx.font = "bold 24px 'M PLUS Rounded 1c', sans-serif";
+        ctx.font = "900 24px 'M PLUS Rounded 1c', sans-serif";
         ctx.fillText("選んだ星玉", lx + 20, ly + 40);
 
         let iconX = lx + 30;
@@ -894,7 +894,7 @@ const LaunchManager = {
         ctx.fill();
 
         ctx.fillStyle = '#fff';
-        ctx.font = "bold 20px 'M PLUS Rounded 1c', sans-serif";
+        ctx.font = "800 20px 'M PLUS Rounded 1c', sans-serif";
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(btn.text, btn.x + btn.w / 2, btn.y + btn.h / 2);
@@ -929,7 +929,7 @@ const LaunchManager = {
         ctx.stroke();
 
         ctx.fillStyle = '#555';
-        ctx.font = "bold 22px 'M PLUS Rounded 1c', sans-serif";
+        ctx.font = "800 22px 'M PLUS Rounded 1c', sans-serif";
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(text, w / 2, h / 2 + 2);
