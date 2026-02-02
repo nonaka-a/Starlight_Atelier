@@ -622,3 +622,108 @@ input[type="file"] {
     color: #888;
     font-size: 16px;
 }
+
+/* --- オープニング画面 --- */
+#screen-op {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1000px;
+    height: 600px;
+    background-color: #000;
+    background-image: url('image/tutorial/tutorialOP_BG.jpg');
+    background-size: cover;
+    background-position: center;
+    z-index: 5500;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    cursor: pointer;
+}
+
+.op-text-container {
+    padding: 40px 60px;
+}
+
+.op-line {
+    opacity: 0;
+    color: #fff;
+    font-size: 32px;
+    font-weight: 800;
+    line-height: 1.8;
+    margin-bottom: 20px;
+    text-shadow: 0 0 15px rgba(0, 0, 0, 0.8), 2px 2px 4px rgba(0, 0, 0, 1.0);
+    animation: opFadeIn 1.5s forwards;
+}
+
+.op-line-1 {
+    animation-delay: 0.8s;
+}
+
+.op-line-2 {
+    animation-delay: 2.3s;
+}
+
+.op-line-3 {
+    animation-delay: 3.8s;
+}
+
+@keyframes opFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.op-text-sub {
+    color: #fff;
+    font-size: 20px;
+    font-weight: 400;
+    line-height: 1.4;
+    margin-top: 25px;
+    opacity: 0.9;
+    text-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+}
+
+/* --- チュートリアル・ストーリー画面 --- */
+#screen-story {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1000px;
+    height: 600px;
+    background-color: #000;
+    z-index: 1800;
+    /* dialogue-wrap (2000) より下、他オーバーレイより上 */
+    display: none;
+    pointer-events: none;
+}
+
+#story-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: url('image/tutorial/tutorial_siro_BG.jpg');
+    background-size: cover;
+    background-position: center;
+}
+
+#story-char {
+    position: absolute;
+    top: 73%;
+    /* キャラクターの位置を調整 (少し大きく、少し上に) */
+    left: 50%;
+    transform: translate(-50%, -100%);
+    max-height: 75%;
+    object-fit: contain;
+    filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.4));
+}

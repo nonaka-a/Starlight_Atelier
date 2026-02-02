@@ -20,6 +20,19 @@
                 <button id="btn-start" class="start-btn">はじめる</button>
             </div>
 
+            <!-- オープニング画面 -->
+            <div id="screen-op" class="overlay" style="display: none;">
+                <div class="op-text-container">
+                    <div class="op-line op-line-1">夜空から ほしがなくなってしまいました。</div>
+                    <div class="op-line op-line-2">ほしをうちあげて</div>
+                    <div class="op-line op-line-3">
+                        きれいな ほしぞらをつくりましょう。
+                        <div class="op-text-sub">The stars have disappeared from the night sky.<br>Let's launch stars
+                            and create a beautiful starry sky.</div>
+                    </div>
+                </div>
+            </div>
+
             <!-- ステージ遷移演出 -->
             <div id="screen-transition">
                 <div id="location-name">ほしあかりの森</div>
@@ -109,6 +122,12 @@
                     <div id="btn-attack" class="action-btn btn-attack">B</div>
                     <div id="btn-jump" class="action-btn btn-jump">A</div>
                 </div>
+            </div>
+
+            <!-- チュートリアル・ストーリー画面 -->
+            <div id="screen-story" class="overlay" style="display: none;">
+                <div id="story-bg"></div>
+                <img id="story-char" src="image/tutorial/siromai.png" alt="char">
             </div>
 
             <!-- 会話ウィンドウ (最前面レイヤー) -->

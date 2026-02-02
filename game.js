@@ -28,6 +28,9 @@ let totalItemCount = 0; // ほしのもと累計 (ステージ持ち越し分)
 let totalStarCount = 0;
 let isAtelierMode = false;
 let spawnPoint = { x: 0, y: 0 }; // 初期位置保存用
+let hasSeenOP = false;
+let hasSeenTutorial = false;
+let tutorialIndex = -1;
 
 const player = {
     x: 0, y: 0,
@@ -60,8 +63,10 @@ let score = 0; // 現在のステージ内での「ほしのもと」取得数
  */
 const DataManager = {
     SAVE_KEY: 'hoshizora_save_v1',
+    isResetting: false,
 
     save: function () {
+        if (this.isResetting) return; // リセット中は保存しない
         // SkyManagerから星データ取得
         let skyData = [];
         if (typeof SkyManager !== 'undefined' && SkyManager.getStarData) {
@@ -71,7 +76,9 @@ const DataManager = {
         const data = {
             item: totalItemCount,
             star: totalStarCount,
-            sky: skyData
+            sky: skyData,
+            op: hasSeenOP,
+            tutorial: hasSeenTutorial
         };
 
         try {
@@ -89,6 +96,8 @@ const DataManager = {
                 const data = JSON.parse(json);
                 if (data.item !== undefined) totalItemCount = data.item;
                 if (data.star !== undefined) totalStarCount = data.star;
+                if (data.op !== undefined) hasSeenOP = data.op;
+                if (data.tutorial !== undefined) hasSeenTutorial = data.tutorial;
 
                 // 星空データの復元
                 if (data.sky && typeof SkyManager !== 'undefined') {
@@ -105,7 +114,15 @@ const DataManager = {
 
     // リセット実行
     resetData: function () {
+        this.isResetting = true; // 以降の如何なる保存処理も拒否
         localStorage.removeItem(this.SAVE_KEY);
+
+        // メモリ上のフラグも全て初期化
+        hasSeenOP = false;
+        hasSeenTutorial = false;
+        totalItemCount = 0;
+        totalStarCount = 0;
+
         if (typeof SkyManager !== 'undefined') {
             SkyManager.setStarData([]);
         }
@@ -163,14 +180,48 @@ function initApp() {
 
     const btnStart = document.getElementById('btn-start');
     if (btnStart) {
-        btnStart.addEventListener('click', () => {
+        btnStart.addEventListener('click', (e) => {
+            if (e) e.stopPropagation();
             document.getElementById('screen-title').style.display = 'none';
             if (typeof AudioSys !== 'undefined') {
                 AudioSys.init();
                 AudioSys.playBGM('atelier', 0.3);
             }
-            tryAutoLoad();
+
+            if (!hasSeenOP) {
+                const screenOP = document.getElementById('screen-op');
+                if (screenOP) {
+                    screenOP.style.display = 'flex';
+                    screenOP.dataset.shownTime = Date.now(); // 表示開始時間を記録
+                } else {
+                    tryAutoLoad();
+                }
+            } else {
+                tryAutoLoad();
+            }
         });
+    }
+
+    const screenOP = document.getElementById('screen-op');
+    if (screenOP) {
+        const startFromOP = (e) => {
+            if (screenOP.style.display === 'none') return;
+
+            // 誤操作防止：表示されてから一定時間（500ms）はクリックを無効化
+            const shownTime = parseInt(screenOP.dataset.shownTime || "0");
+            if (Date.now() - shownTime < 500) return;
+
+            if (e) e.stopPropagation();
+            screenOP.style.display = 'none';
+            hasSeenOP = true;
+            DataManager.save();
+            tryAutoLoad();
+        };
+        screenOP.addEventListener('click', startFromOP);
+        screenOP.addEventListener('touchstart', (e) => {
+            if (e.cancelable) e.preventDefault();
+            startFromOP(e);
+        }, { passive: false });
     }
 
     // 会話ウィンドウのタップ/クリックイベントを明示的に追加 (iPad/スマホ用)
@@ -771,6 +822,13 @@ function scanMapAndSetupObjects() {
                 cell.id = 0;
             }
             else if ([112, 113, 114, 115].includes(cell.id)) {
+                // 初めての時は「さがす」などの看板・施設オブジェクトをセットしない
+                if (!hasSeenTutorial) {
+                    // セルIDは消去して、描画されないようにする
+                    cell.id = 0;
+                    continue;
+                }
+
                 let text = "";
                 if (cell.id === 112) text = "さがす";
                 if (cell.id === 113) text = "つくる";
@@ -972,10 +1030,45 @@ function checkNpcDialogue() {
 
     for (const n of npcs) {
         if (n.bubbleAlpha > 0.8) {
-            const msg = (typeof GameData !== 'undefined') ? GameData.getRandomDialogue('siro_maimai') : "ほしをつくって、うちあげるのじゃ";
-            startDialogue(msg);
+            if (!hasSeenTutorial) {
+                startTutorialSequence();
+            } else {
+                const msg = (typeof GameData !== 'undefined') ? GameData.getRandomDialogue('siro_maimai') : "ほしをつくって、うちあげるのじゃ";
+                startDialogue(msg);
+            }
             break;
         }
+    }
+}
+
+function startTutorialSequence() {
+    tutorialIndex = 0;
+    const screenStory = document.getElementById('screen-story');
+    if (screenStory) screenStory.style.display = 'flex';
+    advanceTutorial();
+}
+
+function advanceTutorial() {
+    const dialogues = (typeof GameData !== 'undefined') ? GameData.dialogues.tutorial_maimai : [];
+    if (tutorialIndex < dialogues.length) {
+        startDialogue(dialogues[tutorialIndex]);
+        tutorialIndex++;
+    } else {
+        finishTutorial();
+    }
+}
+
+function finishTutorial() {
+    tutorialIndex = -1;
+    hasSeenTutorial = true;
+    const screenStory = document.getElementById('screen-story');
+    if (screenStory) screenStory.style.display = 'none';
+    DataManager.save();
+    closeDialogue();
+
+    // 工房の状態を更新するために再読み込み
+    if (currentLevelData) {
+        initGameWithData(currentLevelData);
     }
 }
 
@@ -1003,6 +1096,11 @@ function startDialogue(text) {
 }
 
 function closeDialogue() {
+    if (tutorialIndex !== -1) {
+        advanceTutorial();
+        return;
+    }
+
     dialogueWindow.show = false;
     player.isTalking = false;
     const wrap = document.getElementById('dialogue-wrap');
