@@ -11,6 +11,7 @@ const CraftImages = {
     kiji: {
         A: [], B: [], C: [], D: [], E: []
     },
+    tutorialHand: new Image(),
 
     load: function () {
         if (this.loaded) return;
@@ -37,6 +38,8 @@ const CraftImages = {
                 this.kiji[type].push(img);
             }
         });
+
+        this.tutorialHand.src = 'image/tutorial/hand.png';
 
         this.loaded = true;
         // SEの先行読み込み
@@ -81,10 +84,11 @@ const CraftMixing = {
 
     // アニメーション用
     animFrameTimer: 0,
-    currentAnimFrame: 0,
     mixSoundCooldown: 0,
     kneadSoundCooldown: 0,
     activeSounds: [], // ★再生中の音源を追跡するリスト
+    showTutorial: false, // ★チュートリアル表示フラグ
+    tutorialTimer: 0,
 
     // --- State: Select ---
     updateSelect: function () {
@@ -281,6 +285,10 @@ const CraftMixing = {
         this.startAnimTimer = 0;
         this.animFrameTimer = 0;
         this.currentAnimFrame = 0;
+
+        // 初回のみチュートリアルを表示
+        this.showTutorial = !hasSeenKneadTutorial;
+        this.tutorialTimer = 0;
     },
 
     updatePouring: function () {
@@ -377,6 +385,17 @@ const CraftMixing = {
     updateMix: function () {
         const cm = CraftManager;
         const particles = cm.currentStar.particles;
+
+        if (this.showTutorial) {
+            this.tutorialTimer++;
+            if (Input.isJustPressed) {
+                this.showTutorial = false;
+                hasSeenKneadTutorial = true;
+                if (typeof DataManager !== 'undefined') DataManager.save();
+                AudioSys.playTone(600, 'sine', 0.1);
+            }
+            return; // チュートリアル中はタイマーを進めない
+        }
 
         if (!this.isMixingStarted) {
             this.startAnimTimer++;
@@ -615,7 +634,12 @@ const CraftMixing = {
         }
 
         if (CraftManager.state === 'mixing') {
-            CraftManager.drawSpeechBubble(offsetX, "きじをしっかりまぜよう！");
+            let message = "きじをしっかりまぜよう！";
+            if (progress >= 100) message = "できた！";
+            else if (progress > 50) message = "そのちょうし！";
+            else if (progress >= 20) message = "もっと！もっと！";
+
+            CraftManager.drawSpeechBubble(offsetX, message);
 
             const timeColor = this.timeLeft <= 3 ? '#ff4500' : '#333';
             CraftManager.drawYellowWindow(offsetX, 850, 300, 150, 100, "のこり", Math.ceil(this.timeLeft), timeColor, "びょう");
@@ -634,6 +658,30 @@ const CraftMixing = {
                 ctx.strokeText("スタート！", 0, 0);
                 ctx.fillText("スタート！", 0, 0);
                 ctx.restore();
+            }
+
+            // --- チュートリアルオーバーレイ ---
+            if (this.showTutorial) {
+                // 画面を暗くする
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                ctx.fillRect(offsetX, 0, 1000, 600);
+
+                // 手のアイコンをぐるぐる回す
+                if (CraftImages.tutorialHand.complete) {
+                    const hand = CraftImages.tutorialHand;
+                    const angle = this.tutorialTimer * 0.05;
+                    const radius = 120; // 少し広めに回す
+                    const hx = cx + Math.cos(angle) * radius;
+                    const hy = cy + Math.sin(angle) * radius;
+
+                    ctx.save();
+                    ctx.translate(hx, hy);
+                    // 回転はさせず位置だけ動かす
+                    const hw = 180;
+                    const hh = 180;
+                    ctx.drawImage(hand, -hw / 2, -hh / 2, hw, hh);
+                    ctx.restore();
+                }
             }
         }
     }

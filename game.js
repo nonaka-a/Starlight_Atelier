@@ -31,6 +31,8 @@ let spawnPoint = { x: 0, y: 0 }; // 初期位置保存用
 let hasSeenOP = false;
 let hasSeenTutorial = false;
 let hasSeenExploreTutorial = false;
+let hasSeenKneadTutorial = false;
+let hasSeenMoldTutorial = false;
 let tutorialIndex = -1;
 let exploreTutorialIndex = -1;
 let interactionGracePeriod = 0;
@@ -83,7 +85,9 @@ const DataManager = {
             sky: skyData,
             op: hasSeenOP,
             tutorial: hasSeenTutorial,
-            exploreTutorial: hasSeenExploreTutorial
+            exploreTutorial: hasSeenExploreTutorial,
+            kneadTutorial: hasSeenKneadTutorial,
+            moldTutorial: hasSeenMoldTutorial
         };
 
         try {
@@ -104,6 +108,8 @@ const DataManager = {
                 if (data.op !== undefined) hasSeenOP = data.op;
                 if (data.tutorial !== undefined) hasSeenTutorial = data.tutorial;
                 if (data.exploreTutorial !== undefined) hasSeenExploreTutorial = data.exploreTutorial;
+                if (data.kneadTutorial !== undefined) hasSeenKneadTutorial = data.kneadTutorial;
+                if (data.moldTutorial !== undefined) hasSeenMoldTutorial = data.moldTutorial;
 
                 // 星空データの復元
                 if (data.sky && typeof SkyManager !== 'undefined') {
@@ -127,6 +133,8 @@ const DataManager = {
         hasSeenOP = false;
         hasSeenTutorial = false;
         hasSeenExploreTutorial = false;
+        hasSeenKneadTutorial = false;
+        hasSeenMoldTutorial = false;
         totalItemCount = 0;
         totalStarCount = 0;
 

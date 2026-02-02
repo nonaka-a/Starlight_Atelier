@@ -28,6 +28,7 @@ const CraftMoldingImages = {
     judgeMiss: new Image(),
 
     effects: [],   // 3枚
+    tutorialHand: new Image(),
 
     load: function () {
         if (this.loaded) return;
@@ -52,6 +53,8 @@ const CraftMoldingImages = {
             };
             img.src = this.path + fileName;
         };
+
+        this.tutorialHand.src = 'image/tutorial/hand.png';
 
         setImage(this.bgBase, 'bg_base.png');
 
@@ -124,13 +127,12 @@ const CraftMolding = {
     laneAnimTimer: 0,
 
     // 進行管理
-    isStarted: false,
-    startAnimTimer: 0,
-    startTime: 0,
-    chartData: [],
-    externalChart: null,
-    nextNoteIndex: 0,
     isFinished: false,
+
+    // チュートリアル用
+    showTutorial: false,
+    tutorialTimer: 0,
+    tutorialNotes: [],
 
     setChart: function (data) {
         this.externalChart = data;
@@ -200,6 +202,13 @@ const CraftMolding = {
                 }
             }
         });
+
+        this.showTutorial = !hasSeenMoldTutorial;
+        this.tutorialTimer = 0;
+        this.tutorialNotes = [
+            { lane: 'red', time: 100, processed: false, handAnim: 0, currentX: -100 },
+            { lane: 'blue', time: 220, processed: false, handAnim: 0, currentX: -100 }
+        ];
     },
 
     parseExternalChart: function (data) {
@@ -264,6 +273,11 @@ const CraftMolding = {
     update: function () {
         if (this.isFinished) return;
 
+        if (this.showTutorial) {
+            this.updateTutorial();
+            return;
+        }
+
         if (!this.isStarted) {
             this.startAnimTimer++;
             if (this.startAnimTimer > 90) {
@@ -323,6 +337,61 @@ const CraftMolding = {
         if (this.machineAnim.red > 0) this.machineAnim.red--;
         if (this.machineAnim.blue > 0) this.machineAnim.blue--;
         if (this.feedback.timer > 0) this.feedback.timer--;
+    },
+
+    updateTutorial: function () {
+        this.tutorialTimer++;
+        const speed = this.noteSpeed;
+        const startX = -100;
+
+        // タップで終了
+        if (Input.isJustPressed) {
+            this.showTutorial = false;
+            hasSeenMoldTutorial = true;
+            if (typeof DataManager !== 'undefined') DataManager.save();
+            this.startAnimTimer = 0;
+            AudioSys.playTone(800, 'square', 0.1);
+            return;
+        }
+
+        for (const tn of this.tutorialNotes) {
+            const x = startX + (this.tutorialTimer - tn.time) * speed;
+            tn.currentX = x;
+
+            // 叩くタイミングを少し早める (judgeX - 10)
+            if (x >= this.judgeX - 10 && !tn.processed) {
+                tn.handAnim = 10;
+                tn.processed = true;
+                this.machineAnim[tn.lane] = 10;
+                AudioSys.playTone(tn.lane === 'red' ? 440 : 660, 'sine', 0.1);
+                this.effects.push({ x: this.judgeX, y: this.laneSettings[tn.lane].y + 40, frame: 0 });
+            }
+            if (tn.handAnim > 0) tn.handAnim--;
+        }
+
+        // ループ処理 (一定時間でリセット)
+        if (this.tutorialTimer > 450) {
+            this.tutorialTimer = 0;
+            for (const tn of this.tutorialNotes) {
+                tn.processed = false;
+                tn.handAnim = 0;
+                tn.currentX = -100;
+            }
+            this.machineAnim.red = 0;
+            this.machineAnim.blue = 0;
+        }
+
+        // レーンアニメ等は動かす
+        this.laneAnimTimer++;
+        if (this.laneAnimTimer >= 5) {
+            this.laneAnimTimer = 0;
+            this.laneAnimFrame = (this.laneAnimFrame + 1) % 3;
+            for (let i = this.effects.length - 1; i >= 0; i--) {
+                const eff = this.effects[i];
+                eff.frame++;
+                if (eff.frame >= 3) this.effects.splice(i, 1);
+            }
+        }
     },
 
     spawnNote: function (chartInfo) {
@@ -468,7 +537,9 @@ const CraftMolding = {
 
         const laneImg = imgs.lanes[this.laneAnimFrame];
         if (laneImg && laneImg.complete) {
+            if (this.showTutorial) ctx.globalAlpha = 0.3; // チュートリアル中はレーンを薄く
             ctx.drawImage(laneImg, offsetX, 0, 1000, 600);
+            ctx.globalAlpha = 1.0;
         }
 
         const btnY = 380;
@@ -520,11 +591,13 @@ const CraftMolding = {
         const jx = offsetX + this.judgeX - (mW / 2);
         const mOffsetY = -45;
 
-        const redMach = this.machineAnim.red > 0 ? imgs.machineDown : imgs.machineUp;
+        const redMach = (this.machineAnim.red > 0) ? imgs.machineDown : imgs.machineUp;
         if (redMach.complete) ctx.drawImage(redMach, jx, this.laneSettings.red.y + mOffsetY, mW, mH);
 
-        const blueMach = this.machineAnim.blue > 0 ? imgs.machineDown : imgs.machineUp;
+        const blueMach = (this.machineAnim.blue > 0) ? imgs.machineDown : imgs.machineUp;
         if (blueMach.complete) ctx.drawImage(blueMach, jx, this.laneSettings.blue.y + mOffsetY, mW, mH);
+
+        // チュートリアル用のノーツ描画（ここでは描画せず暗転ブロック内で描画）
 
         for (const eff of this.effects) {
             const effImg = imgs.effects[eff.frame];
@@ -555,7 +628,59 @@ const CraftMolding = {
             }
         }
 
-        if (!this.isStarted) {
+        // チュートリアル中の暗転
+        if (this.showTutorial) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(offsetX, 0, 1000, 600);
+
+            // 特定のパーツだけを再度カラーで描画
+            ctx.globalAlpha = 1.0;
+            if (imgs.btnRedUp.complete) ctx.drawImage(imgs.btnRedUp, offsetX + 50, btnY, 430, 80);
+            if (imgs.btnBlueUp.complete) ctx.drawImage(imgs.btnBlueUp, offsetX + 520, btnY, 430, 80);
+
+            const redMachT = (this.machineAnim.red > 0) ? imgs.machineDown : imgs.machineUp;
+            if (redMachT.complete) ctx.drawImage(redMachT, jx, this.laneSettings.red.y + mOffsetY, mW, mH);
+            const blueMachT = (this.machineAnim.blue > 0) ? imgs.machineDown : imgs.machineUp;
+            if (blueMachT.complete) ctx.drawImage(blueMachT, jx, this.laneSettings.blue.y + mOffsetY, mW, mH);
+
+            for (const tn of this.tutorialNotes) {
+                // ノーツの描画 (暗転の後ろに描画するように変更)
+                if (tn.currentX > -100 && tn.currentX < 1100 && !tn.processed) {
+                    if (imgs.noteNormal.complete) {
+                        ctx.drawImage(imgs.noteNormal, offsetX + tn.currentX, this.laneSettings[tn.lane].y + 10, 60, 60);
+                    }
+                }
+
+                // 手の描画判定 (2秒前から表示)
+                const startX = -100;
+                const speed = this.noteSpeed;
+                const hitTimer = tn.time + (this.judgeX - startX) / speed;
+
+                if (this.tutorialTimer > hitTimer - 120 && this.tutorialTimer < hitTimer + 20) {
+                    if (imgs.tutorialHand.complete) {
+                        const hwT = 180, hhT = 180;
+                        const bxT = (tn.lane === 'red' ? 260 : 730);
+                        // 位置調整 (380 + 50)
+                        let byT = 380 + 50;
+                        if (this.tutorialTimer >= hitTimer) byT += 20;
+
+                        ctx.drawImage(imgs.tutorialHand, offsetX + bxT - hwT / 2, byT - hhT / 2, hwT, hhT);
+                    }
+                }
+            }
+
+            // 操作説明テキストの追加
+            ctx.save();
+            ctx.fillStyle = "#fff";
+            ctx.font = "bold 18px 'M PLUS Rounded 1c', sans-serif";
+            ctx.textAlign = "center";
+            ctx.shadowColor = "rgba(0,0,0,0.8)";
+            ctx.shadowBlur = 10;
+            ctx.fillText("キーボードの「←」「→」キーでもボタンをおせるよ", offsetX + 500, 350);
+            ctx.restore();
+        }
+
+        if (!this.isStarted && !this.showTutorial) {
             ctx.save();
             ctx.fillStyle = '#ff4500';
             ctx.strokeStyle = '#fff';
