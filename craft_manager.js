@@ -54,6 +54,7 @@ const CraftManager = {
     },
 
     start: function (maxMaterials) {
+        if (typeof Input !== 'undefined') Input.reset();
         this.isActive = true;
         this.state = 'select';
         this.camera.x = 0;

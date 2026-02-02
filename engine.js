@@ -34,6 +34,14 @@ const Input = {
         }
     },
 
+    reset: function () {
+        this.isJustPressed = false;
+        this._pressedThisFrame = false;
+        for (let t of this.touches) {
+            t.isJustPressed = false;
+        }
+    },
+
     updatePosition: function (clientX, clientY) {
         if (!canvas) return { x: 0, y: 0 };
         const rect = canvas.getBoundingClientRect();
@@ -173,7 +181,7 @@ function setupTouchControls() {
 
         const down = (e) => {
             if (e.cancelable) e.preventDefault();
-            
+
             // すでにこのボタンが別の指で押されている場合は無視
             if (activeTouchId !== null) return;
 

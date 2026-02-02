@@ -303,6 +303,7 @@ const SkyManager = {
 
     // --- モード制御 ---
     startGazing: function () {
+        if (typeof Input !== 'undefined') Input.reset();
         this.viewScale = 0.6;
 
         this.isActive = true;

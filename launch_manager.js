@@ -148,6 +148,7 @@ const LaunchManager = {
     hasDrawnStar: false,
 
     start: function () {
+        if (typeof Input !== 'undefined') Input.reset();
         LaunchImages.load();
         if (typeof SkyManager === 'undefined' || !SkyManager.isLoaded) {
             SkyManager.init();

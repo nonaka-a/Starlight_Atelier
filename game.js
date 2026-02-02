@@ -31,6 +31,7 @@ let spawnPoint = { x: 0, y: 0 }; // 初期位置保存用
 let hasSeenOP = false;
 let hasSeenTutorial = false;
 let tutorialIndex = -1;
+let interactionGracePeriod = 0;
 
 const player = {
     x: 0, y: 0,
@@ -260,7 +261,11 @@ function initApp() {
         });
     }
 
+    DataManager.load();
     setupControls();
+}
+
+function setupControls() {
     window.addEventListener('resize', fitWindow);
 
     window.addEventListener('keydown', (e) => {
@@ -277,7 +282,6 @@ function initApp() {
     fetch(ANIM_FILE_SRC)
         .then(res => res.json())
         .then(data => {
-            // 新フォーマット ( { tileSize, data } ) か 旧フォーマット ( { idle: ... } ) かを判定
             if (data.data) {
                 animData = data.data;
             } else {
@@ -307,11 +311,7 @@ function initApp() {
         SkyManager.init();
     }
 
-    DataManager.load();
-}
-
-function setupControls() {
-    // 既存のsetupControlsの中身... (省略せずに記述します)
+    // 既存のsetupControlsの中身...
     window.addEventListener('keydown', (e) => {
         AudioSys.init();
         if (typeof AudioSys.playBGM === 'function' && !AudioSys.bgmSource && !AudioSys.isMuted) {
@@ -414,7 +414,6 @@ function setupControls() {
     }, 500);
 
     // ★追加: タブレット・スマホ用 データ消失対策
-    // アプリがバックグラウンドに行った時などに強制保存
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
             DataManager.save();
@@ -1063,6 +1062,11 @@ function finishTutorial() {
     hasSeenTutorial = true;
     const screenStory = document.getElementById('screen-story');
     if (screenStory) screenStory.style.display = 'none';
+
+    // チュートリアル終了直後の誤操作防止
+    interactionGracePeriod = 60;
+    if (typeof Input !== 'undefined') Input.reset();
+
     DataManager.save();
     closeDialogue();
 
@@ -1100,6 +1104,8 @@ function closeDialogue() {
         advanceTutorial();
         return;
     }
+
+    if (typeof Input !== 'undefined') Input.reset();
 
     dialogueWindow.show = false;
     player.isTalking = false;
@@ -1317,6 +1323,11 @@ function checkTileAt(x, y) {
 }
 
 function checkInteraction() {
+    if (interactionGracePeriod > 0) {
+        interactionGracePeriod--;
+        return;
+    }
+
     const cx = player.x + player.width / 2;
     const cy = player.y + player.height / 2;
 
