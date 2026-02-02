@@ -30,7 +30,9 @@ let isAtelierMode = false;
 let spawnPoint = { x: 0, y: 0 }; // 初期位置保存用
 let hasSeenOP = false;
 let hasSeenTutorial = false;
+let hasSeenExploreTutorial = false;
 let tutorialIndex = -1;
+let exploreTutorialIndex = -1;
 let interactionGracePeriod = 0;
 
 const player = {
@@ -78,8 +80,10 @@ const DataManager = {
             item: totalItemCount,
             star: totalStarCount,
             sky: skyData,
+            sky: skyData,
             op: hasSeenOP,
-            tutorial: hasSeenTutorial
+            tutorial: hasSeenTutorial,
+            exploreTutorial: hasSeenExploreTutorial
         };
 
         try {
@@ -99,6 +103,7 @@ const DataManager = {
                 if (data.star !== undefined) totalStarCount = data.star;
                 if (data.op !== undefined) hasSeenOP = data.op;
                 if (data.tutorial !== undefined) hasSeenTutorial = data.tutorial;
+                if (data.exploreTutorial !== undefined) hasSeenExploreTutorial = data.exploreTutorial;
 
                 // 星空データの復元
                 if (data.sky && typeof SkyManager !== 'undefined') {
@@ -121,6 +126,7 @@ const DataManager = {
         // メモリ上のフラグも全て初期化
         hasSeenOP = false;
         hasSeenTutorial = false;
+        hasSeenExploreTutorial = false;
         totalItemCount = 0;
         totalStarCount = 0;
 
@@ -319,7 +325,7 @@ function setupControls() {
             AudioSys.playBGM(bgmName, 0.3);
         }
 
-        if (e.code === 'Space') keys.Space = true;
+        if (e.code === 'Space' || e.code === 'KeyA') keys.Space = true;
         if (e.code === 'ArrowLeft') keys.ArrowLeft = true;
         if (e.code === 'ArrowRight') keys.ArrowRight = true;
         if (e.code === 'ArrowDown') keys.ArrowDown = true;
@@ -328,7 +334,7 @@ function setupControls() {
     });
 
     window.addEventListener('keyup', (e) => {
-        if (e.code === 'Space') keys.Space = false;
+        if (e.code === 'Space' || e.code === 'KeyA') keys.Space = false;
         if (e.code === 'ArrowLeft') keys.ArrowLeft = false;
         if (e.code === 'ArrowRight') keys.ArrowRight = false;
         if (e.code === 'ArrowDown') keys.ArrowDown = false;
@@ -773,6 +779,11 @@ function setupGame() {
 
     if (gameLoopId) cancelAnimationFrame(gameLoopId);
     gameLoopId = requestAnimationFrame(gameLoop);
+
+    // 探索チュートリアルのチェック
+    if (!isAtelierMode && !hasSeenExploreTutorial) {
+        startExploreTutorial();
+    }
 }
 
 function scanMapAndSetupObjects() {
@@ -925,7 +936,7 @@ function update() {
         player.downPressTime = 0;
     }
 
-    if (keys.Space && player.onGround) {
+    if (keys.Space && player.onGround && !player.isTalking) {
         if (keys.ArrowDown) {
             player.vy = JUMP_POWER * 1.4;
             AudioSys.seHighJump();
@@ -1043,7 +1054,13 @@ function checkNpcDialogue() {
 function startTutorialSequence() {
     tutorialIndex = 0;
     const screenStory = document.getElementById('screen-story');
-    if (screenStory) screenStory.style.display = 'flex';
+    const storyBg = document.getElementById('story-bg');
+    if (screenStory) {
+        screenStory.style.display = 'flex';
+        screenStory.style.opacity = '1';
+        screenStory.style.backgroundColor = '#000';
+    }
+    if (storyBg) storyBg.style.display = 'block';
     advanceTutorial();
 }
 
@@ -1061,7 +1078,10 @@ function finishTutorial() {
     tutorialIndex = -1;
     hasSeenTutorial = true;
     const screenStory = document.getElementById('screen-story');
-    if (screenStory) screenStory.style.display = 'none';
+    if (screenStory) {
+        screenStory.style.opacity = '0';
+        setTimeout(() => { if (screenStory.style.opacity === '0') screenStory.style.display = 'none'; }, 500);
+    }
 
     // チュートリアル終了直後の誤操作防止
     interactionGracePeriod = 60;
@@ -1074,6 +1094,55 @@ function finishTutorial() {
     if (currentLevelData) {
         initGameWithData(currentLevelData);
     }
+}
+
+function startExploreTutorial() {
+    // プレイヤーを停止
+    player.vx = 0;
+    player.vy = 0;
+    player.isTalking = true; // 操作を無効化
+
+    // 3秒後に会話を開始
+    setTimeout(() => {
+        exploreTutorialIndex = 0;
+        const screenStory = document.getElementById('screen-story');
+        const storyBg = document.getElementById('story-bg');
+        if (screenStory) {
+            screenStory.style.display = 'flex';
+            screenStory.style.opacity = '1';
+            screenStory.style.backgroundColor = 'transparent'; // 背景を透明に
+        }
+        if (storyBg) storyBg.style.display = 'none'; // 背景画像を隠す
+
+        advanceExploreTutorial();
+    }, 3000);
+}
+
+function advanceExploreTutorial() {
+    const dialogues = (typeof GameData !== 'undefined') ? GameData.dialogues.explore_tutorial : [];
+    if (exploreTutorialIndex < dialogues.length) {
+        startDialogue(dialogues[exploreTutorialIndex]);
+        exploreTutorialIndex++;
+    } else {
+        finishExploreTutorial();
+    }
+}
+
+function finishExploreTutorial() {
+    exploreTutorialIndex = -1;
+    hasSeenExploreTutorial = true;
+    const screenStory = document.getElementById('screen-story');
+    if (screenStory) {
+        screenStory.style.opacity = '0';
+        setTimeout(() => { if (screenStory.style.opacity === '0') screenStory.style.display = 'none'; }, 500);
+    }
+
+    // 誤操作防止
+    interactionGracePeriod = 60;
+    if (typeof Input !== 'undefined') Input.reset();
+
+    DataManager.save();
+    closeDialogue();
 }
 
 function startDialogue(text) {
@@ -1090,6 +1159,7 @@ function startDialogue(text) {
     if (wrap && textElem) {
         textElem.textContent = text;
         wrap.style.display = 'flex';
+        wrap.style.opacity = '1';
     }
     if (uiContainer) {
         uiContainer.style.display = 'none';
@@ -1104,6 +1174,10 @@ function closeDialogue() {
         advanceTutorial();
         return;
     }
+    if (exploreTutorialIndex !== -1) {
+        advanceExploreTutorial();
+        return;
+    }
 
     if (typeof Input !== 'undefined') Input.reset();
 
@@ -1112,7 +1186,10 @@ function closeDialogue() {
     const wrap = document.getElementById('dialogue-wrap');
     const uiContainer = document.getElementById('ui-container');
     const controlPanel = document.getElementById('control-panel');
-    if (wrap) wrap.style.display = 'none';
+    if (wrap) {
+        wrap.style.opacity = '0';
+        setTimeout(() => { if (wrap.style.opacity === '0') wrap.style.display = 'none'; }, 500);
+    }
     if (uiContainer) uiContainer.style.display = 'block';
     if (controlPanel) controlPanel.style.display = 'flex';
 }
@@ -1520,17 +1597,76 @@ function drawAtelierWindows() {
 }
 
 function drawBackground() {
-    if (!bgImage.complete || bgImage.width === 0) return;
-    const factor = 0.2;
-    const w = 1280;
-    const h = 800;
-    let offsetX = -(camera.x * factor) % w;
-    let offsetY = -(camera.y * factor) % h;
-    if (offsetX > 0) offsetX -= w;
-    if (offsetY > 0) offsetY -= h;
-    for (let x = offsetX; x < CANVAS_WIDTH; x += w) {
-        for (let y = offsetY; y < CANVAS_HEIGHT; y += h) {
-            ctx.drawImage(bgImage, Math.floor(x), Math.floor(y), w, h);
+    // 森（Hoshiakari no Mori）モードのとき、打ち上げた星空を背景にする
+    if (!isAtelierMode && typeof SkyManager !== 'undefined' && SkyManager.isLoaded && SkyManager.canvas) {
+        // 星空を描画 (サイズを0.6倍に調整)
+        const sw = SkyManager.worldWidth * 0.6;
+        const sh = SkyManager.worldHeight * 0.6;
+        const starFactor = 0.05; // 星空は極めて遠くにあるため移動を最小限に
+
+        let sOffsetX = -(camera.x * starFactor) % sw;
+        let sOffsetY = -(camera.y * starFactor) % sh;
+        if (sOffsetX > 0) sOffsetX -= sw;
+        if (sOffsetY > 0) sOffsetY -= sh;
+
+        for (let x = sOffsetX; x < CANVAS_WIDTH; x += sw) {
+            for (let y = sOffsetY; y < CANVAS_HEIGHT; y += sh) {
+                ctx.drawImage(SkyManager.canvas, Math.floor(x), Math.floor(y), sw, sh);
+            }
+        }
+
+        // 山を描画 (星空より少し手前)
+        if (SkyManager.mountainImage.complete && SkyManager.mountainImage.naturalWidth > 0) {
+            const mountW = SkyManager.mountainImage.naturalWidth;
+            const mountH = SkyManager.mountainImage.naturalHeight;
+            const mountFactor = 0.15;
+            const vFactor = 0.02; // 垂直方向は非常に控えめに
+
+            let mOffsetX = -(camera.x * mountFactor) % mountW;
+            // さらに位置を下げる (ベースを +280 に変更)
+            let mY = CANVAS_HEIGHT - mountH + 280 - (camera.y * vFactor);
+
+            if (mOffsetX > 0) mOffsetX -= mountW;
+            for (let x = mOffsetX; x < CANVAS_WIDTH; x += mountW) {
+                ctx.drawImage(SkyManager.mountainImage, Math.floor(x), mY, mountW, mountH);
+            }
+        }
+
+        // 遠景の森を描画 (山より手前)
+        if (SkyManager.woodsImage.complete && SkyManager.woodsImage.naturalWidth > 0) {
+            const woodsW = SkyManager.woodsImage.naturalWidth;
+            const woodsH = SkyManager.woodsImage.naturalHeight;
+            const woodsFactor = 0.25;
+            const vFactor = 0.05; // 山よりは動くが控えめに
+
+            let wOffsetX = -(camera.x * woodsFactor) % woodsW;
+            // さらに位置を下げる (ベースを +220 に変更)
+            let wY = CANVAS_HEIGHT - woodsH + 220 - (camera.y * vFactor);
+
+            if (wOffsetX > 0) wOffsetX -= woodsW;
+            for (let x = wOffsetX; x < CANVAS_WIDTH; x += woodsW) {
+                ctx.drawImage(SkyManager.woodsImage, Math.floor(x), wY, woodsW, woodsH);
+            }
+        }
+    } else {
+        // 工房モード、または星空未ロード時のフォールバック
+        if (!bgImage.complete || bgImage.width === 0) {
+            // 背景が真っ暗にならないよう、一応濃い紺色で塗りつぶしておく
+            ctx.fillStyle = '#050510';
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            return;
+        }
+        const factor = 0.2;
+        const w = 1280;
+        const h = 800;
+        let offsetX = -(camera.x * factor) % w;
+        let offsetY = -(camera.y * factor) % h;
+        if (offsetX > 0) offsetX -= w;
+        if (offsetY > 0) offsetY -= h;
+        for (let x = offsetX; x < CANVAS_WIDTH; x += w) {
+            for (let y = offsetY; y < CANVAS_HEIGHT; y += h) {
+                ctx.drawImage(bgImage, Math.floor(x), Math.floor(y), w, h);
+            }
         }
     }
 }

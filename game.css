@@ -559,6 +559,7 @@ input[type="file"] {
     padding-bottom: 30px;
     pointer-events: none;
     font-family: 'M PLUS Rounded 1c', sans-serif;
+    transition: opacity 0.5s ease;
 }
 
 .html-dialogue-box {
@@ -704,6 +705,7 @@ input[type="file"] {
     /* dialogue-wrap (2000) より下、他オーバーレイより上 */
     display: none;
     pointer-events: none;
+    transition: opacity 0.5s ease;
 }
 
 #story-bg {
