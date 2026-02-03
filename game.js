@@ -26,6 +26,7 @@ let gameLoopId = null;
 
 let totalItemCount = 0; // ほしのもと累計 (ステージ持ち越し分)
 let totalStarCount = 0;
+let totalConsumedStars = 0; // ★追加: 累計消費した星の数
 let isAtelierMode = false;
 let spawnPoint = { x: 0, y: 0 }; // 初期位置保存用
 let hasSeenOP = false;
@@ -91,7 +92,8 @@ const DataManager = {
             kneadTutorial: hasSeenKneadTutorial,
             moldTutorial: hasSeenMoldTutorial,
             fireTutorial: hasSeenFireTutorial,
-            finishTutorial: hasSeenFinishTutorial
+            finishTutorial: hasSeenFinishTutorial,
+            consumedStars: totalConsumedStars // ★追加
         };
 
         try {
@@ -116,6 +118,7 @@ const DataManager = {
                 if (data.moldTutorial !== undefined) hasSeenMoldTutorial = data.moldTutorial;
                 if (data.fireTutorial !== undefined) hasSeenFireTutorial = data.fireTutorial;
                 if (data.finishTutorial !== undefined) hasSeenFinishTutorial = data.finishTutorial;
+                if (data.consumedStars !== undefined) totalConsumedStars = data.consumedStars; // ★追加
 
                 // 星空データの復元
                 if (data.sky && typeof SkyManager !== 'undefined') {

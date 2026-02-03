@@ -359,6 +359,24 @@ const LaunchManager = {
 
             // うちあげボタン
             if (placedItems.length > 0 && this.checkBtn(this.ui.btnLaunch)) {
+                // ★追加: 累計消費した星の数を加算
+                let consumed = 0;
+                let refund = 0;
+                this.stockList.forEach(it => {
+                    if (it.placed) consumed += this.costs[it.size];
+                    else refund += this.costs[it.size];
+                });
+                totalConsumedStars += consumed;
+
+                // 未配置分を返却
+                if (refund > 0) {
+                    totalStarCount += refund;
+                    if (typeof updateScoreDisplay === 'function') updateScoreDisplay();
+                }
+
+                // セーブ
+                if (typeof DataManager !== 'undefined') DataManager.save();
+
                 // atelier_bgm1をフェードアウト
                 if (typeof AudioSys !== 'undefined') {
                     AudioSys.fadeOutBGM(2.0); // 2秒かけてフェードアウト

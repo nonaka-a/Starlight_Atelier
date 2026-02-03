@@ -454,6 +454,14 @@ const SkyManager = {
             ctx.fillStyle = '#fff';
             ctx.font = "800 20px 'M PLUS Rounded 1c', sans-serif";
             ctx.textAlign = 'center';
+            ctx.save();
+            ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetY = 2;
+            ctx.fillText(`ほしぞらのあかるさ：${totalConsumedStars}`, 500, 505);
+            ctx.restore();
+
+            ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText("もどる", 920, 550);
             ctx.textAlign = 'left';
