@@ -341,6 +341,17 @@ const SkyManager = {
             AudioSys.playBGM('atelier', 0.3);
         }
 
+        // ★デモ終了判定 (1回のみ)
+        if (!hasSeenDemoEnd && typeof totalConsumedStars !== 'undefined' && totalConsumedStars >= 500) {
+            const screenDemoEnd = document.getElementById('screen-demo-end');
+            if (screenDemoEnd) {
+                hasSeenDemoEnd = true;
+                if (typeof DataManager !== 'undefined') DataManager.save();
+                screenDemoEnd.style.display = 'flex';
+                return;
+            }
+        }
+
         if (typeof resetGameFromCraft === 'function') {
             resetGameFromCraft(0);
         }

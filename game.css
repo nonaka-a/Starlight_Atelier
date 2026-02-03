@@ -646,6 +646,56 @@ input[type="file"] {
     cursor: pointer;
 }
 
+/* --- デモ終了画面 --- */
+#screen-demo-end {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1000px;
+    height: 600px;
+    background-color: #000;
+    background-image: url('image/tutorial/tutorialEND_BG.jpg');
+    background-size: cover;
+    background-position: center;
+    z-index: 5600;
+    display: none;
+    cursor: pointer;
+}
+
+.demo-end-text-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    padding: 60px;
+    box-sizing: border-box;
+}
+
+.demo-end-line {
+    color: #fff;
+    font-size: 24px;
+    font-weight: 800;
+    line-height: 1.6;
+    text-shadow: 0 0 15px rgba(0, 0, 0, 0.8), 2px 2px 4px rgba(0, 0, 0, 1.0);
+    text-align: left;
+    opacity: 0;
+    animation: opFadeIn 1.5s forwards;
+}
+
+.demo-end-text-sub {
+    position: absolute;
+    bottom: 80px;
+    right: 60px;
+    color: #fff;
+    font-size: 20px;
+    font-weight: 400;
+    line-height: 1.4;
+    text-align: right;
+    opacity: 0;
+    text-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+    animation: opFadeIn 1.5s forwards;
+    animation-delay: 1s;
+}
+
 .op-text-container {
     padding: 40px 60px;
 }

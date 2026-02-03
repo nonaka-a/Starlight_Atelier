@@ -36,6 +36,7 @@ let hasSeenKneadTutorial = false;
 let hasSeenMoldTutorial = false;
 let hasSeenFireTutorial = false;
 let hasSeenFinishTutorial = false;
+let hasSeenDemoEnd = false; // ★追加
 let tutorialIndex = -1;
 let exploreTutorialIndex = -1;
 let interactionGracePeriod = 0;
@@ -93,6 +94,7 @@ const DataManager = {
             moldTutorial: hasSeenMoldTutorial,
             fireTutorial: hasSeenFireTutorial,
             finishTutorial: hasSeenFinishTutorial,
+            demoEnd: hasSeenDemoEnd, // ★追加
             consumedStars: totalConsumedStars // ★追加
         };
 
@@ -118,6 +120,7 @@ const DataManager = {
                 if (data.moldTutorial !== undefined) hasSeenMoldTutorial = data.moldTutorial;
                 if (data.fireTutorial !== undefined) hasSeenFireTutorial = data.fireTutorial;
                 if (data.finishTutorial !== undefined) hasSeenFinishTutorial = data.finishTutorial;
+                if (data.demoEnd !== undefined) hasSeenDemoEnd = data.demoEnd; // ★追加
                 if (data.consumedStars !== undefined) totalConsumedStars = data.consumedStars; // ★追加
 
                 // 星空データの復元
@@ -146,6 +149,7 @@ const DataManager = {
         hasSeenMoldTutorial = false;
         hasSeenFireTutorial = false;
         hasSeenFinishTutorial = false;
+        hasSeenDemoEnd = false; // ★追加
         totalItemCount = 0;
         totalStarCount = 0;
 
@@ -247,6 +251,43 @@ function initApp() {
         screenOP.addEventListener('touchstart', (e) => {
             if (e.cancelable) e.preventDefault();
             startFromOP(e);
+        }, { passive: false });
+    }
+
+    const screenDemoEnd = document.getElementById('screen-demo-end');
+    if (screenDemoEnd) {
+        const closeDemoEnd = (e) => {
+            if (screenDemoEnd.style.display === 'none') return;
+            if (e) e.stopPropagation();
+
+            // 一度暗転させる演出 (screen-transitionを利用)
+            const transition = document.getElementById('screen-transition');
+            if (transition) {
+                const locText = document.getElementById('location-name');
+                if (locText) locText.textContent = ""; // 文字は出さない
+                transition.style.display = 'flex';
+                transition.style.opacity = '1';
+                transition.classList.remove('fade-out');
+            }
+
+            setTimeout(() => {
+                screenDemoEnd.style.display = 'none';
+                if (typeof resetGameFromCraft === 'function') {
+                    resetGameFromCraft(0);
+                }
+                // 暗転を解除
+                if (transition) {
+                    transition.classList.add('fade-out');
+                    setTimeout(() => {
+                        transition.style.display = 'none';
+                    }, 1000);
+                }
+            }, 500); // 少し待ってから工房へ
+        };
+        screenDemoEnd.addEventListener('click', closeDemoEnd);
+        screenDemoEnd.addEventListener('touchstart', (e) => {
+            if (e.cancelable) e.preventDefault();
+            closeDemoEnd(e);
         }, { passive: false });
     }
 

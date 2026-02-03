@@ -222,6 +222,18 @@ const LaunchManager = {
 
         this.toggleHtmlUi(true); // UIを戻す
 
+        // ★デモ終了判定 (1回のみ)
+        if (!hasSeenDemoEnd && typeof totalConsumedStars !== 'undefined' && totalConsumedStars >= 500) {
+            const screenDemoEnd = document.getElementById('screen-demo-end');
+            if (screenDemoEnd) {
+                hasSeenDemoEnd = true;
+                DataManager.save(); // フラグを保存
+                screenDemoEnd.style.display = 'flex';
+                // 工房には戻さない (DemoEnd画面のクリックで戻る)
+                return;
+            }
+        }
+
         if (typeof resetGameFromCraft === 'function') {
             resetGameFromCraft(0);
         }
