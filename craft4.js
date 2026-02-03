@@ -10,6 +10,7 @@ const CraftPolishingImages = {
     starDirty: new Image(),
     starShiny: new Image(),
     stampStar: new Image(),
+    tutorialHand: new Image(),
     sparkles: [],
 
     load: function () {
@@ -29,6 +30,7 @@ const CraftPolishingImages = {
             setSrc(s, `effect_sparkle_${i}.png`);
             this.sparkles.push(s);
         }
+        this.tutorialHand.src = 'image/tutorial/hand.png';
         this.loaded = true;
     }
 };
@@ -45,6 +47,9 @@ const CraftPolishing = {
     sparkleAnimTimer: 0,
     sparkleParticles: [], // {x, y, scale, frame, timer}
     seCooldown: 0,
+
+    showTutorial: false,
+    tutorialTimer: 0,
 
     // リザルト管理
     isResultMode: false,
@@ -80,6 +85,9 @@ const CraftPolishing = {
         this.seCooldown = 0;
         this.kiraPlayed = false; // ★リセット
 
+        this.showTutorial = !hasSeenFinishTutorial;
+        this.tutorialTimer = 0;
+
         // マスク用Canvasの初期化 (汚れ画像を描画しておく)
         if (!this.maskCanvas) {
             this.maskCanvas = document.createElement('canvas');
@@ -92,7 +100,7 @@ const CraftPolishing = {
         }
         this.resetMask();
 
-        CraftManager.ui.btnNext.visible = true;
+        CraftManager.ui.btnNext.visible = !this.showTutorial;
         CraftManager.ui.btnNext.text = "かんせい！";
 
         AudioSys.loadBGM('se_polish', 'sounds/se_polish.mp3');
@@ -127,6 +135,11 @@ const CraftPolishing = {
         // --- リザルトモード ---
         if (this.isResultMode) {
             this.updateResult(cm);
+            return;
+        }
+
+        if (this.showTutorial) {
+            this.updateTutorial();
             return;
         }
 
@@ -224,6 +237,16 @@ const CraftPolishing = {
         this.lastY = Input.y;
 
         this.updateSparkles();
+    },
+
+    updateTutorial: function () {
+        this.tutorialTimer++;
+        if (Input.isJustPressed) {
+            this.showTutorial = false;
+            hasSeenFinishTutorial = true;
+            if (typeof DataManager !== 'undefined') DataManager.save();
+            AudioSys.playTone(600, 'sine', 0.1);
+        }
     },
 
     addSparkle: function (x, y) {
@@ -367,6 +390,35 @@ const CraftPolishing = {
         CraftManager.drawSpeechBubble(offsetX, "みがいて完成させよう！");
 
         this.drawPolishingStar(offsetX, 0);
+
+        if (this.showTutorial) {
+            this.drawTutorial(offsetX);
+        }
+    },
+
+    drawTutorial: function (offsetX) {
+        const ctx = CraftManager.ctx;
+        const imgs = CraftPolishingImages;
+        const starCx = 500;
+        const starCy = 280;
+
+        // 画面を暗くする
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.fillRect(offsetX, 0, 1000, 600);
+
+        // 手のアイコンをジグザグに動かす
+        if (imgs.tutorialHand.complete) {
+            const hand = imgs.tutorialHand;
+            const hx = starCx + Math.sin(this.tutorialTimer * 0.2) * 120;
+            const hy = starCy + Math.cos(this.tutorialTimer * 0.03) * 80;
+
+            ctx.save();
+            ctx.translate(offsetX + hx, hy);
+            const hw = 180;
+            const hh = 180;
+            ctx.drawImage(hand, -hw / 2, -hh / 2, hw, hh);
+            ctx.restore();
+        }
     },
 
     drawResultMode: function (offsetX) {

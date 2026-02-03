@@ -450,7 +450,7 @@ const CraftMixing = {
                 this.dragDistance += moveDist;
 
                 if (cm.currentStar.mixProgress < 100) {
-                    cm.currentStar.mixProgress = Math.min(100, this.dragDistance / 150);
+                    cm.currentStar.mixProgress = Math.min(100, this.dragDistance / 200);
                 }
 
                 // ★音の再生 (進捗0~50%未満 & 3秒間隔 & 実際に動いている時)
@@ -669,7 +669,7 @@ const CraftMixing = {
                 // 手のアイコンをぐるぐる回す
                 if (CraftImages.tutorialHand.complete) {
                     const hand = CraftImages.tutorialHand;
-                    const angle = this.tutorialTimer * 0.05;
+                    const angle = this.tutorialTimer * 0.1;
                     const radius = 120; // 少し広めに回す
                     const hx = cx + Math.cos(angle) * radius;
                     const hy = cy + Math.sin(angle) * radius;

@@ -838,6 +838,24 @@ const LaunchManager = {
                 ctx.globalAlpha = 1.0;
 
                 this.drawSpeechBubble(ctx, "どこにうちあげよう？");
+
+                // 次に配置する星玉を画面下中央（音量ボタンの上）に表示
+                const bSize = 80;
+                const bx = 500 - bSize / 2;
+                const by = 440; // 音量ボタンの上あたり
+                this.drawTintedBall(ctx, bx, by, nextItem.size, nextItem.color, bSize, bSize);
+
+                // 星玉の名前をラベルとして表示
+                const label = this.ui.sizes[nextItem.size].label;
+                ctx.save();
+                ctx.fillStyle = "#fff";
+                ctx.font = "bold 24px 'M PLUS Rounded 1c', sans-serif";
+                ctx.textAlign = "left";
+                ctx.textBaseline = "middle";
+                ctx.shadowColor = "rgba(0,0,0,0.8)";
+                ctx.shadowBlur = 4;
+                ctx.fillText(label, bx + bSize - 5, by + bSize / 2);
+                ctx.restore();
             } else {
                 this.drawSpeechBubble(ctx, "うちあげボタンをおしてね！");
             }

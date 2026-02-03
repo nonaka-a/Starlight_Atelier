@@ -33,6 +33,8 @@ let hasSeenTutorial = false;
 let hasSeenExploreTutorial = false;
 let hasSeenKneadTutorial = false;
 let hasSeenMoldTutorial = false;
+let hasSeenFireTutorial = false;
+let hasSeenFinishTutorial = false;
 let tutorialIndex = -1;
 let exploreTutorialIndex = -1;
 let interactionGracePeriod = 0;
@@ -87,7 +89,9 @@ const DataManager = {
             tutorial: hasSeenTutorial,
             exploreTutorial: hasSeenExploreTutorial,
             kneadTutorial: hasSeenKneadTutorial,
-            moldTutorial: hasSeenMoldTutorial
+            moldTutorial: hasSeenMoldTutorial,
+            fireTutorial: hasSeenFireTutorial,
+            finishTutorial: hasSeenFinishTutorial
         };
 
         try {
@@ -110,6 +114,8 @@ const DataManager = {
                 if (data.exploreTutorial !== undefined) hasSeenExploreTutorial = data.exploreTutorial;
                 if (data.kneadTutorial !== undefined) hasSeenKneadTutorial = data.kneadTutorial;
                 if (data.moldTutorial !== undefined) hasSeenMoldTutorial = data.moldTutorial;
+                if (data.fireTutorial !== undefined) hasSeenFireTutorial = data.fireTutorial;
+                if (data.finishTutorial !== undefined) hasSeenFinishTutorial = data.finishTutorial;
 
                 // 星空データの復元
                 if (data.sky && typeof SkyManager !== 'undefined') {
@@ -135,6 +141,8 @@ const DataManager = {
         hasSeenExploreTutorial = false;
         hasSeenKneadTutorial = false;
         hasSeenMoldTutorial = false;
+        hasSeenFireTutorial = false;
+        hasSeenFinishTutorial = false;
         totalItemCount = 0;
         totalStarCount = 0;
 

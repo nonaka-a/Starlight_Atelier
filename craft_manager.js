@@ -226,6 +226,21 @@ const CraftManager = {
         // UI (画面固定)
         if (this.ui.btnNext.visible) {
             this.drawBtn(this.ui.btnNext);
+
+            // チュートリアル表示中はボタンを暗くする
+            let isTutorial = false;
+            if (this.state === 'mixing' && typeof CraftMixing !== 'undefined' && CraftMixing.showTutorial) isTutorial = true;
+            if (this.state === 'molding' && typeof CraftMolding !== 'undefined' && CraftMolding.showTutorial) isTutorial = true;
+            if (this.state === 'firing' && typeof CraftFiring !== 'undefined' && CraftFiring.showTutorial) isTutorial = true;
+            if (this.state === 'polishing' && typeof CraftPolishing !== 'undefined' && CraftPolishing.showTutorial) isTutorial = true;
+
+            if (isTutorial) {
+                const btn = this.ui.btnNext;
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                ctx.beginPath();
+                ctx.roundRect(btn.x, btn.y, btn.w, btn.h + 5, 30);
+                ctx.fill();
+            }
         }
 
         // 共通UI: やめるボタン (赤色)

@@ -136,6 +136,8 @@ const CraftFiring = {
         doorArea: { x: 330, y: 160, w: 340, h: 180 } // 窯の扉クリックエリア(目安)
     },
 
+    showTutorial: false,
+
     init: function () {
         CraftFiringImages.load();
         this.resetParams();
@@ -150,6 +152,8 @@ const CraftFiring = {
         AudioSys.loadBGM('se_fire', 'sounds/fire.mp3');
         AudioSys.loadBGM('se_open', 'sounds/open.mp3');
         AudioSys.loadBGM('se_firewood', 'sounds/firewood.mp3');
+
+        this.showTutorial = !hasSeenFireTutorial;
     },
 
     end: function () {
@@ -199,6 +203,11 @@ const CraftFiring = {
 
     update: function () {
         if (CraftManager.ui.btnNext.visible) return;
+
+        if (this.showTutorial) {
+            this.updateTutorial();
+            return;
+        }
 
         const cm = CraftManager;
         const inputX = Input.x + cm.camera.x - 2000; // Offset 2000
@@ -376,6 +385,15 @@ const CraftFiring = {
         }
         if (this.starTransition.fade < 1.0) {
             this.starTransition.fade = Math.min(1.0, this.starTransition.fade + 1 / 60);
+        }
+    },
+
+    updateTutorial: function () {
+        if (Input.isJustPressed) {
+            this.showTutorial = false;
+            hasSeenFireTutorial = true;
+            if (typeof DataManager !== 'undefined') DataManager.save();
+            AudioSys.playTone(800, 'square', 0.1);
         }
     },
 
@@ -639,73 +657,63 @@ const CraftFiring = {
         // 7. テキスト情報
         CraftManager.drawTitle(offsetX, "ほしやき");
         this.drawGuideMessage(offsetX);
+
+        // --- チュートリアル表示 ---
+        if (this.showTutorial) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(offsetX, 0, 1000, 600);
+
+            ctx.globalAlpha = 1.0;
+
+            // 1. 扉（閉）
+            const doorImg = imgs.door[0]; // door_closed.png
+            if (doorImg && doorImg.complete) {
+                const dx = offsetX + 500 - doorImg.width / 2;
+                const dy = 250 - doorImg.height / 2 + 10;
+                ctx.drawImage(doorImg, dx, dy);
+            }
+
+            // 2. 薪ボタン
+            this.drawFuelButton(offsetX);
+
+            // 3. 温度ゲージ
+            this.drawTempGauge(offsetX);
+
+            // 4. 説明テキスト
+            ctx.save();
+            ctx.fillStyle = "#fff";
+            ctx.font = "bold 24px 'M PLUS Rounded 1c', sans-serif";
+            ctx.textAlign = "center";
+            ctx.shadowColor = "rgba(0,0,0,0.8)";
+            ctx.shadowBlur = 10;
+            ctx.fillText("まきをいれる - ゆっくりおんどを上げる", offsetX + 500, 420);
+            ctx.fillText("まどをあける - すばやくおんどを下げる", offsetX + 500, 460);
+            ctx.restore();
+        }
     },
 
     drawUI: function (offsetX) {
-        const cm = CraftManager;
-        const ctx = cm.ctx;
-        const imgs = CraftFiringImages;
-
         // -- 薪ボタン --
-        const btnF = this.ui.btnFuel;
-        if (imgs.wood.idle.complete) {
-            // そのままのサイズで中心を合わせる
-            ctx.drawImage(imgs.wood.idle, offsetX + btnF.x + btnF.w / 2 - imgs.wood.idle.width / 2, btnF.y + btnF.h / 2 - imgs.wood.idle.height / 2);
-        } else {
-            // 代替
-            ctx.fillStyle = '#795548';
-            ctx.beginPath(); ctx.arc(offsetX + btnF.x + 60, btnF.y + 60, 60, 0, Math.PI * 2); ctx.fill();
-        }
-        ctx.fillStyle = '#fff';
-        ctx.font = "800 40px 'M PLUS Rounded 1c', sans-serif";
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText("まき", offsetX + btnF.x + btnF.w / 2 - 10, btnF.y + btnF.h / 2 - 10); // さらに10px上、10px左へ
+        this.drawFuelButton(offsetX);
 
         // -- 入れるボタン (生星画像1個 + テキスト) --
         if (this.ui.btnInsert.visible) {
             const btnI = this.ui.btnInsert;
+            const imgs = CraftFiringImages;
+            const ctx = CraftManager.ctx;
             if (imgs.star.raw.complete) {
                 ctx.drawImage(imgs.star.raw, offsetX + btnI.x, btnI.y, btnI.w, btnI.h);
             }
             // テキストのみオーバーレイ (黒枠なし)
             ctx.fillStyle = '#fff';
             ctx.font = "800 40px 'M PLUS Rounded 1c', sans-serif";
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
             ctx.fillText("入れる", offsetX + btnI.x + btnI.w / 2, btnI.y + btnI.h / 2);
         }
 
         // -- 温度ゲージ --
-        const gx = offsetX + 910;
-        const gy = 150;
-        const gw = 40;
-        const gh = 300;
-
-        ctx.fillStyle = '#444';
-        ctx.fillRect(gx, gy, gw, gh);
-        ctx.strokeStyle = '#666';
-        ctx.lineWidth = 2;
-        for (let i = 0; i <= 10; i++) {
-            const ly = gy + gh * (i / 10);
-            ctx.beginPath(); ctx.moveTo(gx, ly); ctx.lineTo(gx + gw, ly); ctx.stroke();
-        }
-
-        const range = this.TEMP_MAX_GAUGE;
-        const safeY1 = gy + gh * (1 - this.TARGET_TEMP_MAX / range);
-        const safeY2 = gy + gh * (1 - this.TARGET_TEMP_MIN / range);
-        ctx.fillStyle = 'rgba(76, 175, 80, 0.6)';
-        ctx.fillRect(gx, safeY1, gw, safeY2 - safeY1);
-
-        const curH = Math.min(gh, Math.max(0, (this.ovenTemp / range) * gh));
-        const barY = gy + gh - curH;
-        let barCol = '#2196f3';
-        if (this.ovenTemp >= this.TARGET_TEMP_MIN) barCol = '#4caf50';
-        if (this.ovenTemp > this.TARGET_TEMP_MAX) barCol = '#f44336';
-        ctx.fillStyle = barCol;
-        ctx.fillRect(gx + 5, barY, gw - 10, curH);
-
-        ctx.fillStyle = '#fff';
-        ctx.font = "bold 16px 'M PLUS Rounded 1c', sans-serif";
-        ctx.fillText("おんど", gx + gw / 2, gy - 20);
+        this.drawTempGauge(offsetX);
 
         // -- 焼き上がりゲージ --
         const pgW = 400;
@@ -771,5 +779,59 @@ const CraftFiring = {
             else msg = "いい調子！ そのままキープ！";
         }
         CraftManager.drawSpeechBubble(offsetX, msg);
+    },
+
+    drawFuelButton: function (offsetX) {
+        const ctx = CraftManager.ctx;
+        const imgs = CraftFiringImages;
+        const btnF = this.ui.btnFuel;
+        if (imgs.wood.idle.complete) {
+            ctx.drawImage(imgs.wood.idle, offsetX + btnF.x + btnF.w / 2 - imgs.wood.idle.width / 2, btnF.y + btnF.h / 2 - imgs.wood.idle.height / 2);
+        } else {
+            ctx.fillStyle = '#795548';
+            ctx.beginPath(); ctx.arc(offsetX + btnF.x + 60, btnF.y + 60, 60, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.fillStyle = '#fff';
+        ctx.font = "800 40px 'M PLUS Rounded 1c', sans-serif";
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText("まき", offsetX + btnF.x + btnF.w / 2 - 10, btnF.y + btnF.h / 2 - 10);
+    },
+
+    drawTempGauge: function (offsetX) {
+        const ctx = CraftManager.ctx;
+        const gx = offsetX + 910;
+        const gy = 150;
+        const gw = 40;
+        const gh = 300;
+
+        ctx.fillStyle = '#444';
+        ctx.fillRect(gx, gy, gw, gh);
+        ctx.strokeStyle = '#666';
+        ctx.lineWidth = 2;
+        for (let i = 0; i <= 10; i++) {
+            const ly = gy + gh * (i / 10);
+            ctx.beginPath(); ctx.moveTo(gx, ly); ctx.lineTo(gx + gw, ly); ctx.stroke();
+        }
+
+        const range = this.TEMP_MAX_GAUGE;
+        const safeY1 = gy + gh * (1 - this.TARGET_TEMP_MAX / range);
+        const safeY2 = gy + gh * (1 - this.TARGET_TEMP_MIN / range);
+        ctx.fillStyle = 'rgba(76, 175, 80, 0.6)';
+        ctx.fillRect(gx, safeY1, gw, safeY2 - safeY1);
+
+        const curH = Math.min(gh, Math.max(0, (this.ovenTemp / range) * gh));
+        const barY = gy + gh - curH;
+        let barCol = '#2196f3';
+        if (this.ovenTemp >= this.TARGET_TEMP_MIN) barCol = '#4caf50';
+        if (this.ovenTemp > this.TARGET_TEMP_MAX) barCol = '#f44336';
+        ctx.fillStyle = barCol;
+        ctx.fillRect(gx + 5, barY, gw - 10, curH);
+
+        ctx.fillStyle = '#fff';
+        ctx.font = "bold 16px 'M PLUS Rounded 1c', sans-serif";
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText("おんど", gx + gw / 2, gy - 20);
     }
 };
