@@ -195,7 +195,7 @@ function initApp() {
         img.src = `image/siro_maimai_${i}.png`;
         npcImages.push(img);
     }
-    bubbleImage.src = 'image/fukidasi.png';
+    bubbleImage.src = 'image/UI/fukidasi.png';
 
     bgImage.src = BG_SRC;
 
@@ -677,7 +677,7 @@ function updateHPDisplay() {
     hpContainer.innerHTML = '';
     for (let i = 0; i < player.maxHp; i++) {
         const img = document.createElement('img');
-        img.src = 'image/heart.png';
+        img.src = 'image/UI/heart.png';
         img.className = 'heart-icon';
         if (i >= player.hp) {
             img.style.filter = 'grayscale(100%) opacity(0.3)';

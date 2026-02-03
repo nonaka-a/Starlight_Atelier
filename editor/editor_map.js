@@ -1,7 +1,7 @@
 /** 定数 */
 const TILE_SIZE = 64;
 // ルートフォルダの画像を参照するためパス変更
-const TILESET_SRC = '../image/forest_tileset.png';
+const TILESET_SRC = '../image/tileset/forest_tileset.png';
 
 // 属性（プロパティ）定義リスト
 const PROPERTY_TYPES = [
@@ -56,7 +56,7 @@ let isDrawing = false;
 let isResizing = false;
 let tilesetImage = new Image();
 // ★追加: タイルセットのパスを保持する変数 (保存用)
-let currentTilesetJsonPath = "image/forest_tileset.png";
+let currentTilesetJsonPath = "image/tileset/forest_tileset.png";
 let isImageLoaded = false;
 let isInitialized = false;
 

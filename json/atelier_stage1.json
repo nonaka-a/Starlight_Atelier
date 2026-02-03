@@ -4,7 +4,7 @@
   "width": 20,
   "height": 13,
   "tileSize": 64,
-  "tilesetImage": "image/Atelier_tileset.png",
+  "tilesetImage": "image/tileset/Atelier_tileset.png",
   "layers": [
     {
       "name": "background",

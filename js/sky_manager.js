@@ -70,23 +70,23 @@ const SkyManager = {
             }
         };
 
-        this.stampsImage.src = 'image/star_stamps_h.png';
+        this.stampsImage.src = 'image/sky/star_stamps_h.png';
         this.stampsImage.onload = checkLoad;
         this.stampsImage.onerror = checkLoad;
 
-        this.bgImage.src = 'image/bg_sky.jpg';
+        this.bgImage.src = 'image/sky/bg_sky.jpg';
         this.bgImage.onload = checkLoad;
         this.bgImage.onerror = () => { console.warn("no bg image"); checkLoad(); };
 
-        this.mountainImage.src = 'image/bg_mountain.png';
+        this.mountainImage.src = 'image/sky/bg_mountain.png';
         this.mountainImage.onload = checkLoad;
         this.mountainImage.onerror = () => { console.warn("no mountain image"); checkLoad(); };
 
-        this.woodsImage.src = 'image/bg_Woods.png';
+        this.woodsImage.src = 'image/sky/bg_Woods.png';
         this.woodsImage.onload = checkLoad;
         this.woodsImage.onerror = () => { console.warn("no woods image"); checkLoad(); };
 
-        this.charImage.src = 'image/maimai_watching.png';
+        this.charImage.src = 'image/sky/maimai_watching.png';
         this.charImage.onload = checkLoad;
         this.charImage.onerror = () => { console.warn("no char image"); checkLoad(); };
     },

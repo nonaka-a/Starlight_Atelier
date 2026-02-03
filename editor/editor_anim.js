@@ -31,7 +31,7 @@ window.initAnimEditor = function () {
     anim_ctxPreview = anim_canvasPreview.getContext('2d');
 
     const img = new Image();
-    img.src = '../image/forest_tileset.png';
+    img.src = '../image/tileset/forest_tileset.png';
     img.onload = () => {
         anim_sourceCanvas.width = img.width;
         anim_sourceCanvas.height = img.height;

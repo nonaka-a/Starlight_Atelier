@@ -4,7 +4,7 @@
   "width": 39,
   "height": 24,
   "tileSize": 64,
-  "tilesetImage": "image/forest_tileset.png",
+  "tilesetImage": "image/tileset/forest_tileset.png",
   "layers": [
     {
       "name": "background",
