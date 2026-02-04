@@ -222,14 +222,13 @@ const LaunchManager = {
 
         this.toggleHtmlUi(true); // UIを戻す
 
-        // ★デモ終了判定 (1回のみ)
-        if (!hasSeenDemoEnd && typeof totalConsumedStars !== 'undefined' && totalConsumedStars >= 500) {
+        // ★デモ終了判定 (1回のみ: 300以上)
+        if (!hasSeenDemoEnd && typeof totalConsumedStars !== 'undefined' && totalConsumedStars >= 300) {
             const screenDemoEnd = document.getElementById('screen-demo-end');
             if (screenDemoEnd) {
-                hasSeenDemoEnd = true;
-                DataManager.save(); // フラグを保存
-                screenDemoEnd.style.display = 'flex';
-                // 工房には戻さない (DemoEnd画面のクリックで戻る)
+                hasSeenDemoEnd = true; // フラグを立てる
+                if (typeof DataManager !== 'undefined') DataManager.save(); // セーブ
+                screenDemoEnd.style.display = 'flex'; // 表示
                 return;
             }
         }

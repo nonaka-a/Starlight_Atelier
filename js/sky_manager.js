@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------
-   FILE: sky_manager.js (Fix Data Loss Ver.)
+   FILE: sky_manager.js (Watching Together Ver.)
    ------------------------------------------------------------ */
 
 /**
@@ -23,6 +23,7 @@ const SkyManager = {
     mountainImage: new Image(),
     woodsImage: new Image(),
     charImage: new Image(),
+    charImage2: new Image(), // ★追加: しろまいまい
     isLoaded: false,
 
     // データ保存用
@@ -36,6 +37,7 @@ const SkyManager = {
     isDragging: false,
     uiAlpha: 1.0,
     uiTimer: 0,
+    isWatchingTogether: false, // ★追加: 二人で見るフラグ
 
     init: function () {
         if (this.canvas) return;
@@ -50,7 +52,7 @@ const SkyManager = {
         }
 
         let loadedCount = 0;
-        const totalImages = 5;
+        const totalImages = 6; // 5枚から6枚へ変更
 
         const checkLoad = () => {
             if (this.isLoaded) return; // 二重実行防止
@@ -89,6 +91,11 @@ const SkyManager = {
         this.charImage.src = 'image/sky/maimai_watching.png';
         this.charImage.onload = checkLoad;
         this.charImage.onerror = () => { console.warn("no char image"); checkLoad(); };
+
+        // ★追加: しろまいまい画像
+        this.charImage2.src = 'image/sky/shiromaimai_watching.png';
+        this.charImage2.onload = checkLoad;
+        this.charImage2.onerror = () => { console.warn("no char image 2"); checkLoad(); };
     },
 
     initBackground: function () {
@@ -111,12 +118,9 @@ const SkyManager = {
 
     // --- データ保存・読み込み ---
     getStarData: function () {
-        // ★修正: 画像ロード待ちのデータがある場合はそれを返す (データ消失防止)
-        // これにより、ロード中にセーブが走っても空データで上書きされるのを防ぎます
         if (this.pendingLoadData) {
             return this.pendingLoadData;
         }
-        // 現在のリストを返す
         return this.starDataList;
     },
 
@@ -141,7 +145,6 @@ const SkyManager = {
 
         // 全ての星を再描画
         for (const s of this.starDataList) {
-            // 第8引数 false = 履歴には追加しない(二重追加防止)
             this.drawSingleStamp(this.ctx, s.x, s.y, s.row, s.col, s.color, s.scale, false);
         }
         console.log(`SkyManager: Restored ${this.starDataList.length} stars on canvas.`);
@@ -169,28 +172,20 @@ const SkyManager = {
                 if (dist <= 1.0) densityIndex = 0;
                 else if (dist <= radius * 0.6) densityIndex = 1;
 
-                // 密度のダウングレード（確率はそのまま）
                 if (densityIndex === 0 && Math.random() < 0.66) densityIndex = 1;
                 else if (densityIndex === 1 && Math.random() < 0.66) densityIndex = 2;
 
-                // ★修正: 間引き率を緩和（iPad等でスカスカにならないように）
-                // 低密度: 40%除外 -> 20%除外に変更
                 if (densityIndex === 2 && Math.random() < 0.2) continue;
-                // 中密度: 10%除外 -> 0% (必ず描く)
-                // if (densityIndex === 1 && Math.random() < 0.1) continue; 
 
                 this.drawStampAtGrid(gridX + dx, gridY + dy, densityIndex, color);
 
-                // 重ね打ち（確率はそのまま）
                 if (densityIndex === 0 && Math.random() < 0.5) {
                     this.drawStampAtGrid(gridX + dx, gridY + dy, densityIndex, color);
                 }
             }
         }
 
-        // ステップ2: 拡張 (Spikes)
-        // ★修正: 本数を増やしてボリュームアップ
-        const spikeCount = 3 + Math.floor(Math.random() * 3); // 2~3本 -> 3~5本
+        const spikeCount = 3 + Math.floor(Math.random() * 3); 
         for (let i = 0; i < spikeCount; i++) {
             const angle = Math.random() * Math.PI * 2;
             const spikeLen = radius + 2 + Math.floor(Math.random() * 3);
@@ -198,7 +193,6 @@ const SkyManager = {
             for (let d = radius + 1; d <= spikeLen; d++) {
                 const ox = Math.round(Math.cos(angle) * d);
                 const oy = Math.round(Math.sin(angle) * d);
-                // ★修正: 描画確率を上げる (0.6 -> 0.8)
                 if (Math.random() < 0.8) {
                     const spikeDensity = (Math.random() < 0.2) ? 1 : 2;
                     this.drawStampAtGrid(gridX + ox, gridY + oy, spikeDensity, color);
@@ -206,9 +200,7 @@ const SkyManager = {
             }
         }
 
-        // ステップ3: 飛び地 (近距離)
-        // ★修正: 個数を微増
-        const strayCount = 3 + Math.floor(Math.random() * 4); // 2~5 -> 3~6個
+        const strayCount = 3 + Math.floor(Math.random() * 4); 
         for (let i = 0; i < strayCount; i++) {
             const angle = Math.random() * Math.PI * 2;
             const dist = radius * (1.5 + Math.random() * 0.8);
@@ -217,9 +209,7 @@ const SkyManager = {
             this.drawStampAtGrid(gridX + sx, gridY + sy, 2, color);
         }
 
-        // ステップ4: 遠方飛び地
-        // ★修正: 個数を微増
-        const farStrayCount = 4 + Math.floor(Math.random() * 5); // 3~6 -> 4~8個
+        const farStrayCount = 4 + Math.floor(Math.random() * 5); 
         for (let i = 0; i < farStrayCount; i++) {
             const angle = Math.random() * Math.PI * 2;
             const dist = radius * 2.5 + Math.random() * 6.0;
@@ -230,7 +220,6 @@ const SkyManager = {
 
         ctx.restore();
     },
-
 
     drawStampAtGrid: function (gx, gy, densityIndex, color) {
         const logicalPx = gx * this.gridSize;
@@ -257,8 +246,6 @@ const SkyManager = {
 
     drawSingleStamp: function (ctx, x, y, row, col, color, scale, record) {
         if (record) {
-            // ★修正: 保存データを軽量化
-            // 座標は整数に丸める、スケールは小数点第2位までにする
             this.starDataList.push({
                 x: Math.floor(x),
                 y: Math.floor(y),
@@ -310,11 +297,13 @@ const SkyManager = {
         this.uiAlpha = 1.0;
         this.uiTimer = 0;
 
+        // ★確率判定 (0.8 = 80%)
+        this.isWatchingTogether = Math.random() < 0.4;
+
         const ui = document.getElementById('ui-container');
         if (ui) ui.style.display = 'none';
         this.syncHtmlUiOpacity(1.0);
 
-        // カメラ初期位置 (中央)
         const visibleW = 1000 / this.viewScale;
         const visibleH = 600 / this.viewScale;
         this.camera.x = (this.worldWidth - visibleW) / 2;
@@ -338,11 +327,11 @@ const SkyManager = {
         this.syncHtmlUiOpacity(1.0);
 
         if (typeof AudioSys !== 'undefined') {
+            AudioSys.stopBGM();
             AudioSys.playBGM('atelier', 0.3);
         }
 
-        // ★デモ終了判定 (1回のみ)
-        if (!hasSeenDemoEnd && typeof totalConsumedStars !== 'undefined' && totalConsumedStars >= 500) {
+        if (!hasSeenDemoEnd && typeof totalConsumedStars !== 'undefined' && totalConsumedStars >= 300) {
             const screenDemoEnd = document.getElementById('screen-demo-end');
             if (screenDemoEnd) {
                 hasSeenDemoEnd = true;
@@ -423,7 +412,6 @@ const SkyManager = {
         const visibleW = 1000 / this.viewScale;
         const visibleH = 600 / this.viewScale;
 
-        // 1. 夜空と星 (背景)
         if (this.canvas) {
             const sX = this.camera.x * this.resolutionScale;
             const sY = this.camera.y * this.resolutionScale;
@@ -435,25 +423,20 @@ const SkyManager = {
             ctx.fillRect(0, 0, 1000, 600);
         }
 
-        // 2. 山 (中景: 視差スクロール)
         if (this.mountainImage.complete && this.mountainImage.naturalWidth > 0) {
-            // 移動距離を少しだけ短くすることで奥行き(密着マルチ)を表現
             const parallaxFactor = 0.9;
             const px = this.camera.x * parallaxFactor;
             const py = this.camera.y * parallaxFactor;
             ctx.drawImage(this.mountainImage, px, py, visibleW, visibleH, 0, 0, 1000, 600);
         }
 
-        // 3. 森 (近景: 視差スクロール)
         if (this.woodsImage.complete && this.woodsImage.naturalWidth > 0) {
-            // 移動倍率を0.7に下げて、動きをさらに抑制
             const parallaxFactor = 0.7;
             const px = this.camera.x * parallaxFactor;
             const py = this.camera.y * parallaxFactor;
             ctx.drawImage(this.woodsImage, px, py, visibleW, visibleH, 0, 0, 1000, 600);
         }
 
-        // 4. キャラクター (前面)
         this.drawCharacters(ctx);
 
         if (this.uiAlpha > 0) {
@@ -483,12 +466,29 @@ const SkyManager = {
     },
 
     drawCharacters: function (ctx) {
+        // 配置・確率調整用パラメータ
+        const config = {
+            scale: 0.5,
+            baseX: 50,
+            baseY: 600,
+            offset2X: 150, // 2人目の横位置ずらし
+            offset2Y: -213  // 2人目の縦位置ずらし
+        };
+
+        // 1人目
         if (this.charImage.complete && this.charImage.naturalWidth > 0) {
-            const imgW = this.charImage.naturalWidth * 0.5;
-            const imgH = this.charImage.naturalHeight * 0.5;
-            const x = 50;
-            const y = 600 - imgH;
+            const imgW = this.charImage.naturalWidth * config.scale;
+            const imgH = this.charImage.naturalHeight * config.scale;
+            const x = config.baseX;
+            const y = config.baseY - imgH;
             ctx.drawImage(this.charImage, x, y, imgW, imgH);
+
+            // 2人目 (上レイヤー)
+            if (this.isWatchingTogether && this.charImage2.complete && this.charImage2.naturalWidth > 0) {
+                const imgW2 = this.charImage2.naturalWidth * config.scale;
+                const imgH2 = this.charImage2.naturalHeight * config.scale;
+                ctx.drawImage(this.charImage2, x + config.offset2X, config.baseY - imgH2 + config.offset2Y, imgW2, imgH2);
+            }
         } else {
             ctx.fillStyle = '#1a237e';
             ctx.beginPath();
@@ -498,10 +498,12 @@ const SkyManager = {
             ctx.beginPath();
             ctx.arc(450, 530, 25, 0, Math.PI * 2);
             ctx.fill();
-            ctx.fillStyle = '#f48fb1';
-            ctx.beginPath();
-            ctx.arc(520, 535, 23, 0, Math.PI * 2);
-            ctx.fill();
+            if (this.isWatchingTogether) {
+                ctx.fillStyle = '#f48fb1';
+                ctx.beginPath();
+                ctx.arc(520, 535, 23, 0, Math.PI * 2);
+                ctx.fill();
+            }
         }
     }
 };
