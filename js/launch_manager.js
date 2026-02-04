@@ -119,9 +119,9 @@ const LaunchManager = {
     // UI定義
     ui: {
         sizes: [
-            { x: 50, y: 158, w: 140, h: 200, label: "星玉", cost: 10 },
-            { x: 210, y: 158, w: 140, h: 200, label: "5星玉", cost: 50 },
-            { x: 370, y: 158, w: 140, h: 200, label: "10星玉", cost: 100 }
+            { x: 50, y: 158, w: 140, h: 200, label: "10星玉", cost: 10 },
+            { x: 210, y: 158, w: 140, h: 200, label: "50星玉", cost: 50 },
+            { x: 370, y: 158, w: 140, h: 200, label: "100星玉", cost: 100 }
         ],
         colors: [
             { code: '#ffffff', x: 100, y: 460, r: 25 }, // 白
@@ -682,7 +682,7 @@ const LaunchManager = {
             }
 
             ctx.fillStyle = canBuy ? '#5d4037' : '#888';
-            ctx.font = "900 32px 'M PLUS Rounded 1c', sans-serif";
+            ctx.font = "900 28px 'M PLUS Rounded 1c', sans-serif";
             ctx.fillText(b.label, b.x + b.w / 2, b.y + 35);
             ctx.font = "900 24px 'M PLUS Rounded 1c', sans-serif";
             ctx.fillText(`星 ${b.cost}個`, b.x + b.w / 2, b.y + 175);
