@@ -523,6 +523,16 @@ window.event_onPreviewMouseDown = function (e) {
 window.event_onKeyDown = function (e) {
     if (e.target.tagName === 'INPUT') return;
     if (!document.getElementById('mode-event').classList.contains('active')) return;
+
+    // Ctrl+D / Cmd+D (レイヤー複製)
+    if ((e.ctrlKey || e.metaKey) && e.code === 'KeyD') {
+        e.preventDefault();
+        if (event_selectedLayerIndex !== -1) {
+            event_duplicateLayer(event_selectedLayerIndex);
+        }
+        return;
+    }
+
     if (e.code === 'F9' && event_selectedKey) {
         event_pushHistory(); const k = event_selectedKey.keyObj;
         const s = !(k.easeIn && k.easeOut); k.easeIn = s; k.easeOut = s; event_draw();

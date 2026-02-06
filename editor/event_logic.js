@@ -55,6 +55,39 @@ window.event_pasteKeyframe = function () {
     }
 };
 
+/**
+ * 指定したインデックスのレイヤーを複製する
+ */
+window.event_duplicateLayer = function (layerIdx) {
+    if (layerIdx < 0 || layerIdx >= event_data.layers.length) return;
+
+    event_pushHistory(); // 履歴保存
+
+    const original = event_data.layers[layerIdx];
+
+    // ディープコピーを作成 (imgObj等の非JSON要素は消える)
+    const clone = JSON.parse(JSON.stringify(original));
+
+    // 新しいIDと名前の設定
+    clone.id = 'layer_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+    clone.name = original.name + " コピー";
+
+    // 描画に必要なImageオブジェクトの参照を復元
+    if (original.imgObj) {
+        clone.imgObj = original.imgObj;
+    }
+
+    // 元のレイヤーの直上に挿入
+    event_data.layers.splice(layerIdx, 0, clone);
+
+    // 複製したレイヤーを選択状態にする
+    event_selectedLayerIndex = layerIdx;
+    event_selectedKey = null;
+
+    event_draw();
+    console.log("Layer duplicated:", clone.name);
+};
+
 // コンポジション切り替え
 window.event_switchComposition = function (compId) {
     // 現在の編集内容を保存
