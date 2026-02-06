@@ -532,6 +532,8 @@ window.event_onKeyDown = function (e) {
     else if (e.code === 'Space') { e.preventDefault(); event_togglePlay(); }
     else if (e.code === 'Delete' || e.code === 'Backspace') { event_pushHistory(); event_deleteSelectedKeyframe(); }
     else if (e.code === 'KeyU' && event_selectedLayerIndex !== -1) { event_data.layers[event_selectedLayerIndex].expanded = !event_data.layers[event_selectedLayerIndex].expanded; event_draw(); }
+    else if (e.code === 'KeyJ') { event_jumpToPrevKeyframe(); }
+    else if (e.code === 'KeyK') { event_jumpToNextKeyframe(); }
 };
 
 window.event_showInlineInput = function (x, y, initialValue, trackType, callback) {

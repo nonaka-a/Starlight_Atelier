@@ -62,14 +62,15 @@ let event_data = {
 
 // --- やり直し (Undo) 用の履歴管理 ---
 let event_history = [];
-const EVENT_MAX_HISTORY = 10;
+const EVENT_MAX_HISTORY = 20; // 履歴数を少し増やす
 
 window.event_pushHistory = function () {
     // データの整合性を保つため、現在の編集中のレイヤーをアセットに同期させてから保存
     if (event_data.activeCompId) {
         const comp = event_data.assets.find(a => a.id === event_data.activeCompId);
         if (comp) {
-            comp.layers = event_data.layers; // 参照なので基本同期されているが念のため
+            // 現在のレイヤー状態をアセットに反映 (imgObj等の参照は保持される)
+            comp.layers = event_data.layers; 
             comp.name = event_data.composition.name;
             comp.width = event_data.composition.width;
             comp.height = event_data.composition.height;
@@ -78,7 +79,7 @@ window.event_pushHistory = function () {
         }
     }
 
-    // ディープコピーして保存
+    // ディープコピーして保存 (imgObjなどの関数・DOM要素は消える)
     const snapshot = JSON.parse(JSON.stringify({
         assets: event_data.assets,
         activeCompId: event_data.activeCompId
@@ -101,24 +102,58 @@ window.event_undo = function () {
     // 状態の復元
     event_data.assets = prevState.assets;
 
-    // 現在のコンポジションを再読み込み (保存処理をスキップするために一時的にIDを消す)
-    const targetCompId = prevState.activeCompId;
-    event_data.activeCompId = null;
-    event_switchComposition(targetCompId);
+    // 画像オブジェクト (imgObj) の再生成
+    // JSON.stringify/parse で imgObj が消えているため、source プロパティから再読み込みする
+    event_restoreImagesInAssets(event_data.assets);
 
-    // imgObj は JSON化で消えるので、全レイヤーで再生成
-    event_data.layers.forEach(l => {
-        if (l.source) {
-            const img = new Image();
-            img.src = l.source;
-            img.onload = () => event_draw();
-            l.imgObj = img;
+    // 現在のコンポジションを再読み込み
+    // switchComposition を使うと初期化処理が走るため、手動で復元する
+    const targetCompId = prevState.activeCompId;
+    event_data.activeCompId = targetCompId;
+
+    if (targetCompId) {
+        const comp = window.event_findAssetById(targetCompId, event_data.assets);
+        if (comp) {
+            event_data.composition = {
+                name: comp.name,
+                width: comp.width,
+                height: comp.height,
+                duration: comp.duration,
+                fps: comp.fps
+            };
+            event_data.layers = comp.layers; // 参照をセット
+        } else {
+            // コンポジションが見つからない場合 (削除された場合など)
+            event_data.activeCompId = null;
+            event_data.layers = [];
         }
-    });
+    } else {
+        event_data.layers = [];
+    }
 
     event_draw();
     if (window.event_refreshProjectList) event_refreshProjectList();
 };
+
+// ヘルパー: アセットツリー内の画像オブジェクトを復元
+window.event_restoreImagesInAssets = function(assets) {
+    assets.forEach(item => {
+        if (item.type === 'comp' && item.layers) {
+            item.layers.forEach(l => {
+                if (l.source && !l.imgObj) {
+                    const img = new Image();
+                    img.src = l.source;
+                    img.onload = () => window.event_draw(); // 読み込み完了後に再描画
+                    l.imgObj = img;
+                }
+            });
+        }
+        if (item.type === 'folder' && item.children) {
+            event_restoreImagesInAssets(item.children);
+        }
+    });
+};
+
 
 const UI_LAYOUT = {
     TRASH_RIGHT: 30,
