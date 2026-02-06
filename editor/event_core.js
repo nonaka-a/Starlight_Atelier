@@ -62,15 +62,14 @@ let event_data = {
 
 // --- やり直し (Undo) 用の履歴管理 ---
 let event_history = [];
-const EVENT_MAX_HISTORY = 20; // 履歴数を少し増やす
+const EVENT_MAX_HISTORY = 30;
 
 window.event_pushHistory = function () {
-    // データの整合性を保つため、現在の編集中のレイヤーをアセットに同期させてから保存
+    // 1. 現在の編集状態をアセット（マスターデータ）に一度同期させる
     if (event_data.activeCompId) {
         const comp = event_data.assets.find(a => a.id === event_data.activeCompId);
         if (comp) {
-            // 現在のレイヤー状態をアセットに反映 (imgObj等の参照は保持される)
-            comp.layers = event_data.layers; 
+            comp.layers = event_data.layers;
             comp.name = event_data.composition.name;
             comp.width = event_data.composition.width;
             comp.height = event_data.composition.height;
@@ -79,10 +78,11 @@ window.event_pushHistory = function () {
         }
     }
 
-    // ディープコピーして保存 (imgObjなどの関数・DOM要素は消える)
+    // 2. ディープコピーを作成してスタックに積む
     const snapshot = JSON.parse(JSON.stringify({
         assets: event_data.assets,
-        activeCompId: event_data.activeCompId
+        activeCompId: event_data.activeCompId,
+        currentTime: event_currentTime
     }));
 
     event_history.push(snapshot);
@@ -97,22 +97,37 @@ window.event_undo = function () {
         return;
     }
 
+    // スタックから直前の保存状態を取り出す
     const prevState = event_history.pop();
 
-    // 状態の復元
-    event_data.assets = prevState.assets;
+    // 3. データの復元
+    event_data.assets = prevState.assets; 
+    event_data.activeCompId = prevState.activeCompId;
+    event_currentTime = prevState.currentTime || 0;
 
-    // 画像オブジェクト (imgObj) の再生成
-    // JSON.stringify/parse で imgObj が消えているため、source プロパティから再読み込みする
-    event_restoreImagesInAssets(event_data.assets);
+    // 4. 画像オブジェクト (JSON化で失われる参照) の再生成
+    const restoreImages = (items) => {
+        items.forEach(item => {
+            if (item.type === 'comp' && item.layers) {
+                item.layers.forEach(l => {
+                    if (l.source) {
+                        const img = new Image();
+                        img.src = l.source;
+                        img.onload = () => window.event_draw();
+                        l.imgObj = img;
+                    }
+                });
+            }
+            if (item.type === 'folder' && item.children) {
+                restoreImages(item.children);
+            }
+        });
+    };
+    restoreImages(event_data.assets);
 
-    // 現在のコンポジションを再読み込み
-    // switchComposition を使うと初期化処理が走るため、手動で復元する
-    const targetCompId = prevState.activeCompId;
-    event_data.activeCompId = targetCompId;
-
-    if (targetCompId) {
-        const comp = window.event_findAssetById(targetCompId, event_data.assets);
+    // 5. event_data のショートカット参照 (layers, composition) の再接続
+    if (event_data.activeCompId) {
+        const comp = event_data.assets.find(a => a.id === event_data.activeCompId);
         if (comp) {
             event_data.composition = {
                 name: comp.name,
@@ -121,39 +136,19 @@ window.event_undo = function () {
                 duration: comp.duration,
                 fps: comp.fps
             };
-            event_data.layers = comp.layers; // 参照をセット
+            event_data.layers = comp.layers;
         } else {
-            // コンポジションが見つからない場合 (削除された場合など)
-            event_data.activeCompId = null;
             event_data.layers = [];
         }
-    } else {
-        event_data.layers = [];
     }
 
+    // 選択状態のリセット（不正なインデックス参照を防ぐ）
+    event_selectedLayerIndex = -1;
+    event_selectedKey = null;
+    
     event_draw();
     if (window.event_refreshProjectList) event_refreshProjectList();
 };
-
-// ヘルパー: アセットツリー内の画像オブジェクトを復元
-window.event_restoreImagesInAssets = function(assets) {
-    assets.forEach(item => {
-        if (item.type === 'comp' && item.layers) {
-            item.layers.forEach(l => {
-                if (l.source && !l.imgObj) {
-                    const img = new Image();
-                    img.src = l.source;
-                    img.onload = () => window.event_draw(); // 読み込み完了後に再描画
-                    l.imgObj = img;
-                }
-            });
-        }
-        if (item.type === 'folder' && item.children) {
-            event_restoreImagesInAssets(item.children);
-        }
-    });
-};
-
 
 const UI_LAYOUT = {
     TRASH_RIGHT: 30,
@@ -169,17 +164,15 @@ const UI_LAYOUT = {
 };
 
 // UI定数 (パネル幅拡張)
-const EVENT_HEADER_HEIGHT = 30; // 25 -> 30
+const EVENT_HEADER_HEIGHT = 30;
 const EVENT_TRACK_HEIGHT = 30;
-const EVENT_LEFT_PANEL_WIDTH = 320; // 250 -> 320 (幅広げ)
+const EVENT_LEFT_PANEL_WIDTH = 320;
 const EVENT_KEYFRAME_SIZE = 6;
 const EVENT_KEYFRAME_HIT_RADIUS = 8;
 const EVENT_VALUE_CLICK_WIDTH = 80;
 const EVENT_LAYER_HANDLE_WIDTH = 6;
 
 // 操作ステート
-// 'idle', 'scrub-time', 'drag-key', 'check-value-edit', 'scrub-value', 
-// 'resize-panel', 'resize-project', 'drag-preview', 'drag-layer-move', 'drag-layer-in', 'drag-layer-out'
 let event_state = 'idle';
 let event_dragStartPos = { x: 0, y: 0 };
 let event_dragTarget = null;
@@ -190,7 +183,6 @@ let event_selectedKey = null;
 window.initEventEditor = function () {
     if (event_initialized) return;
 
-    // DOM取得
     event_canvasPreview = document.getElementById('event-preview-canvas');
     event_canvasTimeline = document.getElementById('event-timeline-canvas');
     event_timelineContainer = document.getElementById('event-timeline-container');
@@ -199,23 +191,18 @@ window.initEventEditor = function () {
     const resizeHandle = document.getElementById('event-resize-handle');
     const projectResize = document.getElementById('event-project-resize');
 
-    // 要素確認
-    if (!event_canvasPreview || !event_canvasTimeline) {
-        return;
-    }
+    if (!event_canvasPreview || !event_canvasTimeline) return;
 
     console.log("Event Editor Initializing...");
 
     event_ctxPreview = event_canvasPreview.getContext('2d');
     event_ctxTimeline = event_canvasTimeline.getContext('2d');
 
-    // イベントリスナー設定
     event_canvasTimeline.addEventListener('mousedown', event_onTimelineMouseDown);
     event_canvasTimeline.addEventListener('dblclick', event_onTimelineDblClick);
     window.addEventListener('mousemove', event_onGlobalMouseMove);
     window.addEventListener('mouseup', event_onGlobalMouseUp);
 
-    // タイムラインへのD&D受け入れ
     event_canvasTimeline.addEventListener('dragover', event_onTimelineDragOver);
     event_canvasTimeline.addEventListener('drop', event_onTimelineDrop);
 
@@ -236,19 +223,15 @@ window.initEventEditor = function () {
     }
 
     event_canvasPreview.addEventListener('mousedown', event_onPreviewMouseDown);
-
-    // キーボードイベント
     window.addEventListener('keydown', event_onKeyDown);
 
-    // プロジェクトパネル初期化
     if (window.event_initProject) {
         event_initProject();
     }
 
-    // 初期コンポジションをアクティブにする
+    // 初期コンポジション設定
     event_switchComposition('comp_1');
 
-    // 初期レイヤー追加 (Siro Maimai) - assetsから検索して追加
     if (event_data.layers.length === 0) {
         const imgAsset = event_data.assets.find(a => a.type === 'image' && a.name === 'Siro Maimai');
         if (imgAsset) {
@@ -256,7 +239,6 @@ window.initEventEditor = function () {
         }
     }
 
-    // 初期設定反映
     event_applyCompSettings(true);
 
     const zoomInput = document.getElementById('event-zoom');
