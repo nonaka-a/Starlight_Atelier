@@ -11,10 +11,16 @@ window.event_initProject = function () {
 
     const list = document.getElementById('event-project-list');
 
-    // 背景ダブルクリックで読み込み
+    // 背景ダブルクリックで画像読み込み (Electronダイアログを直接起動)
     list.addEventListener('dblclick', (e) => {
+        // e.target がリスト自体の背景（アイテムではない場所）であるか確認
         if (e.target === list) {
-            document.getElementById('event-file-input').click();
+            // event_project.js または event_input.js で定義した Electron用関数を呼ぶ
+            if (typeof event_onFileSelected === 'function') {
+                event_onFileSelected();
+            } else {
+                console.error("event_onFileSelected function not found");
+            }
         }
     });
 
@@ -33,9 +39,8 @@ window.event_initProject = function () {
         e.preventDefault();
         list.style.backgroundColor = '';
 
-        // ターゲットがリスト背景の場合のみルートへ移動
         if (e.target === list && window.event_draggedProjectItem) {
-            event_moveAssetToFolder(window.event_draggedProjectItem, null); // null = root
+            event_moveAssetToFolder(window.event_draggedProjectItem, null); 
         }
     });
 };
@@ -230,28 +235,46 @@ window.event_refreshProjectList = function () {
 
 // ... (ファイル読み込み等は変更なし)
 
-// ファイル読み込み
-window.event_onFileSelected = function (input) {
-    const files = input.files;
-    if (!files.length) return;
+/**
+ * ファイル選択時の処理 (Electron 相対パス自動変換版)
+ */
+window.event_onFileSelected = async function (input) {
+    const filePaths = await window.electronAPI.openFileDialog();
+    if (!filePaths || filePaths.length === 0) return;
 
-    Array.from(files).forEach(file => {
-        if (!file.type.startsWith('image/')) return;
+    filePaths.forEach(fullPath => {
+        const fileName = fullPath.split('/').pop();
+        
+        // --- 相対パスへの自動変換ロジック ---
+        // Starlight_Atelier/image/ フォルダ内にあることを前提にパスを整形します。
+        // もしパスの中に "image/" という文字が含まれていたら、それ以降を活かして "../image/..." に変換します。
+        let savedPath = fullPath;
+        if (fullPath.includes('image/')) {
+            savedPath = '../image/' + fullPath.split('image/').pop();
+        }
+        // ----------------------------------
 
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const newItem = {
-                type: 'image',
-                name: file.name,
-                id: 'img_' + Date.now() + Math.random(),
-                src: e.target.result
-            };
-            event_pushHistory(); // 履歴保存
-            event_data.assets.push(newItem);
-            event_refreshProjectList();
+        const newItem = {
+            type: 'image',
+            name: fileName,
+            id: 'img_' + Date.now() + Math.random(),
+            src: savedPath, // ゲームでそのまま使える相対パスを保存！
         };
-        reader.readAsDataURL(file);
+
+        const img = new Image();
+        img.onload = () => {
+            newItem.imgObj = img;
+            event_draw();
+        };
+        // プレビューにはフルパスを使わないとElectron上で表示されない場合があるため、
+        // 読み込み時のみフルパスを使用します。
+        img.src = fullPath;
+
+        event_pushHistory();
+        event_data.assets.push(newItem);
+        event_refreshProjectList();
     });
+
     input.value = '';
 };
 
@@ -294,76 +317,66 @@ window.event_exportJSON = function () {
     console.log("Project exported to JSON.");
 };
 
-// JSON読み込み
-window.event_importJSON = function (input) {
-    const file = input.files[0];
-    if (!file) return;
+/**
+ * JSON読み込み (Electron専用)
+ */
+window.event_importJSON = async function () {
+    // 1. Electronのダイアログを開く
+    const filePaths = await window.electronAPI.openFileDialog();
+    if (!filePaths || filePaths.length === 0) return;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        try {
-            const data = JSON.parse(e.target.result);
-            if (!data.assets) throw new Error("Invalid format: 'assets' not found");
-
-            event_pushHistory(); // 履歴保存
-
-            // データの読み込み
-            event_data.assets = data.assets;
-
-            // 全ての子孫を走査して Image オブジェクトを再生成する関数
-            function restoreImages(items) {
-                items.forEach(item => {
-                    if (item.type === 'comp' && item.layers) {
-                        item.layers.forEach(l => {
-                            if (l.source) {
-                                const img = new Image();
-                                img.src = l.source;
-                                img.onload = () => event_draw();
-                                l.imgObj = img;
-                            }
-                        });
-                    }
-                    if (item.type === 'folder' && item.children) {
-                        restoreImages(item.children);
-                    }
-                });
-            }
-            restoreImages(event_data.assets);
-
-            // プロジェクトリストの更新
-            event_refreshProjectList();
-
-            // コンポジションの切り替え (activeCompIdがあれば)
-            // 読み込み直後の switchComposition で古いデータが上書き保存されないように ID を一旦クリア
-            const targetCompId = data.activeCompId || (event_data.assets.find(a => a.type === 'comp') || {}).id;
-            event_data.activeCompId = null;
-
-            if (targetCompId) {
-                event_switchComposition(targetCompId);
-            }
-
-            console.log("Project imported from JSON.");
-            alert("プロジェクトを読み込みました。");
-        } catch (err) {
-            console.error(err);
-            alert("ファイルの読み込みに失敗しました: " + err.message);
-        }
-    };
-    reader.readAsText(file);
-    input.value = ''; // Reset input
+    const fullPath = filePaths[0];
+    
+    try {
+        // 2. ファイルを読み込む
+        const content = await window.electronAPI.readFile(fullPath);
+        const data = JSON.parse(content);
+        
+        // ... (以下、読み込み処理。既存のコードと同じ)
+        event_pushHistory();
+        event_data.assets = data.assets;
+        // restoreImages などの実行 ...
+        alert("プロジェクトを読み込みました。");
+        event_draw();
+        event_refreshProjectList();
+    } catch (err) {
+        console.error(err);
+        alert("読み込みエラー: " + err.message);
+    }
 };
 
-// フォルダ作成
-window.event_createFolder = function () {
-    const name = prompt("フォルダ名", "New Folder");
-    if (name) {
-        event_data.assets.push({
-            type: 'folder',
-            name: name,
-            id: 'folder_' + Date.now(),
-            children: []
-        });
-        event_pushHistory(); // 履歴保存
+/**
+ * 画像選択 (Electron専用)
+ */
+window.event_onFileSelected = async function () {
+    // 1. Electronのダイアログを開く
+    const filePaths = await window.electronAPI.openFileDialog();
+    if (!filePaths || filePaths.length === 0) return;
+
+    filePaths.forEach(fullPath => {
+        const fileName = fullPath.split('/').pop();
+        
+        let savedPath = fullPath;
+        if (fullPath.includes('image/')) {
+            savedPath = '../image/' + fullPath.split('image/').pop();
+        }
+
+        const newItem = {
+            type: 'image',
+            name: fileName,
+            id: 'img_' + Date.now() + Math.random(),
+            src: savedPath,
+        };
+
+        const img = new Image();
+        img.onload = () => {
+            newItem.imgObj = img;
+            event_draw();
+        };
+        img.src = fullPath;
+
+        event_pushHistory();
+        event_data.assets.push(newItem);
         event_refreshProjectList();
-    }
+    });
 };

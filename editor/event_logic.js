@@ -446,11 +446,14 @@ window.anim_integrateToEvent = function () {
 
     const packName = document.getElementById('anim-pack-name').value || 'Animations';
 
-    // 現在の anim_img (tileset) を Base64化して保持
+    // タイルセットのソースを取得
     let tilesetSrc = "";
     if (window.anim_img instanceof HTMLImageElement) {
-        tilesetSrc = window.anim_img.src;
+        // すでにパス（../image/...等）を持っている場合はそれを使う
+        // DataURL(data:image/...)の場合はそのまま保持される
+        tilesetSrc = window.anim_img.getAttribute('src') || window.anim_img.src;
     } else if (window.anim_img instanceof HTMLCanvasElement) {
+        // キャンバス（連結画像等）の場合は現状Base64化せざるを得ない
         tilesetSrc = window.anim_img.toDataURL();
     }
 
