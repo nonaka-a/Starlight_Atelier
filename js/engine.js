@@ -56,6 +56,8 @@ const Input = {
 
 // --- 入力処理 ---
 function setupControls() {
+    window.addEventListener('resize', fitWindow);
+
     window.addEventListener('keydown', (e) => {
         // BGM再生トリガー
         AudioSys.init();
@@ -99,9 +101,10 @@ function setupControls() {
         Input.isDown = false;
     });
 
-    // --- スマホ用マルチタッチ ---
+    // --- スマホ用マルチタッチ (Inputオブジェクト用) ---
+    // ここではInputオブジェクトの状態更新のみを行う
     const onTouchStart = (e) => {
-        if (e.cancelable) e.preventDefault();
+        // ここでのpreventDefaultは削除（setupTouchControls側で一括管理するため）
         if (typeof AudioSys !== 'undefined') AudioSys.init();
 
         Input.isDown = true;
@@ -116,7 +119,6 @@ function setupControls() {
                 y: pos.y,
                 isJustPressed: true
             });
-            // 互換性のためのメイン座標更新
             if (i === 0) {
                 Input.x = pos.x;
                 Input.y = pos.y;
@@ -125,7 +127,7 @@ function setupControls() {
     };
 
     const onTouchMove = (e) => {
-        if (e.cancelable) e.preventDefault();
+        // preventDefaultはsetupTouchControlsで行う
         for (let i = 0; i < e.changedTouches.length; i++) {
             const t = e.changedTouches[i];
             const pos = Input.updatePosition(t.clientX, t.clientY);
@@ -134,8 +136,6 @@ function setupControls() {
                 found.x = pos.x;
                 found.y = pos.y;
             }
-
-            // 互換性のためにメイン座標も更新 (最後に動かした指の座標にする)
             Input.x = pos.x;
             Input.y = pos.y;
         }
@@ -156,6 +156,7 @@ function setupControls() {
 
     setTimeout(() => {
         if (canvas) {
+            // passive: false は preventDefault() を呼ぶために必須
             canvas.addEventListener('touchstart', onTouchStart, { passive: false });
             canvas.addEventListener('touchmove', onTouchMove, { passive: false });
             canvas.addEventListener('touchend', onTouchEnd);
@@ -167,83 +168,107 @@ function setupControls() {
 }
 
 function setupTouchControls() {
-    const bindTouch = (id, code) => {
-        const btn = document.getElementById(id);
-        if (!btn) return;
-
-        // ブラウザのジェスチャー（スクロール、ズーム）を完全に無効化
-        btn.style.touchAction = 'none';
-        btn.style.userSelect = 'none';
-        btn.style.webkitUserSelect = 'none';
-
-        // タッチIDを追跡するための変数
-        let activeTouchId = null;
-
-        const down = (e) => {
-            if (e.cancelable) e.preventDefault();
-
-            // すでにこのボタンが別の指で押されている場合は無視
-            if (activeTouchId !== null) return;
-
-            // 新しく触れた指のIDを記憶
-            if (e.changedTouches) {
-                activeTouchId = e.changedTouches[0].identifier;
-            }
-
-            AudioSys.init();
-            if (typeof AudioSys.playBGM === 'function' && !AudioSys.bgmSource && !AudioSys.isMuted) {
-                const bgmName = (typeof isAtelierMode !== 'undefined' && isAtelierMode) ? 'atelier' : 'forest';
-                AudioSys.playBGM(bgmName, 0.3);
-            }
-            keys[code] = true;
-            btn.classList.add('active');
-        };
-
-        const up = (e) => {
-            if (e.cancelable) e.preventDefault();
-
-            if (e.changedTouches) {
-                // 離れた指が、このボタンを押し始めた指と同じか確認
-                let match = false;
-                for (let i = 0; i < e.changedTouches.length; i++) {
-                    if (e.changedTouches[i].identifier === activeTouchId) {
-                        match = true;
-                        break;
-                    }
-                }
-                if (!match) return; // 別の指が離れただけなら無視
-            }
-
-            activeTouchId = null;
-            keys[code] = false;
-            btn.classList.remove('active');
-        };
-
-        // タッチイベント
-        btn.addEventListener('touchstart', down, { passive: false });
-        btn.addEventListener('touchend', up, { passive: false });
-        btn.addEventListener('touchcancel', up, { passive: false }); // iPadでの中断対策
-
-        // マウスイベント（PC用）
-        btn.addEventListener('mousedown', (e) => {
-            if (e.button !== 0) return; // 左クリック以外除外
-            keys[code] = true;
-            btn.classList.add('active');
-        });
-        const mouseUp = () => {
-            keys[code] = false;
-            btn.classList.remove('active');
-        };
-        btn.addEventListener('mouseup', mouseUp);
-        btn.addEventListener('mouseleave', mouseUp);
+    const btnIds = ['btn-left', 'btn-right', 'btn-down', 'btn-jump', 'btn-attack'];
+    const keyMap = {
+        'btn-left': 'ArrowLeft',
+        'btn-right': 'ArrowRight',
+        'btn-down': 'ArrowDown',
+        'btn-jump': 'Space',
+        'btn-attack': 'KeyB'
     };
 
-    bindTouch('btn-left', 'ArrowLeft');
-    bindTouch('btn-right', 'ArrowRight');
-    bindTouch('btn-down', 'ArrowDown');
-    bindTouch('btn-jump', 'Space');
-    bindTouch('btn-attack', 'KeyB');
+    // ボタン要素を取得
+    const getButtons = () => {
+        return btnIds.map(id => {
+            const el = document.getElementById(id);
+            return el ? { id, el, key: keyMap[id] } : null;
+        }).filter(b => b !== null);
+    };
 
+    // ★重要: タッチ座標とボタンの当たり判定を行うロジック
+    const updateKeysFromTouches = (touches) => {
+        const buttons = getButtons();
+        
+        // 一旦すべてのバーチャルキーをOFFにする
+        buttons.forEach(btn => {
+            keys[btn.key] = false;
+            btn.el.classList.remove('active');
+        });
+
+        // 現在画面にある全ての指について判定
+        for (let i = 0; i < touches.length; i++) {
+            const t = touches[i];
+            const tx = t.clientX;
+            const ty = t.clientY;
+
+            buttons.forEach(btn => {
+                const rect = btn.el.getBoundingClientRect();
+                // 操作性を良くするため、当たり判定を少し広げる (margin: 25px)
+                const margin = 25;
+                
+                if (tx >= rect.left - margin && tx <= rect.right + margin &&
+                    ty >= rect.top - margin && ty <= rect.bottom + margin) {
+                    
+                    keys[btn.key] = true;
+                    btn.el.classList.add('active');
+                    
+                    // 初回タッチ時のオーディオ初期化
+                    AudioSys.init();
+                    if (typeof AudioSys.playBGM === 'function' && !AudioSys.bgmSource && !AudioSys.isMuted) {
+                        const bgmName = (typeof isAtelierMode !== 'undefined' && isAtelierMode) ? 'atelier' : 'forest';
+                        AudioSys.playBGM(bgmName, 0.3);
+                    }
+                }
+            });
+        }
+    };
+
+    // タッチイベントハンドラ (画面全体で監視)
+    const handleGlobalTouch = (e) => {
+        // ブラウザのスクロールやズーム、テキスト選択を防止
+        if (e.cancelable) e.preventDefault();
+        updateKeysFromTouches(e.touches);
+    };
+
+    // windowに対してイベントを設定し、どこを触っていても判定できるようにする
+    // これにより「ボタンから指が外れた」判定を確実に追跡できる
+    window.addEventListener('touchstart', handleGlobalTouch, { passive: false });
+    window.addEventListener('touchmove', handleGlobalTouch, { passive: false });
+    window.addEventListener('touchend', handleGlobalTouch, { passive: false });
+    window.addEventListener('touchcancel', handleGlobalTouch, { passive: false });
+
+    // CSS側のタッチアクション無効化もJSで補強
+    btnIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.style.touchAction = 'none';
+            el.style.userSelect = 'none';
+            el.style.webkitUserSelect = 'none';
+        }
+    });
+
+    // --- PCマウス操作用 (デバッグ・PCプレイ用) ---
+    // タッチデバイスでは touchstart 等で preventDefault されるため、
+    // ここでの mousedown は発火しない想定だが、PC操作用に残す。
+    buttons.forEach(btn => {
+        if (!btn) return;
+        btn.el.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            keys[btn.key] = true;
+            btn.el.classList.add('active');
+        });
+    });
+
+    window.addEventListener('mouseup', () => {
+        buttons.forEach(btn => {
+            if (keys[btn.key]) {
+                keys[btn.key] = false;
+                btn.el.classList.remove('active');
+            }
+        });
+    });
+
+    // 機能ボタン (クリックイベント)
     document.getElementById('btn-fullscreen')?.addEventListener('click', toggleFullScreen);
     document.getElementById('btn-mute')?.addEventListener('click', toggleMute);
 }
