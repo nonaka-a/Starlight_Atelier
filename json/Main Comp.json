@@ -11,13 +11,13 @@
       "fps": 30,
       "layers": [
         {
-          "id": "layer_audio_1770701295286",
+          "id": "layer_audio_1770727482873",
           "type": "audio",
-          "name": "fire.mp3",
-          "assetId": "audio_17707012899660.7578531144581818",
-          "startTime": 3.1698999999977646,
-          "inPoint": 3.1698999999977646,
-          "outPoint": 63.329899999997764,
+          "name": "jump.mp3",
+          "assetId": "audio_17707274773710.4861996141200261",
+          "startTime": 0.5666666666666667,
+          "inPoint": 0.5666666666666667,
+          "outPoint": 0.7333333333333333,
           "expanded": false,
           "tracks": {
             "volume": {
@@ -25,15 +25,8 @@
               "type": "number",
               "keys": [
                 {
-                  "time": 3.2333333333333334,
-                  "value": -50,
-                  "easeIn": false,
-                  "easeOut": false,
-                  "interpolation": "Linear"
-                },
-                {
-                  "time": 3.6333333333333333,
-                  "value": -10,
+                  "time": 1.4,
+                  "value": -4.6000000000000005,
                   "easeIn": false,
                   "easeOut": false,
                   "interpolation": "Linear"
@@ -73,14 +66,21 @@
                   "interpolation": "Linear"
                 },
                 {
-                  "time": 0.9666666666666667,
+                  "time": 0.6,
+                  "value": "jump",
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Linear"
+                },
+                {
+                  "time": 1.2666666666666666,
                   "value": "run",
                   "easeIn": false,
                   "easeOut": false,
                   "interpolation": "Linear"
                 },
                 {
-                  "time": 3.033333333333333,
+                  "time": 3.0666666666666664,
                   "value": "idle",
                   "easeIn": false,
                   "easeOut": false,
@@ -95,27 +95,37 @@
               "type": "vector2",
               "keys": [
                 {
-                  "time": 0,
+                  "time": 0.6,
                   "value": {
-                    "x": -346.1731788729629,
-                    "y": 171.2939328490084
+                    "x": -201.29846361100397,
+                    "y": 179.494388429874
                   },
                   "easeIn": false,
                   "easeOut": false,
                   "interpolation": "Linear"
                 },
                 {
-                  "time": 0.9666666666666667,
+                  "time": 0.9,
                   "value": {
-                    "x": -346.1731788729629,
-                    "y": 171.2939328490084
+                    "x": -205.39869140143676,
+                    "y": -26.883743688577027
+                  },
+                  "easeIn": true,
+                  "easeOut": true,
+                  "interpolation": "Linear"
+                },
+                {
+                  "time": 1.2666666666666666,
+                  "value": {
+                    "x": -201.29846361100397,
+                    "y": 179.494388429874
                   },
                   "easeIn": false,
                   "easeOut": true,
                   "interpolation": "Linear"
                 },
                 {
-                  "time": 3.033333333333333,
+                  "time": 3.0666666666666664,
                   "value": {
                     "x": 281.0406440212056,
                     "y": 179.06931081877082
@@ -147,7 +157,7 @@
                   "interpolation": "Hold"
                 },
                 {
-                  "time": 3.033333333333333,
+                  "time": 3.0666666666666664,
                   "value": {
                     "x": -250.27272727272722,
                     "y": 250.27272727272722
@@ -180,6 +190,42 @@
               "max": 100,
               "step": 1,
               "initialValue": 100
+            }
+          }
+        },
+        {
+          "id": "layer_audio_1770701295286",
+          "type": "audio",
+          "name": "fire.mp3",
+          "assetId": "audio_17707012899660.7578531144581818",
+          "startTime": 3.1698999999977646,
+          "inPoint": 3.1698999999977646,
+          "outPoint": 63.329899999997764,
+          "expanded": false,
+          "tracks": {
+            "volume": {
+              "label": "Volume (dB)",
+              "type": "number",
+              "keys": [
+                {
+                  "time": 3.2333333333333334,
+                  "value": -50,
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Linear"
+                },
+                {
+                  "time": 3.6333333333333333,
+                  "value": -10,
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Linear"
+                }
+              ],
+              "min": -60,
+              "max": 12,
+              "step": 0.1,
+              "initialValue": 0
             }
           }
         },
@@ -252,7 +298,7 @@
           "imgObj": {},
           "parent": "layer_1770690629051_258",
           "expanded": false,
-          "inPoint": 0,
+          "inPoint": 0.8333333333333334,
           "outPoint": 10,
           "tracks": {
             "position": {
@@ -312,14 +358,14 @@
               "type": "number",
               "keys": [
                 {
-                  "time": 0,
+                  "time": 0.9,
                   "value": 0,
                   "easeIn": false,
                   "easeOut": false,
                   "interpolation": "Linear"
                 },
                 {
-                  "time": 0.4666666666666667,
+                  "time": 1.2333333333333334,
                   "value": 100,
                   "easeIn": false,
                   "easeOut": false,
@@ -446,7 +492,7 @@
           "source": "../image/craft_image3/bg_kiln.png",
           "imgObj": {},
           "parent": null,
-          "expanded": true,
+          "expanded": false,
           "inPoint": 0,
           "outPoint": 10,
           "tracks": {
@@ -466,17 +512,7 @@
               "linked": true,
               "keys": [
                 {
-                  "time": 0.9,
-                  "value": {
-                    "x": 124,
-                    "y": 124
-                  },
-                  "easeIn": false,
-                  "easeOut": false,
-                  "interpolation": "Linear"
-                },
-                {
-                  "time": 5.866666666666666,
+                  "time": 6.533333333333333,
                   "value": {
                     "x": 100,
                     "y": 100
@@ -768,6 +804,15 @@
       "id": "img_17707021603200.585046707172355",
       "src": "../image/craft_image3/star_raw.png",
       "imgObj": {}
+    },
+    {
+      "type": "audio",
+      "name": "jump.mp3",
+      "id": "audio_17707274773710.4861996141200261",
+      "src": "../sounds/jump.mp3",
+      "audioBuffer": {},
+      "duration": 0.15546485260770976,
+      "waveform": {}
     }
   ]
 }

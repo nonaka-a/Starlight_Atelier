@@ -109,27 +109,36 @@ window.event_undo = function () {
     event_data.activeCompId = prevState.activeCompId;
     event_currentTime = prevState.currentTime || 0;
 
-    // 4. 画像オブジェクト (JSON化で失われる参照) の再生成
-    const restoreImages = (items) => {
-        items.forEach(item => {
-            if (item.type === 'comp' && item.layers) {
-                item.layers.forEach(l => {
-                    if (l.source && (l.type === 'image' || !l.type)) {
-                        const img = new Image();
-                        img.src = l.source;
-                        img.onload = () => window.event_draw();
-                        l.imgObj = img;
-                    } else if (l.type === 'audio') {
-                        // オーディオアセットの復元は event_project.js の restoreAssets で行う
-                    }
-                });
-            }
-            if (item.type === 'folder' && item.children) {
-                restoreImages(item.children);
-            }
-        });
-    };
-    restoreImages(event_data.assets);
+    // 4. 非シリアライズオブジェクトの復元 (Image, AudioBuffer, Canvas等)
+    if (window.event_restoreAssetObjects) {
+        window.event_restoreAssetObjects(event_data.assets);
+    } else {
+        // フォールバック (念のため)
+        const restoreImages = (items) => {
+            items.forEach(item => {
+                if ((item.type === 'image' && item.src) || (item.type === 'animation' && item.source)) {
+                    const img = new Image();
+                    img.src = item.src || item.source;
+                    img.onload = () => window.event_draw();
+                    item.imgObj = img;
+                }
+                if (item.type === 'comp' && item.layers) {
+                    item.layers.forEach(l => {
+                        if (l.source && (l.type === 'image' || l.type === 'animated_layer' || !l.type)) {
+                            const img = new Image();
+                            img.src = l.source;
+                            img.onload = () => window.event_draw();
+                            l.imgObj = img;
+                        }
+                    });
+                }
+                if (item.type === 'folder' && item.children) {
+                    restoreImages(item.children);
+                }
+            });
+        };
+        restoreImages(event_data.assets);
+    }
 
     // 5. event_data のショートカット参照 (layers, composition) の再接続
     if (event_data.activeCompId) {
@@ -151,10 +160,14 @@ window.event_undo = function () {
     // 選択状態のリセット（不正なインデックス参照を防ぐ）
     event_selectedLayerIndex = -1;
     event_selectedKey = null;
+    event_selectedKeys = [];
 
     event_draw();
     if (window.event_refreshProjectList) event_refreshProjectList();
 };
+
+let event_selectedKeys = [];
+window.event_selectedKeys = event_selectedKeys;
 
 const UI_LAYOUT = {
     TRASH_RIGHT: 30,

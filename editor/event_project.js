@@ -478,100 +478,7 @@ window.event_loadProjectData = function (data) {
     if (typeof event_pushHistory === 'function') event_pushHistory();
     event_data.assets = data.assets;
 
-    async function restoreAssets(list) {
-        for (const item of list) {
-            // パスを相対化 (絶対パスが混入していた場合の対策)
-            if (item.src) item.src = event_toRelativePath(item.src);
-            if (item.source) item.source = event_toRelativePath(item.source);
-
-            if (item.type === 'folder' && item.children) {
-                await restoreAssets(item.children);
-            } else if ((item.type === 'image' && item.src) || (item.type === 'animation' && item.source)) {
-                // 画像またはアニメーションの読み込み
-                const url = item.src || item.source;
-                const img = new Image();
-                img.onload = () => { if (event_data.activeCompId) event_draw(); };
-                img.onerror = () => {
-                    // フォールバック: ../ を取り除いて再試行
-                    if (url.startsWith('../')) {
-                        const fallback = url.substring(3);
-                        const img2 = new Image();
-                        img2.onload = () => {
-                            if (item.src) item.src = fallback;
-                            if (item.source) item.source = fallback;
-                            item.imgObj = img2;
-                            event_draw();
-                        };
-                        img2.src = fallback;
-                    }
-                };
-                img.src = url;
-                item.imgObj = img;
-            } else if (item.type === 'audio' && item.src) {
-                try {
-                    const response = await fetch(item.src);
-                    const arrayBuffer = await response.arrayBuffer();
-                    if (event_audioCtx) {
-                        const audioBuffer = await event_audioCtx.decodeAudioData(arrayBuffer);
-                        item.audioBuffer = audioBuffer;
-                        item.duration = audioBuffer.duration;
-                        item.waveform = event_generateWaveform(audioBuffer);
-                    }
-                } catch (e) {
-                    console.warn("Failed to load audio asset:", item.src, e);
-                }
-            } else if (item.type === 'comp' && item.layers) {
-                const cx = (item.width || 1000) / 2;
-                const cy = (item.height || 600) / 2;
-                item.layers.forEach(layer => {
-                    if (!layer.tracks) layer.tracks = {};
-                    if (layer.source) layer.source = event_toRelativePath(layer.source); // レイヤーのソースも相対化
-
-                    if (layer.type === 'audio') {
-                        if (!layer.tracks.volume) {
-                            layer.tracks.volume = { label: "Volume (dB)", type: "number", keys: [], min: -60, max: 12, step: 0.1, initialValue: 0 };
-                        }
-                    } else {
-                        if (!layer.tracks.position) layer.tracks.position = { label: "Position", type: "vector2", keys: [], initialValue: { x: cx, y: cy } };
-                        if (!layer.tracks.scale) layer.tracks.scale = { label: "Scale", type: "vector2", linked: true, keys: [], initialValue: { x: 100, y: 100 } };
-                        if (!layer.tracks.rotation) layer.tracks.rotation = { label: "Rotation", type: "rotation", keys: [], initialValue: 0 };
-                        if (!layer.tracks.opacity) layer.tracks.opacity = { label: "Opacity", type: "number", keys: [], min: 0, max: 100, initialValue: 100 };
-                    }
-                    if (layer.source && (layer.type === 'image' || layer.type === 'animated_layer' || !layer.type)) {
-                        const img = new Image();
-                        img.src = layer.source;
-                        layer.imgObj = img;
-                        img.onload = () => { if (event_data.activeCompId === item.id) event_draw(); }
-                        img.onerror = () => {
-                            if (layer.source.startsWith('../')) {
-                                const fallback = layer.source.substring(3);
-                                const img2 = new Image();
-                                img2.onload = () => { layer.source = fallback; layer.imgObj = img2; event_draw(); };
-                                img2.src = fallback;
-                            }
-                        };
-
-                        // アニメーションレイヤーの場合、アセットとの紐付けを再帰検索で試みる
-                        if (layer.type === 'animated_layer' && !layer.animAssetId) {
-                            const findAnimAsset = (list) => {
-                                for (const a of list) {
-                                    if (a.type === 'animation' && event_toRelativePath(a.source) === layer.source) return a;
-                                    if (a.type === 'folder' && a.children) {
-                                        const f = findAnimAsset(a.children);
-                                        if (f) return f;
-                                    }
-                                }
-                                return null;
-                            };
-                            const asset = findAnimAsset(data.assets);
-                            if (asset) layer.animAssetId = asset.id;
-                        }
-                    }
-                });
-            }
-        }
-    }
-    restoreAssets(event_data.assets).then(() => event_draw());
+    window.event_restoreAssetObjects(event_data.assets).then(() => event_draw());
 
     if (data.activeCompId) {
         event_data.activeCompId = data.activeCompId;
@@ -606,4 +513,83 @@ window.event_loadProjectData = function (data) {
     event_draw();
     event_refreshProjectList();
     alert("プロジェクトを読み込みました。");
+};
+
+/**
+ * JSON化で失われる非シリアライズオブジェクト（Image, AudioBuffer, Canvas等）を復元する
+ */
+window.event_restoreAssetObjects = async function (list) {
+    if (!list) return;
+
+    for (const item of list) {
+        // パスを相対化
+        if (item.src) item.src = event_toRelativePath(item.src);
+        if (item.source) item.source = event_toRelativePath(item.source);
+
+        if (item.type === 'folder' && item.children) {
+            await event_restoreAssetObjects(item.children);
+        } else if ((item.type === 'image' && item.src) || (item.type === 'animation' && item.source)) {
+            const url = item.src || item.source;
+            const img = new Image();
+            img.onload = () => { if (event_data.activeCompId) event_draw(); };
+            img.onerror = () => {
+                if (url.startsWith('../')) {
+                    const fallback = url.substring(3);
+                    const img2 = new Image();
+                    img2.onload = () => {
+                        if (item.src) item.src = fallback;
+                        if (item.source) item.source = fallback;
+                        item.imgObj = img2;
+                        event_draw();
+                    };
+                    img2.src = fallback;
+                }
+            };
+            img.src = url;
+            item.imgObj = img;
+        } else if (item.type === 'audio' && item.src) {
+            try {
+                let arrayBuffer;
+                // 1. まず fetch を試みる (相対パスの解決をブラウザ/Electronに任せる)
+                try {
+                    const response = await fetch(item.src);
+                    if (response.ok) {
+                        arrayBuffer = await response.arrayBuffer();
+                    }
+                } catch (fetchErr) {
+                    // fetch が失敗（CORSなど）した場合は electronAPI へのフォールバックを検討
+                }
+
+                // 2. fetch が失敗し、かつ Electron 環境なら直接読み込みを試行
+                if (!arrayBuffer && window.electronAPI && !item.src.startsWith('data:')) {
+                    try {
+                        const rawBuffer = await window.electronAPI.readFile(item.src, 'binary');
+                        arrayBuffer = (rawBuffer instanceof Uint8Array) ? rawBuffer.buffer : rawBuffer;
+                    } catch (readErr) {
+                        console.warn("electronAPI.readFile also failed:", item.src, readErr);
+                    }
+                }
+
+                if (event_audioCtx && arrayBuffer) {
+                    const audioBuffer = await event_audioCtx.decodeAudioData(arrayBuffer);
+                    item.audioBuffer = audioBuffer;
+                    item.duration = audioBuffer.duration;
+                    item.waveform = event_generateWaveform(audioBuffer);
+                    event_draw();
+                }
+            } catch (e) {
+                console.warn("Audio restoration failed:", item.src, e);
+            }
+        } else if (item.type === 'comp' && item.layers) {
+            item.layers.forEach(layer => {
+                if (layer.source) layer.source = event_toRelativePath(layer.source);
+                if (layer.source && (layer.type === 'image' || layer.type === 'animated_layer' || !layer.type)) {
+                    const img = new Image();
+                    img.src = layer.source;
+                    layer.imgObj = img;
+                    img.onload = () => { if (event_data.activeCompId === item.id) event_draw(); }
+                }
+            });
+        }
+    }
 };

@@ -195,15 +195,18 @@ window.event_updateKeyframe = function (layerIndex, prop, time, value) {
 };
 
 window.event_deleteSelectedKeyframe = function () {
-    if (!event_selectedKey) return;
-    const { layerIdx, prop, keyObj } = event_selectedKey;
-    const track = event_data.layers[layerIdx].tracks[prop];
-    const index = track.keys.indexOf(keyObj);
-    if (index !== -1) {
-        track.keys.splice(index, 1);
-        event_selectedKey = null;
-        event_draw();
-    }
+    if (event_selectedKeys.length === 0) return;
+    event_pushHistory();
+    event_selectedKeys.forEach(sk => {
+        const track = event_data.layers[sk.layerIdx].tracks[sk.prop];
+        const index = track.keys.indexOf(sk.keyObj);
+        if (index !== -1) {
+            track.keys.splice(index, 1);
+        }
+    });
+    event_selectedKey = null;
+    event_selectedKeys = [];
+    event_draw();
 };
 
 /**
