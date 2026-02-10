@@ -40,6 +40,42 @@
           }
         },
         {
+          "id": "layer_audio_1770701295286",
+          "type": "audio",
+          "name": "fire.mp3",
+          "assetId": "audio_17707012899660.7578531144581818",
+          "startTime": 3.1698999999977646,
+          "inPoint": 3.1698999999977646,
+          "outPoint": 11.233333333333333,
+          "expanded": false,
+          "tracks": {
+            "volume": {
+              "label": "Volume (dB)",
+              "type": "number",
+              "keys": [
+                {
+                  "time": 3.2333333333333334,
+                  "value": -50,
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Linear"
+                },
+                {
+                  "time": 3.6333333333333333,
+                  "value": -10,
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Linear"
+                }
+              ],
+              "min": -60,
+              "max": 12,
+              "step": 0.1,
+              "initialValue": 0
+            }
+          }
+        },
+        {
           "id": "layer_anim_1770691022287",
           "type": "animated_layer",
           "name": "animations",
@@ -107,8 +143,8 @@
                 {
                   "time": 0.9,
                   "value": {
-                    "x": -205.39869140143676,
-                    "y": -26.883743688577027
+                    "x": -205.39869140143674,
+                    "y": -26.883743688577056
                   },
                   "easeIn": true,
                   "easeOut": true,
@@ -149,8 +185,8 @@
                 {
                   "time": 0,
                   "value": {
-                    "x": 250.27272727272722,
-                    "y": 250.27272727272722
+                    "x": 250.2727272727272,
+                    "y": 250.2727272727272
                   },
                   "easeIn": false,
                   "easeOut": false,
@@ -159,8 +195,8 @@
                 {
                   "time": 3.0666666666666664,
                   "value": {
-                    "x": -250.27272727272722,
-                    "y": 250.27272727272722
+                    "x": -250.2727272727272,
+                    "y": 250.2727272727272
                   },
                   "easeIn": false,
                   "easeOut": false,
@@ -169,8 +205,8 @@
               ],
               "step": 1,
               "initialValue": {
-                "x": 90.90909090909088,
-                "y": 90.90909090909088
+                "x": 90.90909090909086,
+                "y": 90.90909090909086
               }
             },
             "rotation": {
@@ -190,42 +226,6 @@
               "max": 100,
               "step": 1,
               "initialValue": 100
-            }
-          }
-        },
-        {
-          "id": "layer_audio_1770701295286",
-          "type": "audio",
-          "name": "fire.mp3",
-          "assetId": "audio_17707012899660.7578531144581818",
-          "startTime": 3.1698999999977646,
-          "inPoint": 3.1698999999977646,
-          "outPoint": 63.329899999997764,
-          "expanded": false,
-          "tracks": {
-            "volume": {
-              "label": "Volume (dB)",
-              "type": "number",
-              "keys": [
-                {
-                  "time": 3.2333333333333334,
-                  "value": -50,
-                  "easeIn": false,
-                  "easeOut": false,
-                  "interpolation": "Linear"
-                },
-                {
-                  "time": 3.6333333333333333,
-                  "value": -10,
-                  "easeIn": false,
-                  "easeOut": false,
-                  "interpolation": "Linear"
-                }
-              ],
-              "min": -60,
-              "max": 12,
-              "step": 0.1,
-              "initialValue": 0
             }
           }
         },
@@ -492,14 +492,25 @@
           "source": "../image/craft_image3/bg_kiln.png",
           "imgObj": {},
           "parent": null,
-          "expanded": false,
+          "expanded": true,
           "inPoint": 0,
           "outPoint": 10,
           "tracks": {
             "position": {
               "label": "Position",
               "type": "vector2",
-              "keys": [],
+              "keys": [
+                {
+                  "time": 4,
+                  "value": {
+                    "x": 500,
+                    "y": 300
+                  },
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Linear"
+                }
+              ],
               "step": 1,
               "initialValue": {
                 "x": 500,
@@ -512,12 +523,12 @@
               "linked": true,
               "keys": [
                 {
-                  "time": 6.533333333333333,
+                  "time": 4,
                   "value": {
                     "x": 100,
                     "y": 100
                   },
-                  "easeIn": true,
+                  "easeIn": false,
                   "easeOut": false,
                   "interpolation": "Linear"
                 }
