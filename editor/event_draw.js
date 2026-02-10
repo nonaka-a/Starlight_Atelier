@@ -1,7 +1,6 @@
 /**
  * イベントエディタ: 描画関連
- * Step 16 (Fix): UI位置調整、Vector2個別操作対応、スケール連動UI
- * 固定ヘッダー対応: スクロールしても時間目盛りとヘッダー情報を最上部に固定
+ * Step 17: 矩形選択の描画追加
  */
 
 // UI定数のオーバーライド
@@ -499,7 +498,7 @@ window.event_draw = function () {
                     track.keys.forEach(key => {
                         const kx = EVENT_LEFT_PANEL_WIDTH + (key.time - event_viewStartTime) * event_pixelsPerSec;
                         const ky = currentY + EVENT_TRACK_HEIGHT / 2;
-                        const isSelected = (event_selectedKey && event_selectedKey.keyObj === key);
+                        const isSelected = (event_selectedKey && event_selectedKey.keyObj === key) || (event_selectedKeys && event_selectedKeys.some(sk => sk.keyObj === key));
                         const isDragging = (event_dragTarget && event_dragTarget.type === 'key' && event_dragTarget.obj === key);
                         const isHold = (key.interpolation === 'Hold');
                         const isEase = (key.easeIn || key.easeOut);
@@ -581,5 +580,21 @@ window.event_draw = function () {
     if (lineX >= EVENT_LEFT_PANEL_WIDTH && lineX <= w) {
         ctx.strokeStyle = '#f00'; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(lineX, scrollY + EVENT_HEADER_HEIGHT); ctx.lineTo(lineX, h); ctx.stroke();
+    }
+
+    // --- 矩形選択範囲の描画 (スクロール補正済み) ---
+    if (event_state === 'rect-select') {
+        const x1 = Math.min(event_rectStartPos.x, event_rectEndPos.x);
+        const x2 = Math.max(event_rectStartPos.x, event_rectEndPos.x);
+        const y1 = Math.min(event_rectStartPos.y, event_rectEndPos.y);
+        const y2 = Math.max(event_rectStartPos.y, event_rectEndPos.y);
+
+        ctx.strokeStyle = '#0ff';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.strokeRect(x1, y1 - scrollY, x2 - x1, y2 - y1);
+        ctx.fillStyle = 'rgba(0, 255, 255, 0.1)';
+        ctx.fillRect(x1, y1 - scrollY, x2 - x1, y2 - y1);
+        ctx.setLineDash([]);
     }
 };
