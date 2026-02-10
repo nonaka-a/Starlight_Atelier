@@ -624,8 +624,8 @@
                         <span class="prop-label">FPS:</span>
                         <input type="number" id="inp-anim-fps" class="prop-val" value="10" min="1" max="60"
                             onchange="anim_updateProp()">
-                        <label style="font-size:0.8rem; color:#ccc;"><input type="checkbox" id="inp-anim-loop"
-                                checked onchange="anim_updateProp()"> ループ</label>
+                        <label style="font-size:0.8rem; color:#ccc;"><input type="checkbox" id="inp-anim-loop" checked
+                                onchange="anim_updateProp()"> ループ</label>
                     </div>
                 </div>
             </div>
@@ -732,8 +732,6 @@
                         title="新規フォルダ">📁</button>
                     <button onclick="event_createComp()" style="padding: 2px 8px; font-size: 0.8rem;"
                         title="新規コンポジション">🎞️</button>
-                    <button onclick="event_addAssetLink()" style="padding: 2px 8px; font-size: 0.8rem;"
-                        title="パスで画像を追加">🔗</button>
                     <button onclick="event_onFileSelected()" style="padding: 2px 8px; font-size: 0.8rem;"
                         title="画像を読み込む">⬆️</button>
                 </div>
@@ -810,37 +808,49 @@
             </div>
         </div>
     </div>
-</div>
 
-<script src="editor_map.js"></script>
-<script src="editor_anim.js"></script>
-<script src="editor_chart.js"></script>
-<script src="event_core.js"></script>
-<script src="event_logic.js"></script>
-<script src="event_draw.js"></script>
-<script src="event_input.js"></script>
-<script src="event_project.js"></script>
+    <div id="event-prompt-modal" class="overlay" style="display: none;">
+        <div class="modal" style="width: 300px;">
+            <h2 id="event-prompt-title">入力してください</h2>
+            <div style="display: flex; flex-direction: column; gap: 10px; text-align: left;">
+                <input type="text" id="event-prompt-input" style="width: 100%;">
+            </div>
+            <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+                <button class="danger" onclick="window.event_onPromptCancel()">キャンセル</button>
+                <button class="active" onclick="window.event_onPromptOK()">OK</button>
+            </div>
+        </div>
+    </div>
 
-<script>
-    window.switchMode = function (mode) {
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-        const tabBtn = document.getElementById(`tab-${mode}`);
-        if (tabBtn) tabBtn.classList.add('active');
+    <script src="editor_map.js"></script>
+    <script src="editor_anim.js"></script>
+    <script src="editor_chart.js"></script>
+    <script src="event_core.js"></script>
+    <script src="event_logic.js"></script>
+    <script src="event_draw.js"></script>
+    <script src="event_input.js"></script>
+    <script src="event_project.js"></script>
 
-        document.querySelectorAll('.mode-area').forEach(area => area.classList.remove('active'));
-        const modeArea = document.getElementById(`mode-${mode}`);
-        if (modeArea) modeArea.classList.add('active');
+    <script>
+        window.switchMode = function (mode) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            const tabBtn = document.getElementById(`tab-${mode}`);
+            if (tabBtn) tabBtn.classList.add('active');
 
-        if (mode === 'map' && window.initMapEditor) window.initMapEditor();
-        if (mode === 'anim' && window.initAnimEditor) window.initAnimEditor();
-        if (mode === 'chart' && window.initChartEditor) window.initChartEditor();
-        if (mode === 'event' && window.initEventEditor) window.initEventEditor();
-    };
+            document.querySelectorAll('.mode-area').forEach(area => area.classList.remove('active'));
+            const modeArea = document.getElementById(`mode-${mode}`);
+            if (modeArea) modeArea.classList.add('active');
 
-    window.onload = () => {
-        if (window.initMapEditor) window.initMapEditor();
-    };
-</script>
-</body>
+            if (mode === 'map' && window.initMapEditor) window.initMapEditor();
+            if (mode === 'anim' && window.initAnimEditor) window.initAnimEditor();
+            if (mode === 'chart' && window.initChartEditor) window.initChartEditor();
+            if (mode === 'event' && window.initEventEditor) window.initEventEditor();
+        };
+
+        window.onload = () => {
+            if (window.initMapEditor) window.initMapEditor();
+        };
+    </script>
+    </body>
 
 </html>

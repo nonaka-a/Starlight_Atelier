@@ -28,11 +28,11 @@ window.event_calcPreviewScale = function () {
         if (!container) return;
         const cw = container.clientWidth - 20;
         const ch = container.clientHeight - 40;
-        const compW = event_data.composition.width;
-        const compH = event_data.composition.height;
+        const compW = event_data.composition.width || 1000;
+        const compH = event_data.composition.height || 600;
         const scaleW = cw / compW;
         const scaleH = ch / compH;
-        event_previewScale = Math.min(scaleW, scaleH);
+        event_previewScale = (compW > 0 && compH > 0) ? Math.min(scaleW, scaleH) : 1.0;
     } else {
         event_previewScale = event_previewZoomMode;
     }
@@ -95,6 +95,14 @@ function event_applyLayerTransform(ctx, layerIdx, time) {
 let event_offscreenCanvas = null;
 let event_offscreenCtx = null;
 
+function event_isValidDrawable(obj) {
+    if (!obj) return false;
+    if (obj instanceof HTMLImageElement) {
+        return obj.complete && obj.naturalWidth > 0;
+    }
+    return (obj instanceof HTMLCanvasElement || obj instanceof OffscreenCanvas || obj instanceof ImageBitmap);
+}
+
 // --- 描画メイン ---
 window.event_draw = function () {
     if (!event_canvasTimeline || !event_canvasPreview) return;
@@ -145,8 +153,8 @@ window.event_draw = function () {
     }
 
     if (event_offscreenCanvas.width !== event_data.composition.width || event_offscreenCanvas.height !== event_data.composition.height) {
-        event_offscreenCanvas.width = event_data.composition.width;
-        event_offscreenCanvas.height = event_data.composition.height;
+        event_offscreenCanvas.width = event_data.composition.width || 100;
+        event_offscreenCanvas.height = event_data.composition.height || 100;
     }
 
     event_ctxPreview.fillStyle = '#000';
@@ -162,7 +170,7 @@ window.event_draw = function () {
     for (let i = event_data.layers.length - 1; i >= 0; i--) {
         const idx = i;
         const layer = event_data.layers[idx];
-        if (drawTime < layer.inPoint || drawTime > layer.outPoint) continue;
+        if (drawTime < layer.inPoint || drawTime > layer.outPoint || layer.type === 'audio') continue;
 
         osCtx.clearRect(0, 0, cw, ch);
         osCtx.save();
@@ -181,19 +189,28 @@ window.event_draw = function () {
                     const frameIdx = Math.floor(elapsed * anim.fps);
                     const actualIdx = layer.loop ? (frameIdx % anim.frames.length) : Math.min(frameIdx, anim.frames.length - 1);
                     const frame = anim.frames[actualIdx];
-                    if (frame) {
-                        osCtx.drawImage(layer.imgObj, frame.x, frame.y, frame.w, frame.h, -frame.w / 2, -frame.h / 2, frame.w, frame.h);
-                        drawW = frame.w; drawH = frame.h;
-                        drawAnchorX = -frame.w / 2; drawAnchorY = -frame.h / 2;
+                    const imgToDraw = (event_isValidDrawable(layer.imgObj) && layer.imgObj.complete) ? layer.imgObj : asset.imgObj;
+                    if (frame && event_isValidDrawable(imgToDraw) && imgToDraw.complete) {
+                        try {
+                            osCtx.drawImage(imgToDraw, frame.x, frame.y, frame.w, frame.h, -frame.w / 2, -frame.h / 2, frame.w, frame.h);
+                            drawW = frame.w; drawH = frame.h;
+                            drawAnchorX = -frame.w / 2; drawAnchorY = -frame.h / 2;
+                        } catch (e) {
+                            console.error("Draw error (animated_layer):", e, layer);
+                        }
                     }
                 }
             }
-        } else if (layer.imgObj && layer.imgObj.complete && layer.imgObj.naturalWidth > 0) {
-            const iw = layer.imgObj.naturalWidth;
-            const ih = layer.imgObj.naturalHeight;
-            osCtx.drawImage(layer.imgObj, -iw / 2, -ih / 2);
-            drawW = iw; drawH = ih;
-            drawAnchorX = -iw / 2; drawAnchorY = -ih / 2;
+        } else if (event_isValidDrawable(layer.imgObj) && layer.imgObj.complete && layer.imgObj.naturalWidth > 0) {
+            try {
+                const iw = layer.imgObj.naturalWidth;
+                const ih = layer.imgObj.naturalHeight;
+                osCtx.drawImage(layer.imgObj, -iw / 2, -ih / 2);
+                drawW = iw; drawH = ih;
+                drawAnchorX = -iw / 2; drawAnchorY = -ih / 2;
+            } catch (e) {
+                console.error("Draw error (image):", e, layer);
+            }
         } else {
             osCtx.fillStyle = '#48f';
             osCtx.fillRect(-32, -32, 64, 64);
@@ -224,7 +241,13 @@ window.event_draw = function () {
             event_ctxPreview.filter = filterStr.trim() || 'none';
         }
 
-        event_ctxPreview.drawImage(event_offscreenCanvas, 0, 0);
+        if (event_isValidDrawable(event_offscreenCanvas) && event_offscreenCanvas.width > 0 && event_offscreenCanvas.height > 0) {
+            try {
+                event_ctxPreview.drawImage(event_offscreenCanvas, 0, 0);
+            } catch (e) {
+                console.error("Draw error (offscreen):", e);
+            }
+        }
 
         if (event_ctxPreview.filter !== undefined) {
             event_ctxPreview.filter = 'none';
@@ -284,7 +307,7 @@ window.event_draw = function () {
         const iconSize = 20;
         const iconX = 25;
         const iconY = currentY + 5;
-        if (layer.imgObj && layer.imgObj.complete) {
+        if (event_isValidDrawable(layer.imgObj) && layer.imgObj.complete) {
             try {
                 const aspect = layer.imgObj.width / layer.imgObj.height;
                 let dw = iconSize;
@@ -296,7 +319,7 @@ window.event_draw = function () {
                 ctx.fillText("🖼️", iconX, currentY + 20);
             }
         } else {
-            ctx.fillText("📄", iconX, currentY + 20);
+            ctx.fillText(layer.type === 'audio' ? "🔊" : "📄", iconX, currentY + 20);
         }
 
         ctx.fillStyle = '#fff';
@@ -352,9 +375,40 @@ window.event_draw = function () {
 
         ctx.save();
         ctx.beginPath(); ctx.rect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, h); ctx.clip();
+
         if (barW > 0) {
-            ctx.fillStyle = 'rgba(100, 150, 255, 0.3)';
+            // 背景
+            ctx.fillStyle = 'rgba(100, 150, 255, 0.1)';
             ctx.fillRect(barX, currentY + 4, barW, EVENT_TRACK_HEIGHT - 8);
+
+            // 波形描画
+            if (layer.type === 'audio') {
+                const asset = event_findAssetById(layer.assetId);
+                if (asset && asset.waveform) {
+                    const startT = layer.startTime;
+                    const wfCanvas = asset.waveform;
+                    // 波形全体のピクセル幅
+                    const waveformW = asset.duration * event_pixelsPerSec;
+                    const waveformX = EVENT_LEFT_PANEL_WIDTH + (startT - event_viewStartTime) * event_pixelsPerSec;
+
+                    // 描画範囲のクリッピング
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.rect(barX, currentY + 4, barW, EVENT_TRACK_HEIGHT - 8);
+                    ctx.clip();
+                    ctx.globalAlpha = 0.8;
+                    if (event_isValidDrawable(wfCanvas)) {
+                        try {
+                            ctx.drawImage(wfCanvas, waveformX, currentY + 4, waveformW, EVENT_TRACK_HEIGHT - 8);
+                        } catch (e) {
+                            console.error("Draw error (waveform):", e);
+                        }
+                    }
+                    ctx.restore();
+                }
+            }
+
+            // ハンドルと枠
             ctx.fillStyle = 'rgba(100, 150, 255, 0.8)';
             if (inX >= EVENT_LEFT_PANEL_WIDTH) ctx.fillRect(inX, currentY + 4, EVENT_LAYER_HANDLE_WIDTH, EVENT_TRACK_HEIGHT - 8);
             if (outX >= EVENT_LEFT_PANEL_WIDTH) ctx.fillRect(outX - EVENT_LAYER_HANDLE_WIDTH, currentY + 4, EVENT_LAYER_HANDLE_WIDTH, EVENT_TRACK_HEIGHT - 8);

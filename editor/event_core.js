@@ -23,6 +23,10 @@ let event_viewStartTime = 0;
 let event_previewZoomMode = 'fit';
 let event_previewScale = 1.0;
 
+// オーディオ管理
+let event_audioCtx = null;
+let event_audioLayers = {}; // layerId -> { sourceNode, gainNode }
+
 // データ構造
 // event_data は「現在編集中のデータ」を保持する
 let event_data = {
@@ -101,7 +105,7 @@ window.event_undo = function () {
     const prevState = event_history.pop();
 
     // 3. データの復元
-    event_data.assets = prevState.assets; 
+    event_data.assets = prevState.assets;
     event_data.activeCompId = prevState.activeCompId;
     event_currentTime = prevState.currentTime || 0;
 
@@ -110,11 +114,13 @@ window.event_undo = function () {
         items.forEach(item => {
             if (item.type === 'comp' && item.layers) {
                 item.layers.forEach(l => {
-                    if (l.source) {
+                    if (l.source && (l.type === 'image' || !l.type)) {
                         const img = new Image();
                         img.src = l.source;
                         img.onload = () => window.event_draw();
                         l.imgObj = img;
+                    } else if (l.type === 'audio') {
+                        // オーディオアセットの復元は event_project.js の restoreAssets で行う
                     }
                 });
             }
@@ -145,7 +151,7 @@ window.event_undo = function () {
     // 選択状態のリセット（不正なインデックス参照を防ぐ）
     event_selectedLayerIndex = -1;
     event_selectedKey = null;
-    
+
     event_draw();
     if (window.event_refreshProjectList) event_refreshProjectList();
 };
@@ -205,6 +211,18 @@ window.initEventEditor = function () {
 
     event_canvasTimeline.addEventListener('dragover', event_onTimelineDragOver);
     event_canvasTimeline.addEventListener('drop', event_onTimelineDrop);
+
+    // AudioContext の初期化（ユーザー操作が必要）
+    const initAudio = () => {
+        if (!event_audioCtx) {
+            event_audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (event_audioCtx.state === 'suspended') {
+            event_audioCtx.resume();
+        }
+    };
+    window.addEventListener('mousedown', initAudio, { once: true });
+    window.addEventListener('keydown', initAudio, { once: true });
 
     if (resizeHandle) {
         resizeHandle.addEventListener('mousedown', (e) => {
@@ -271,6 +289,9 @@ function event_loop(timestamp) {
             if (headScreenX > timelineW * 0.9) {
                 event_viewStartTime = event_currentTime - (timelineW * 0.1) / event_pixelsPerSec;
             }
+            // オーディオの同期
+            event_syncAudio();
+            event_updateAudioVolumes();
         }
         event_lastTimestamp = timestamp;
         event_draw();

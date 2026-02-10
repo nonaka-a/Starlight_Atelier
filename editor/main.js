@@ -37,17 +37,18 @@ ipcMain.handle('open-file-dialog', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     properties: ['openFile', 'multiSelections'],
     filters: [
-      { name: 'Supported Files', extensions: ['json', 'jpg', 'png', 'gif'] }
+      { name: 'All Files', extensions: ['*'] },
+      { name: 'Assets', extensions: ['json', 'jpg', 'jpeg', 'png', 'gif', 'mp3', 'wav', 'ogg', 'm4a', 'JSON', 'JPG', 'JPEG', 'PNG', 'GIF', 'MP3', 'WAV', 'OGG', 'M4A'] }
     ]
   });
   if (canceled) return [];
   return filePaths;
 });
 
-// ファイルをテキストとして読み込む処理
-ipcMain.handle('read-file', async (event, filePath) => {
+// ファイルを読み込む処理
+ipcMain.handle('read-file', async (event, filePath, encoding = 'utf8') => {
   try {
-    return fs.readFileSync(filePath, 'utf8');
+    return fs.readFileSync(filePath, encoding === 'binary' ? null : encoding);
   } catch (err) {
     console.error("File Read Error:", err);
     throw err;

@@ -27,6 +27,8 @@ window.event_onTimelineDrop = function (e) {
         event_addAnimatedLayer(item.name, item.id);
     } else if (item.type === 'sub_animation') {
         event_addAnimatedLayer(item.name, item.parentAssetId, item.animId);
+    } else if (item.type === 'audio') {
+        event_addAudioLayer(item.name, item.id);
     } else if (item.type === 'comp') {
         console.log("Nested composition not supported yet.");
     }
@@ -439,6 +441,36 @@ window.event_onGlobalMouseMove = function (e) {
             event_timelinePanel.style.height = `${tlHeight}%`;
             event_draw();
         }
+    } else if (event_state === 'drag-preview') {
+        const dx = (e.clientX - event_dragStartPos.x) / event_previewScale;
+        const dy = (e.clientY - event_dragStartPos.y) / event_previewScale;
+
+        const layerIdx = event_dragTarget.layerIdx;
+        const layer = event_data.layers[layerIdx];
+
+        let moveX = dx;
+        let moveY = dy;
+
+        // 親がいる場合、マウスの移動量を親の回転・スケールの逆で補正してローカル移動量にする
+        if (layer.parent) {
+            const pIdx = event_data.layers.findIndex(l => l.id === layer.parent);
+            if (pIdx !== -1) {
+                const pWorld = event_getLayerWorldTransform(pIdx, event_currentTime);
+                const pRad = -pWorld.rotation * Math.PI / 180;
+                const pCos = Math.cos(pRad);
+                const pSin = Math.sin(pRad);
+
+                const lx = (dx * pCos - dy * pSin) / (pWorld.scale.x || 1);
+                const ly = (dx * pSin + dy * pCos) / (pWorld.scale.y || 1);
+                moveX = lx;
+                moveY = ly;
+            }
+        }
+
+        const newX = event_dragTarget.startX + moveX;
+        const newY = event_dragTarget.startY + moveY;
+        event_updateKeyframe(layerIdx, 'position', event_currentTime, { x: newX, y: newY });
+        event_draw();
     } else if (event_state === 'drag-layer-in' || event_state === 'drag-layer-out' || event_state === 'drag-layer-move') {
         const dt = (e.clientX - event_dragStartPos.x) / event_pixelsPerSec;
         const layer = event_data.layers[event_dragTarget.layerIdx];
@@ -505,19 +537,42 @@ window.event_onPreviewMouseDown = function (e) {
     const rect = event_canvasPreview.getBoundingClientRect();
     const mx = (e.clientX - rect.left) / event_previewScale;
     const my = (e.clientY - rect.top) / event_previewScale;
+
+    // 前面（インデックスが小さい方）から判定
     for (let i = 0; i < event_data.layers.length; i++) {
         const layer = event_data.layers[i];
-        if (event_currentTime < layer.inPoint || event_currentTime > layer.outPoint || !layer.imgObj) continue;
-        const pos = event_getInterpolatedValue(i, "position", event_currentTime);
-        const iw = layer.imgObj.naturalWidth || 64, ih = layer.imgObj.naturalHeight || 64;
-        if (mx >= pos.x - iw / 2 && mx <= pos.x + iw / 2 && my >= pos.y - ih / 2 && my <= pos.y + ih / 2) {
-            event_pushHistory(); event_selectedLayerIndex = i; event_state = 'drag-preview';
+        if (event_currentTime < layer.inPoint || event_currentTime > layer.outPoint || !layer.imgObj || layer.type === 'audio') continue;
+
+        // ワールドトランスフォームを取得して当たり判定
+        const world = event_getLayerWorldTransform(i, event_currentTime);
+        const iw = layer.imgObj.naturalWidth || 64;
+        const ih = layer.imgObj.naturalHeight || 64;
+
+        // マウス座標をレイヤーのローカル空間に変換
+        const dx = mx - world.position.x;
+        const dy = my - world.position.y;
+        const rad = -world.rotation * Math.PI / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+
+        // 親のスケールも考慮して逆算
+        const lx = (dx * cos - dy * sin) / (world.scale.x || 1);
+        const ly = (dx * sin + dy * cos) / (world.scale.y || 1);
+
+        // 本来の画像サイズ内であればヒット
+        if (lx >= -iw / 2 && lx <= iw / 2 && ly >= -ih / 2 && ly <= ih / 2) {
+            const pos = event_getInterpolatedValue(i, "position", event_currentTime);
+            event_pushHistory();
+            event_selectedLayerIndex = i;
+            event_state = 'drag-preview';
             event_dragStartPos = { x: e.clientX, y: e.clientY };
             event_dragTarget = { layerIdx: i, startX: pos.x, startY: pos.y };
-            event_draw(); return;
+            event_draw();
+            return;
         }
     }
-    event_selectedLayerIndex = -1; event_draw();
+    event_selectedLayerIndex = -1;
+    event_draw();
 };
 
 window.event_onKeyDown = function (e) {
@@ -570,19 +625,71 @@ window.event_showInlineInput = function (x, y, initialValue, trackType, callback
 };
 
 window.event_showParentSelect = function (x, y, childIdx) {
-    const select = document.createElement('select');
-    select.style.position = 'absolute'; select.style.left = x + 'px'; select.style.top = y + 'px';
-    const optNone = document.createElement('option'); optNone.value = ""; optNone.text = "なし";
-    select.appendChild(optNone);
-    event_data.layers.forEach(l => {
-        if (l.id === event_data.layers[childIdx].id) return;
-        const opt = document.createElement('option'); opt.value = l.id; opt.text = l.name;
-        if (l.id === event_data.layers[childIdx].parent) opt.selected = true;
-        select.appendChild(opt);
+    // 既存のメニューがあれば削除
+    const oldMenu = document.getElementById('event-parent-custom-menu');
+    if (oldMenu) oldMenu.remove();
+
+    const menu = document.createElement('div');
+    menu.id = 'event-parent-custom-menu';
+    menu.style.position = 'fixed';
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+    menu.style.backgroundColor = '#333';
+    menu.style.border = '1px solid #666';
+    menu.style.padding = '5px 0';
+    menu.style.zIndex = '3000';
+    menu.style.boxShadow = '0 4px 12px rgba(0,0,0,0.5)';
+    menu.style.minWidth = '140px';
+    menu.style.borderRadius = '4px';
+
+    const currentParentId = event_data.layers[childIdx].parent;
+
+    // 選択肢の作成
+    const options = [
+        { id: null, name: "なし" },
+        ...event_data.layers
+            .filter(l => l.id !== event_data.layers[childIdx].id) // 自分以外
+            .map(l => ({ id: l.id, name: l.name }))
+    ];
+
+    options.forEach(opt => {
+        const item = document.createElement('div');
+        item.style.padding = '6px 15px';
+        item.style.cursor = 'pointer';
+        item.style.fontSize = '12px';
+        item.style.color = (opt.id === currentParentId) ? '#66aa44' : '#fff';
+        item.style.display = 'flex';
+        item.style.alignItems = 'center';
+
+        let label = opt.name;
+        if (opt.id === currentParentId) label = '✓ ' + label;
+        item.textContent = label;
+
+        item.onmouseover = () => item.style.backgroundColor = '#444';
+        item.onmouseout = () => item.style.backgroundColor = '';
+        item.onclick = (e) => {
+            e.stopPropagation();
+            event_pushHistory();
+            event_setLayerParent(childIdx, opt.id);
+            menu.remove();
+        };
+        menu.appendChild(item);
     });
-    select.onchange = () => { event_pushHistory(); event_setLayerParent(childIdx, select.value || null); select.remove(); };
-    select.onblur = () => select.remove();
-    document.body.appendChild(select); select.focus();
+
+    // メニュー外クリックで閉じる処理
+    const closeMenu = (e) => {
+        if (!menu.contains(e.target)) {
+            if (menu.parentNode) menu.remove();
+            window.removeEventListener('mousedown', closeMenu);
+        }
+    };
+
+    // 次のティックでイベント登録（今のクリックで即閉じないように）
+    setTimeout(() => {
+        window.addEventListener('mousedown', closeMenu);
+    }, 10);
+
+    document.body.appendChild(menu);
 };
 
 window.event_showEnumSelect = function (x, y, initialValue, options, callback) {

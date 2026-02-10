@@ -39,7 +39,7 @@ window.event_pasteKeyframe = function () {
         // 同じプロパティにペースト
         const { layerIdx, prop } = event_selectedKey;
         const val = event_clipboardKey.value; // 値
-        
+
         // 値を更新
         const key = event_updateKeyframe(layerIdx, prop, event_currentTime, val);
 
@@ -181,12 +181,12 @@ window.event_updateKeyframe = function (layerIndex, prop, time, value) {
     } else {
         // 新規キーフレーム作成
         // デフォルトはリニア
-        const newKey = { 
-            time: time, 
-            value: valToSave, 
-            easeIn: false, 
-            easeOut: false, 
-            interpolation: 'Linear' 
+        const newKey = {
+            time: time,
+            value: valToSave,
+            easeIn: false,
+            easeOut: false,
+            interpolation: 'Linear'
         };
         track.keys.push(newKey);
         track.keys.sort((a, b) => a.time - b.time);
@@ -206,18 +206,56 @@ window.event_deleteSelectedKeyframe = function () {
     }
 };
 
-// --- 親子関係設定 (位置補正付き) ---
+/**
+ * レイヤーのワールドトランスフォーム（Canvas上での絶対的な位置・スケール・回転）を取得する
+ */
+window.event_getLayerWorldTransform = function (layerIdx, time) {
+    const layer = event_data.layers[layerIdx];
+    const pos = event_getInterpolatedValue(layerIdx, "position", time);
+    const scale = event_getInterpolatedValue(layerIdx, "scale", time);
+    const rot = event_getInterpolatedValue(layerIdx, "rotation", time);
+
+    let worldPos = { x: pos.x, y: pos.y };
+    let worldScale = { x: scale.x / 100, y: scale.y / 100 };
+    let worldRot = rot;
+
+    if (layer.parent) {
+        const parentIdx = event_data.layers.findIndex(l => l.id === layer.parent);
+        if (parentIdx !== -1) {
+            const parentTransform = event_getLayerWorldTransform(parentIdx, time);
+
+            // 親の回転を考慮した座標計算
+            const rad = parentTransform.rotation * Math.PI / 180;
+            const cos = Math.cos(rad);
+            const sin = Math.sin(rad);
+
+            // 親のスケールと回転を適用
+            const lx = pos.x * parentTransform.scale.x;
+            const ly = pos.y * parentTransform.scale.y;
+
+            worldPos.x = parentTransform.position.x + (lx * cos - ly * sin);
+            worldPos.y = parentTransform.position.y + (lx * sin + ly * cos);
+
+            worldScale.x *= parentTransform.scale.x;
+            worldScale.y *= parentTransform.scale.y;
+            worldRot += parentTransform.rotation;
+        }
+    }
+
+    return {
+        position: worldPos,
+        scale: worldScale,
+        rotation: worldRot
+    };
+};
+
+// --- 親子関係設定 (位置・スケール・回転補正付き) ---
 window.event_setLayerParent = function (childLayerIdx, parentLayerId) {
     const childLayer = event_data.layers[childLayerIdx];
     if (!childLayer) return;
 
-    // 現在の親ID
     const oldParentId = childLayer.parent;
-    if (oldParentId === parentLayerId) return; // 変更なし
-
-    // 親レイヤー取得
-    const newParentLayer = parentLayerId ? event_data.layers.find(l => l.id === parentLayerId) : null;
-    const oldParentLayer = oldParentId ? event_data.layers.find(l => l.id === oldParentId) : null;
+    if (oldParentId === parentLayerId) return;
 
     // 循環参照チェック
     let currentId = parentLayerId;
@@ -227,38 +265,71 @@ window.event_setLayerParent = function (childLayerIdx, parentLayerId) {
             return;
         }
         const parent = event_data.layers.find(l => l.id === currentId);
-        if (parent) {
-            currentId = parent.parent;
-        } else {
-            break;
+        if (parent) currentId = parent.parent;
+        else break;
+    }
+
+    // 1. 現在のワールド状態を記録 (親子付け変更前の見た目)
+    const world = event_getLayerWorldTransform(childLayerIdx, event_currentTime);
+
+    // 2. 親子関係を更新
+    childLayer.parent = parentLayerId || null;
+
+    // 3. 新しい親のワールド状態を取得
+    let parentWorld = { position: { x: 0, y: 0 }, scale: { x: 1, y: 1 }, rotation: 0 };
+    if (childLayer.parent) {
+        const pIdx = event_data.layers.findIndex(l => l.id === childLayer.parent);
+        if (pIdx !== -1) {
+            parentWorld = event_getLayerWorldTransform(pIdx, event_currentTime);
         }
     }
 
-    // 位置補正: 親を設定/解除しても、現在の見た目の位置を維持するようにローカル座標を補正する
-    let offsetX = 0;
-    let offsetY = 0;
+    // 4. 新しいローカル値を逆算
+    // 回転
+    const newLocalRot = world.rotation - parentWorld.rotation;
+    // スケール
+    const newLocalScale = {
+        x: (parentWorld.scale.x !== 0) ? (world.scale.x / parentWorld.scale.x) * 100 : world.scale.x * 100,
+        y: (parentWorld.scale.y !== 0) ? (world.scale.y / parentWorld.scale.y) * 100 : world.scale.y * 100
+    };
+    // 位置
+    const dx = world.position.x - parentWorld.position.x;
+    const dy = world.position.y - parentWorld.position.y;
+    const pRad = -parentWorld.rotation * Math.PI / 180; // 親の回転の逆向き
+    const pCos = Math.cos(pRad);
+    const pSin = Math.sin(pRad);
 
-    // 1. 旧親の影響を取り除く（旧ローカル -> ワールド）
-    if (oldParentLayer) {
-        const pPos = event_getInterpolatedValue(event_data.layers.indexOf(oldParentLayer), "position", event_currentTime);
-        offsetX += pPos.x;
-        offsetY += pPos.y;
-    }
+    // 回転を戻してから親のスケールで割る
+    let newLocalPos = {
+        x: (dx * pCos - dy * pSin) / (parentWorld.scale.x || 1),
+        y: (dx * pSin + dy * pCos) / (parentWorld.scale.y || 1)
+    };
 
-    // 2. 新親の影響を加える（ワールド -> 新ローカル）
-    if (newParentLayer) {
-        const pPos = event_getInterpolatedValue(event_data.layers.indexOf(newParentLayer), "position", event_currentTime);
-        offsetX -= pPos.x;
-        offsetY -= pPos.y;
-    }
+    // 5. 補正値を子レイヤーの全キーフレームと初期値に適用
+    // ここでは単純化のため、現在の見た目を維持するための「オフセット」を計算して適用する手法をとる
+    const currentLocalPos = event_getInterpolatedValue(childLayerIdx, "position", event_currentTime);
+    const currentLocalScale = event_getInterpolatedValue(childLayerIdx, "scale", event_currentTime);
+    const currentLocalRot = event_getInterpolatedValue(childLayerIdx, "rotation", event_currentTime);
 
-    // 全キーフレームにオフセット適用
-    childLayer.tracks["position"].keys.forEach(key => {
-        key.value.x += offsetX;
-        key.value.y += offsetY;
-    });
+    const posOffset = { x: newLocalPos.x - currentLocalPos.x, y: newLocalPos.y - currentLocalPos.y };
+    const rotOffset = newLocalRot - currentLocalRot;
 
-    childLayer.parent = parentLayerId;
+    // Position 補正
+    childLayer.tracks["position"].keys.forEach(k => { k.value.x += posOffset.x; k.value.y += posOffset.y; });
+    childLayer.tracks["position"].initialValue.x += posOffset.x;
+    childLayer.tracks["position"].initialValue.y += posOffset.y;
+
+    // Rotation 補正
+    childLayer.tracks["rotation"].keys.forEach(k => { k.value += rotOffset; });
+    childLayer.tracks["rotation"].initialValue += rotOffset;
+
+    // Scale 補正 (加算ではなく比率で補正する必要がある)
+    const scaleRatioX = newLocalScale.x / (currentLocalScale.x || 100);
+    const scaleRatioY = newLocalScale.y / (currentLocalScale.y || 100);
+    childLayer.tracks["scale"].keys.forEach(k => { k.value.x *= scaleRatioX; k.value.y *= scaleRatioY; });
+    childLayer.tracks["scale"].initialValue.x *= scaleRatioX;
+    childLayer.tracks["scale"].initialValue.y *= scaleRatioY;
+
     event_draw();
 };
 
@@ -272,9 +343,18 @@ window.event_snapTime = function (time) {
 
 // --- 補間計算 (イージング・停止キーフレーム対応) ---
 window.event_getInterpolatedValue = function (layerIndex, prop, time) {
-    const track = event_data.layers[layerIndex].tracks[prop];
+    const layer = event_data.layers[layerIndex];
+    const track = layer.tracks[prop];
+    if (!track) {
+        // トラックが存在しない場合のデフォルト値
+        if (prop === 'position') return { x: 0, y: 0 };
+        if (prop === 'scale') return { x: 100, y: 100 };
+        if (prop === 'rotation') return 0;
+        if (prop === 'opacity') return 100;
+        return 0;
+    }
     if (!track.keys || track.keys.length === 0) {
-        return track.initialValue;
+        return track.initialValue !== undefined ? track.initialValue : 0;
     }
     const keys = track.keys;
     if (keys.length === 1) return keys[0].value;
@@ -301,7 +381,7 @@ window.event_getInterpolatedValue = function (layerIndex, prop, time) {
                 t = 0.5 * (1 - Math.cos(t * Math.PI));
             } else if (easeIn) {
                 // イーズインのみ: 終点に向かって減速（ゆっくり停車する）
-                t = 1 - (1 - t) * (1 - t); 
+                t = 1 - (1 - t) * (1 - t);
             } else if (easeOut) {
                 // イーズアウトのみ: 始点から加速（ゆっくり発車する）
                 t = t * t;
@@ -321,16 +401,16 @@ window.event_getInterpolatedValue = function (layerIndex, prop, time) {
 };
 
 // --- 再生制御 ---
-window.event_seekTo = function (time) {
-    event_currentTime = Math.max(0, time);
-    event_draw();
-};
-
 window.event_togglePlay = function () {
     event_isPlaying = !event_isPlaying;
     const btn = document.getElementById('btn-event-play');
     if (btn) btn.textContent = event_isPlaying ? '⏸' : '▶';
-    if (event_isPlaying) event_lastTimestamp = performance.now();
+    if (event_isPlaying) {
+        event_lastTimestamp = performance.now();
+        event_syncAudio();
+    } else {
+        event_stopAllAudio();
+    }
 };
 
 window.event_stop = function () {
@@ -338,7 +418,133 @@ window.event_stop = function () {
     event_currentTime = 0;
     event_viewStartTime = 0;
     document.getElementById('btn-event-play').textContent = '▶';
+    event_stopAllAudio();
     event_draw();
+};
+
+window.event_seekTo = function (time) {
+    event_currentTime = Math.max(0, time);
+    if (event_isPlaying) {
+        event_syncAudio();
+    } else {
+        // 再生中でない場合、一度止めてから同期（音だしはしない）
+        event_stopAllAudio();
+    }
+    event_draw();
+};
+
+window.event_addAudioLayer = function (name, assetId) {
+    event_pushHistory();
+    const asset = event_findAssetById(assetId);
+    if (!asset || asset.type !== 'audio') return;
+
+    const newLayer = {
+        id: 'layer_audio_' + Date.now(),
+        type: 'audio',
+        name: name,
+        assetId: assetId,
+        startTime: event_currentTime,
+        inPoint: event_currentTime,
+        outPoint: event_currentTime + (asset.duration || 5),
+        expanded: true,
+        tracks: {
+            "volume": { label: "Volume (dB)", type: "number", keys: [], min: -60, max: 12, step: 0.1, initialValue: 0 }
+        }
+    };
+
+    event_data.layers.unshift(newLayer);
+    event_selectedLayerIndex = 0;
+    event_draw();
+};
+
+/**
+ * オーディオの再生状態を現在の時間に合わせて同期させる
+ */
+window.event_syncAudio = function () {
+    if (!event_audioCtx) return;
+
+    event_data.layers.forEach(layer => {
+        if (layer.type !== 'audio') return;
+
+        const asset = event_findAssetById(layer.assetId);
+        if (!asset || !asset.audioBuffer) return;
+
+        // 現在の相対再生位置
+        const offset = event_currentTime - layer.startTime;
+
+        // 再生範囲内かチェック
+        const isWithinRange = (event_currentTime >= layer.inPoint && event_currentTime < layer.outPoint);
+        const isWithinBuffer = (offset >= 0 && offset < asset.audioBuffer.duration);
+
+        if (event_isPlaying && isWithinRange && isWithinBuffer) {
+            // 再生中であるべき
+            if (!event_audioLayers[layer.id]) {
+                const source = event_audioCtx.createBufferSource();
+                source.buffer = asset.audioBuffer;
+                const gainNode = event_audioCtx.createGain();
+                source.connect(gainNode);
+                gainNode.connect(event_audioCtx.destination);
+
+                // 初期音量設定
+                const volDb = event_getInterpolatedValue(event_data.layers.indexOf(layer), "volume", event_currentTime);
+                gainNode.gain.setValueAtTime(event_dbToGain(volDb), event_audioCtx.currentTime);
+
+                // 開始位置と継続時間を計算
+                const startOff = Math.max(0, offset);
+                const duration = Math.min(asset.audioBuffer.duration - startOff, layer.outPoint - event_currentTime);
+
+                source.start(0, startOff, duration);
+                event_audioLayers[layer.id] = { source, gain: gainNode };
+
+                source.onended = () => {
+                    if (event_audioLayers[layer.id] && event_audioLayers[layer.id].source === source) {
+                        delete event_audioLayers[layer.id];
+                    }
+                };
+            }
+        } else {
+            // 停止すべき
+            if (event_audioLayers[layer.id]) {
+                try {
+                    event_audioLayers[layer.id].source.stop();
+                } catch (e) { }
+                delete event_audioLayers[layer.id];
+            }
+        }
+    });
+};
+
+window.event_stopAllAudio = function () {
+    Object.keys(event_audioLayers).forEach(id => {
+        try {
+            event_audioLayers[id].source.stop();
+        } catch (e) { }
+        delete event_audioLayers[id];
+    });
+};
+
+/**
+ * 再生中のオーディオの音量をリアルタイム更新
+ */
+window.event_updateAudioVolumes = function () {
+    if (!event_audioCtx || !event_isPlaying) return;
+
+    event_data.layers.forEach((layer, idx) => {
+        if (layer.type === 'audio' && event_audioLayers[layer.id]) {
+            const volDb = event_getInterpolatedValue(idx, "volume", event_currentTime);
+            const gainNode = event_audioLayers[layer.id].gain;
+            // 短いランプで滑らかに音量変更
+            gainNode.gain.setTargetAtTime(event_dbToGain(volDb), event_audioCtx.currentTime, 0.05);
+        }
+    });
+};
+
+/**
+ * デシベルをゲイン倍率に変換 (0dB = 1.0)
+ */
+window.event_dbToGain = function (db) {
+    if (db <= -60) return 0; // -60dB以下はミュート
+    return Math.pow(10, db / 20);
 };
 
 window.event_jumpToPrevKeyframe = function () {
