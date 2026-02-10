@@ -246,6 +246,101 @@
           }
         },
         {
+          "id": "layer_1770702162767_268",
+          "name": "star_raw.png",
+          "source": "../image/craft_image3/star_raw.png",
+          "imgObj": {},
+          "parent": "layer_1770690629051_258",
+          "expanded": false,
+          "inPoint": 0,
+          "outPoint": 10,
+          "tracks": {
+            "position": {
+              "label": "Position",
+              "type": "vector2",
+              "keys": [
+                {
+                  "time": 4.633333333333333,
+                  "value": {
+                    "x": 2.515723270440276,
+                    "y": -11.226415094339643
+                  },
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Linear"
+                }
+              ],
+              "step": 1,
+              "initialValue": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            "scale": {
+              "label": "Scale",
+              "type": "vector2",
+              "linked": true,
+              "keys": [
+                {
+                  "time": 4.633333333333333,
+                  "value": {
+                    "x": 74,
+                    "y": 74
+                  },
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Linear"
+                }
+              ],
+              "step": 1,
+              "initialValue": {
+                "x": 100,
+                "y": 100
+              }
+            },
+            "rotation": {
+              "label": "Rotation",
+              "type": "rotation",
+              "keys": [],
+              "min": -3600,
+              "max": 3600,
+              "step": 1,
+              "initialValue": 0
+            },
+            "opacity": {
+              "label": "Opacity",
+              "type": "number",
+              "keys": [
+                {
+                  "time": 0,
+                  "value": 0,
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Linear"
+                },
+                {
+                  "time": 0.4666666666666667,
+                  "value": 100,
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Linear"
+                },
+                {
+                  "time": 4.633333333333333,
+                  "value": 100,
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Linear"
+                }
+              ],
+              "min": 0,
+              "max": 100,
+              "step": 1,
+              "initialValue": 100
+            }
+          }
+        },
+        {
           "id": "layer_anim_1770697719290",
           "type": "animated_layer",
           "name": "fire_mid",
@@ -351,7 +446,7 @@
           "source": "../image/craft_image3/bg_kiln.png",
           "imgObj": {},
           "parent": null,
-          "expanded": false,
+          "expanded": true,
           "inPoint": 0,
           "outPoint": 10,
           "tracks": {
@@ -371,17 +466,17 @@
               "linked": true,
               "keys": [
                 {
-                  "time": 0,
+                  "time": 0.9,
                   "value": {
-                    "x": 110,
-                    "y": 110
+                    "x": 124,
+                    "y": 124
                   },
                   "easeIn": false,
                   "easeOut": false,
                   "interpolation": "Linear"
                 },
                 {
-                  "time": 3.033333333333333,
+                  "time": 5.866666666666666,
                   "value": {
                     "x": 100,
                     "y": 100
@@ -666,6 +761,13 @@
         }
       ],
       "_collapsed": true
+    },
+    {
+      "type": "image",
+      "name": "star_raw.png",
+      "id": "img_17707021603200.585046707172355",
+      "src": "../image/craft_image3/star_raw.png",
+      "imgObj": {}
     }
   ]
 }
