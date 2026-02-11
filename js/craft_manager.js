@@ -7,7 +7,7 @@ const CraftManager = {
     loopId: null,
     ctx: null,
 
-    // 現在の工程: 'select', 'pouring', 'mixing', 'molding', 'firing', 'polishing'
+    // 現在の工程: 'loading', 'select', 'pouring', 'mixing', 'molding', 'firing', 'polishing'
     state: 'select',
 
     camera: { x: 0, y: 0, targetX: 0 },
@@ -40,6 +40,9 @@ const CraftManager = {
 
     showConfirm: false,
 
+    // ★追加: ロード状態管理
+    assetsLoaded: false,
+
     init: function () {
         if (typeof canvas !== 'undefined') {
             this.ctx = canvas.getContext('2d');
@@ -53,10 +56,60 @@ const CraftManager = {
         console.log("譜面データをロードしました", data.length, "ノーツ");
     },
 
+    // ★追加: 画像ロードヘルパー (Promise)
+    loadImage: function (src) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = (e) => {
+                console.error("Image Load Error:", src);
+                resolve(img); // エラーでも止まらない
+            };
+            img.src = src;
+        });
+    },
+
+    // ★追加: 音声ロードヘルパー (Promise)
+    loadSound: function (name, src) {
+        if (typeof AudioSys !== 'undefined' && AudioSys.loadBGM) {
+            return AudioSys.loadBGM(name, src).catch(e => console.error(e));
+        }
+        return Promise.resolve();
+    },
+
+    // ★追加: 全アセットの一括ロード
+    loadAllAssets: async function () {
+        if (this.assetsLoaded) return;
+
+        console.log("Start loading all craft assets...");
+        const promises = [];
+
+        // Craft1 (Mixing)
+        if (typeof CraftMixing !== 'undefined' && CraftMixing.loadAssets) {
+            promises.push(CraftMixing.loadAssets());
+        }
+        // Craft2 (Molding)
+        if (typeof CraftMolding !== 'undefined' && CraftMolding.loadAssets) {
+            promises.push(CraftMolding.loadAssets());
+        }
+        // Craft3 (Firing)
+        if (typeof CraftFiring !== 'undefined' && CraftFiring.loadAssets) {
+            promises.push(CraftFiring.loadAssets());
+        }
+        // Craft4 (Polishing)
+        if (typeof CraftPolishing !== 'undefined' && CraftPolishing.loadAssets) {
+            promises.push(CraftPolishing.loadAssets());
+        }
+
+        await Promise.all(promises);
+        this.assetsLoaded = true;
+        console.log("All craft assets loaded.");
+    },
+
     start: function (maxMaterials) {
         if (typeof Input !== 'undefined') Input.reset();
         this.isActive = true;
-        this.state = 'select';
+        this.state = 'loading'; // まずロード中状態にする
         this.camera.x = 0;
         this.camera.targetX = 0;
 
@@ -81,7 +134,7 @@ const CraftManager = {
         this.resetNextBtn();
         this.ui.btnNext.visible = false;
         this.ui.btnNext.text = "つぎへ！";
-        this.ui.btnCancel.visible = true; // ★追加: 二回目以降に消えないように明示的に表示設定する
+        this.ui.btnCancel.visible = true;
 
         if (typeof CraftMolding !== 'undefined') CraftMolding.reset?.();
         if (typeof CraftPolishing !== 'undefined') CraftPolishing.reset?.();
@@ -89,10 +142,13 @@ const CraftManager = {
         const ui = document.getElementById('ui-container');
         if (ui) ui.style.display = 'none';
 
-        // 最初の工程(Select)の初期化は Craft1 が担当するが、
-        // Select自体はループ開始直後に処理される
-
         if (this.loopId) cancelAnimationFrame(this.loopId);
+
+        // アセットロード開始
+        this.loadAllAssets().then(() => {
+            this.state = 'select'; // ロード完了後にSelectへ
+        });
+
         this.loop();
     },
 
@@ -147,7 +203,9 @@ const CraftManager = {
         }
 
         // 状態に応じて各モジュールのupdateを呼ぶ
-        if (this.state === 'select') {
+        if (this.state === 'loading') {
+            return;
+        } else if (this.state === 'select') {
             if (CraftMixing && CraftMixing.updateSelect) CraftMixing.updateSelect();
         } else if (this.state === 'pouring') {
             if (CraftMixing && CraftMixing.updatePouring) CraftMixing.updatePouring();
@@ -183,6 +241,16 @@ const CraftManager = {
 
         // 各工程の描画
         // カメラ位置に基づいて描画すべきステージのみを描画し、表示バグを防ぐ
+
+        if (this.state === 'loading') {
+            ctx.fillStyle = '#333';
+            ctx.font = "bold 32px 'M PLUS Rounded 1c', sans-serif";
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText("読み込み中...", w / 2, h / 2);
+            ctx.restore();
+            return;
+        }
 
         // Craft 1 (Select/Pour/Mix) - Offset 0
         if (Math.abs(this.camera.x - 0) < 1100) {

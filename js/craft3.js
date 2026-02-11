@@ -35,50 +35,51 @@ const CraftFiringImages = {
         burn: []
     },
 
-    load: function () {
+    loadAssets: async function () {
         if (this.loaded) return;
 
-        let loadedCount = 0;
-        // 読み込む画像の総数目安 (エラーハンドリングは簡易的)
-        const checkLoad = () => {
-            loadedCount++;
-            // 簡易的にある程度読み込まれたら完了とする、または使用時にチェック
-            this.loaded = true;
-        };
-        const setSrc = (img, name) => {
-            img.src = this.path + name;
-            img.onload = checkLoad;
-            img.onerror = () => console.warn('Missing img:', name);
-        };
+        const promises = [];
+        const path = this.path;
+        const setSrc = (name) => CraftManager.loadImage(path + name);
 
-        setSrc(this.bgKiln, 'bg_kiln.png');
+        promises.push(setSrc('bg_kiln.png').then(img => this.bgKiln = img));
 
         // 扉
-        const doorFiles = ['door_closed.png', 'door_half.png', 'door_open.png'];
-        for (let i = 0; i < 3; i++) {
-            this.door[i] = new Image();
-            setSrc(this.door[i], doorFiles[i]);
-        }
+        this.door = new Array(3);
+        promises.push(setSrc('door_closed.png').then(img => this.door[0] = img));
+        promises.push(setSrc('door_half.png').then(img => this.door[1] = img));
+        promises.push(setSrc('door_open.png').then(img => this.door[2] = img));
 
         // 星
-        setSrc(this.star.raw, 'star_raw.png');
-        setSrc(this.star.baked, 'star_baked.png');
-        setSrc(this.star.burnt1, 'star_burnt_1.png');
-        setSrc(this.star.burnt2, 'star_burnt_2.png');
-        setSrc(this.star.burnt3, 'star_burnt_3.png');
+        promises.push(setSrc('star_raw.png').then(img => this.star.raw = img));
+        promises.push(setSrc('star_baked.png').then(img => this.star.baked = img));
+        promises.push(setSrc('star_burnt_1.png').then(img => this.star.burnt1 = img));
+        promises.push(setSrc('star_burnt_2.png').then(img => this.star.burnt2 = img));
+        promises.push(setSrc('star_burnt_3.png').then(img => this.star.burnt3 = img));
 
         // 火 (ループアニメは連番)
-        for (let i = 1; i <= 3; i++) {
-            const l = new Image(); setSrc(l, `fire_low_${i}.png`); this.fire.low.push(l);
-            const m = new Image(); setSrc(m, `fire_mid_${i}.png`); this.fire.mid.push(m);
-            const h = new Image(); setSrc(h, `fire_high_${i}.png`); this.fire.high.push(h);
-            const w = new Image(); setSrc(w, `wood_burn_${i}.png`); this.wood.burn.push(w);
+        this.fire.low = new Array(3);
+        this.fire.mid = new Array(3);
+        this.fire.high = new Array(3);
+        this.wood.burn = new Array(3);
+
+        for (let i = 0; i < 3; i++) {
+            promises.push(setSrc(`fire_low_${i + 1}.png`).then(img => this.fire.low[i] = img));
+            promises.push(setSrc(`fire_mid_${i + 1}.png`).then(img => this.fire.mid[i] = img));
+            promises.push(setSrc(`fire_high_${i + 1}.png`).then(img => this.fire.high[i] = img));
+            promises.push(setSrc(`wood_burn_${i + 1}.png`).then(img => this.wood.burn[i] = img));
         }
 
         // 薪
-        setSrc(this.wood.idle, 'wood_idle.png');
-        setSrc(this.wood.thrown, 'wood_thrown.png');
-    }
+        promises.push(setSrc('wood_idle.png').then(img => this.wood.idle = img));
+        promises.push(setSrc('wood_thrown.png').then(img => this.wood.thrown = img));
+
+        await Promise.all(promises);
+        this.loaded = true;
+    },
+
+    // 互換性
+    load: function () { this.loadAssets(); }
 };
 
 const CraftFiring = {
@@ -138,20 +139,27 @@ const CraftFiring = {
 
     showTutorial: false,
 
+    loadAssets: async function () {
+        await CraftFiringImages.loadAssets();
+        // BGM/SE ロード
+        await Promise.all([
+            CraftManager.loadSound('bgm_craft3', 'sounds/atelier_bgm1.mp3'),
+            CraftManager.loadSound('se_fire', 'sounds/fire.mp3'),
+            CraftManager.loadSound('se_open', 'sounds/open.mp3'),
+            CraftManager.loadSound('se_firewood', 'sounds/firewood.mp3')
+        ]);
+    },
+
     init: function () {
-        CraftFiringImages.load();
+        // CraftFiringImages.load(); // 事前ロード済み
         this.resetParams();
         CraftManager.currentStar.bakeTemp = this.ovenTemp;
         CraftManager.ui.btnNext.visible = false;
 
-        AudioSys.loadBGM('bgm_craft3', 'sounds/atelier_bgm1.mp3').then(() => {
-            if (CraftManager.state === 'firing') {
-                AudioSys.playBGM('bgm_craft3', 0.3);
-            }
-        });
-        AudioSys.loadBGM('se_fire', 'sounds/fire.mp3');
-        AudioSys.loadBGM('se_open', 'sounds/open.mp3');
-        AudioSys.loadBGM('se_firewood', 'sounds/firewood.mp3');
+        // BGM再生
+        if (CraftManager.state === 'firing') {
+            AudioSys.playBGM('bgm_craft3', 0.3);
+        }
 
         this.showTutorial = !hasSeenFireTutorial;
     },

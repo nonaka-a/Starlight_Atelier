@@ -13,39 +13,43 @@ const CraftImages = {
     },
     tutorialHand: new Image(),
 
-    load: function () {
+    loadAssets: async function () {
         if (this.loaded) return;
 
         const path = 'image/craft_image/';
+        const promises = [];
 
         // 背景・ボウル
-        this.bgBack.src = path + 'bg_bowl_back.png';
-        this.bowlFront.src = path + 'bowl_front.png';
+        promises.push(CraftManager.loadImage(path + 'bg_bowl_back.png').then(img => this.bgBack = img));
+        promises.push(CraftManager.loadImage(path + 'bowl_front.png').then(img => this.bowlFront = img));
 
         // ほしのもと (3種)
-        for (let i = 1; i <= 3; i++) {
-            const img = new Image();
-            img.src = path + `star_${i}.png`;
-            this.stars.push(img);
+        this.stars = new Array(3);
+        for (let i = 0; i < 3; i++) {
+            promises.push(CraftManager.loadImage(path + `star_${i + 1}.png`).then(img => this.stars[i] = img));
         }
 
         // きじアニメーション (A~E, 各8枚)
         const types = ['A', 'B', 'C', 'D', 'E'];
         types.forEach(type => {
-            for (let i = 1; i <= 8; i++) {
-                const img = new Image();
-                img.src = path + `kiji_${type}_${i}.png`;
-                this.kiji[type].push(img);
+            this.kiji[type] = new Array(8);
+            for (let i = 0; i < 8; i++) {
+                promises.push(CraftManager.loadImage(path + `kiji_${type}_${i + 1}.png`).then(img => this.kiji[type][i] = img));
             }
         });
 
-        this.tutorialHand.src = 'image/tutorial/hand.png';
+        promises.push(CraftManager.loadImage('image/tutorial/hand.png').then(img => this.tutorialHand = img));
 
-        this.loaded = true;
         // SEの先行読み込み
-        AudioSys.loadBGM('se_mix', 'sounds/Mix_candies.mp3');
-        AudioSys.loadBGM('se_knead', 'sounds/Knead.mp3');
-    }
+        promises.push(CraftManager.loadSound('se_mix', 'sounds/Mix_candies.mp3'));
+        promises.push(CraftManager.loadSound('se_knead', 'sounds/Knead.mp3'));
+
+        await Promise.all(promises);
+        this.loaded = true;
+    },
+
+    // 後方互換性のため残すが、ロード完了を待てないので非推奨
+    load: function () { this.loadAssets(); }
 };
 
 const CraftMixing = {
@@ -91,8 +95,13 @@ const CraftMixing = {
     tutorialTimer: 0,
 
     // --- State: Select ---
+    loadAssets: async function () {
+        await CraftImages.loadAssets();
+    },
+
     updateSelect: function () {
-        CraftImages.load();
+        // CraftImages.load(); // loading画面で完了しているので不要だが、念のため残すならこう書く
+        // しかしここでは削除推奨。CraftManagerが一括管理するため。
 
         const cm = CraftManager;
         const mx = Input.x - cm.camera.x;

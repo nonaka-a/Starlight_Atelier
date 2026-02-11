@@ -30,69 +30,54 @@ const CraftMoldingImages = {
     effects: [],   // 3枚
     tutorialHand: new Image(),
 
-    load: function () {
+    loadAssets: async function () {
         if (this.loaded) return;
 
-        // ロード完了チェック用カウンタ
-        let loadedCount = 0;
-        const totalImages = 20;
+        const promises = [];
+        const path = this.path;
 
-        const checkLoad = () => {
-            loadedCount++;
-            if (loadedCount >= totalImages) {
-                this.loaded = true;
-                console.log("Craft2 Images Loaded Complete");
-            }
-        };
-
-        const setImage = (img, fileName) => {
-            img.onload = checkLoad;
-            img.onerror = (e) => {
-                console.error("Image Load Error:", fileName);
-                checkLoad();
-            };
-            img.src = this.path + fileName;
-        };
-
-        this.tutorialHand.src = 'image/tutorial/hand.png';
-
-        setImage(this.bgBase, 'bg_base.png');
+        promises.push(CraftManager.loadImage('image/tutorial/hand.png').then(img => this.tutorialHand = img));
+        promises.push(CraftManager.loadImage(path + 'bg_base.png').then(img => this.bgBase = img));
 
         // レーンアニメ (1-3)
-        for (let i = 1; i <= 3; i++) {
-            const img = new Image();
-            this.lanes.push(img);
-            setImage(img, `lane_${i}.png`);
+        this.lanes = new Array(3);
+        for (let i = 0; i < 3; i++) {
+            promises.push(CraftManager.loadImage(path + `lane_${i + 1}.png`).then(img => this.lanes[i] = img));
         }
 
         // ノーツ
-        setImage(this.noteNormal, 'note_normal.png');
-        setImage(this.noteDone, 'note_done.png');
-        setImage(this.noteLongBody, 'note_long_body.png');
-        setImage(this.noteLongEnd, 'note_long_end.png');
+        promises.push(CraftManager.loadImage(path + 'note_normal.png').then(img => this.noteNormal = img));
+        promises.push(CraftManager.loadImage(path + 'note_done.png').then(img => this.noteDone = img));
+        promises.push(CraftManager.loadImage(path + 'note_long_body.png').then(img => this.noteLongBody = img));
+        promises.push(CraftManager.loadImage(path + 'note_long_end.png').then(img => this.noteLongEnd = img));
 
         // マシン
-        setImage(this.machineUp, 'machine_up.png');
-        setImage(this.machineDown, 'machine_down.png');
+        promises.push(CraftManager.loadImage(path + 'machine_up.png').then(img => this.machineUp = img));
+        promises.push(CraftManager.loadImage(path + 'machine_down.png').then(img => this.machineDown = img));
 
         // ボタン
-        setImage(this.btnRedUp, 'btn_red_up.png');
-        setImage(this.btnRedDown, 'btn_red_down.png');
-        setImage(this.btnBlueUp, 'btn_blue_up.png');
-        setImage(this.btnBlueDown, 'btn_blue_down.png');
+        promises.push(CraftManager.loadImage(path + 'btn_red_up.png').then(img => this.btnRedUp = img));
+        promises.push(CraftManager.loadImage(path + 'btn_red_down.png').then(img => this.btnRedDown = img));
+        promises.push(CraftManager.loadImage(path + 'btn_blue_up.png').then(img => this.btnBlueUp = img));
+        promises.push(CraftManager.loadImage(path + 'btn_blue_down.png').then(img => this.btnBlueDown = img));
 
         // 判定文字
-        setImage(this.judgePerfect, 'judge_perfect.png');
-        setImage(this.judgeGood, 'judge_good.png');
-        setImage(this.judgeMiss, 'judge_miss.png');
+        promises.push(CraftManager.loadImage(path + 'judge_perfect.png').then(img => this.judgePerfect = img));
+        promises.push(CraftManager.loadImage(path + 'judge_good.png').then(img => this.judgeGood = img));
+        promises.push(CraftManager.loadImage(path + 'judge_miss.png').then(img => this.judgeMiss = img));
 
         // エフェクト (1-3)
-        for (let i = 1; i <= 3; i++) {
-            const img = new Image();
-            this.effects.push(img);
-            setImage(img, `effect_hit_${i}.png`);
+        this.effects = new Array(3);
+        for (let i = 0; i < 3; i++) {
+            promises.push(CraftManager.loadImage(path + `effect_hit_${i + 1}.png`).then(img => this.effects[i] = img));
         }
-    }
+
+        await Promise.all(promises);
+        this.loaded = true;
+    },
+
+    // 互換性
+    load: function () { this.loadAssets(); }
 };
 
 const CraftMolding = {
@@ -166,8 +151,14 @@ const CraftMolding = {
         console.log("Mold Score:", CraftManager.currentStar.scoreMold);
     },
 
+    loadAssets: async function () {
+        await CraftMoldingImages.loadAssets();
+        // BGMロード
+        await CraftManager.loadSound(this.bgmName, this.bgmSrc);
+    },
+
     init: function () {
-        CraftMoldingImages.load();
+        // CraftMoldingImages.load(); // 事前ロード済み
 
         this.notes = [];
         this.effects = [];
@@ -191,8 +182,8 @@ const CraftMolding = {
         this.chartData = [];
         this.nextNoteIndex = 0;
 
-        // BGMロードと譜面生成
-        AudioSys.loadBGM(this.bgmName, this.bgmSrc).then(buffer => {
+        // BGM準備と譜面生成
+        const onBgmReady = (buffer) => {
             if (buffer) {
                 this.bgmDuration = buffer.duration;
                 if (this.externalChart && this.externalChart.length > 0) {
@@ -201,7 +192,13 @@ const CraftMolding = {
                     this.generateChart(buffer.duration);
                 }
             }
-        });
+        };
+
+        if (AudioSys.buffers[this.bgmName]) {
+            onBgmReady(AudioSys.buffers[this.bgmName]);
+        } else {
+            AudioSys.loadBGM(this.bgmName, this.bgmSrc).then(onBgmReady);
+        }
 
         this.showTutorial = !hasSeenMoldTutorial;
         this.tutorialTimer = 0;

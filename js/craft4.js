@@ -13,26 +13,30 @@ const CraftPolishingImages = {
     tutorialHand: new Image(),
     sparkles: [],
 
-    load: function () {
+    loadAssets: async function () {
         if (this.loaded) return;
 
-        const setSrc = (img, name) => {
-            img.src = this.path + name;
-        };
+        const promises = [];
+        const path = this.path;
+        const setSrc = (name) => CraftManager.loadImage(path + name);
 
-        setSrc(this.bgPolish, 'bg_polish.png');
-        setSrc(this.starDirty, 'star_dirty.png');
-        setSrc(this.starShiny, 'star_shiny.png');
-        setSrc(this.stampStar, 'stamp_star.png');
+        promises.push(setSrc('bg_polish.png').then(img => this.bgPolish = img));
+        promises.push(setSrc('star_dirty.png').then(img => this.starDirty = img));
+        promises.push(setSrc('star_shiny.png').then(img => this.starShiny = img));
+        promises.push(setSrc('stamp_star.png').then(img => this.stampStar = img));
+        promises.push(CraftManager.loadImage('image/tutorial/hand.png').then(img => this.tutorialHand = img));
 
-        for (let i = 1; i <= 3; i++) {
-            const s = new Image();
-            setSrc(s, `effect_sparkle_${i}.png`);
-            this.sparkles.push(s);
+        this.sparkles = new Array(3);
+        for (let i = 0; i < 3; i++) {
+            promises.push(setSrc(`effect_sparkle_${i + 1}.png`).then(img => this.sparkles[i] = img));
         }
-        this.tutorialHand.src = 'image/tutorial/hand.png';
+
+        await Promise.all(promises);
         this.loaded = true;
-    }
+    },
+
+    // 互換性
+    load: function () { this.loadAssets(); }
 };
 
 const CraftPolishing = {
@@ -67,8 +71,16 @@ const CraftPolishing = {
 
     kiraPlayed: false, // ★追加: kira.mp3再生済みフラグ
 
+    loadAssets: async function () {
+        await CraftPolishingImages.loadAssets();
+        await Promise.all([
+            CraftManager.loadSound('se_polish', 'sounds/se_polish.mp3'),
+            CraftManager.loadSound('se_kira', 'sounds/kira.mp3')
+        ]);
+    },
+
     init: function () {
-        CraftPolishingImages.load();
+        // CraftPolishingImages.load(); // 事前ロード済み
 
         this.shineLevel = 0;
         this.lastX = Input.x;
@@ -102,9 +114,6 @@ const CraftPolishing = {
 
         CraftManager.ui.btnNext.visible = !this.showTutorial;
         CraftManager.ui.btnNext.text = "かんせい！";
-
-        AudioSys.loadBGM('se_polish', 'sounds/se_polish.mp3');
-        AudioSys.loadBGM('se_kira', 'sounds/kira.mp3');
     },
 
     end: function () {
