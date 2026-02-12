@@ -1,11 +1,10 @@
 /**
  * イベントエディタ: ロジック
- * Step 19: キーフレーム複数選択コピペ対応
- * Step 1 (Update): イージング機能（AE準拠）、親子関係、スケール連動初期値
+ * Step 19 (Fix): ペースト先の自動判定強化（選択解除後のペースト対応）
  */
 
 // クリップボード (メモリ内)
-let event_clipboard = null; // { type: 'keys', items: [...] }
+let event_clipboard = null; // { type: 'keys', sourceLayerIdx: 0, items: [...] }
 
 // イージング関数定義 (基本計算用)
 const event_easingFunctions = {
@@ -30,9 +29,13 @@ window.event_copySelectedKeyframe = function () {
 
     // 選択されたキーの中で最小の時間を基準とする
     const minTime = Math.min(...event_selectedKeys.map(k => k.keyObj.time));
+    
+    // コピー元の代表レイヤーインデックスを保存（ペースト時のフォールバック用）
+    const sourceLayerIdx = event_selectedKeys[0].layerIdx;
 
     event_clipboard = {
         type: 'keys',
+        sourceLayerIdx: sourceLayerIdx,
         items: event_selectedKeys.map(sk => ({
             prop: sk.prop, // プロパティ名
             // 値とイージング情報をディープコピー
@@ -50,14 +53,22 @@ window.event_copySelectedKeyframe = function () {
 window.event_pasteKeyframe = function () {
     if (!event_clipboard || event_clipboard.type !== 'keys') return;
 
-    // ペースト先のレイヤー決定
+    // ペースト先のレイヤー決定優先順位:
+    // 1. 現在選択されているレイヤー (event_selectedLayerIndex)
+    // 2. 現在キーフレームが選択されているレイヤー
+    // 3. コピー元のレイヤー (event_clipboard.sourceLayerIdx)
+    
     let targetLayerIdx = event_selectedLayerIndex;
     
-    // レイヤーが選択されていない場合、コピー元のレイヤー(選択中のキーがあればそのレイヤー)を優先
     if (targetLayerIdx === -1 && event_selectedKeys.length > 0) {
         targetLayerIdx = event_selectedKeys[0].layerIdx;
     }
+    
+    if (targetLayerIdx === -1 && event_clipboard.sourceLayerIdx !== undefined) {
+        targetLayerIdx = event_clipboard.sourceLayerIdx;
+    }
 
+    // ターゲットレイヤーが存在するか確認
     if (targetLayerIdx === -1 || !event_data.layers[targetLayerIdx]) {
         console.log("No layer selected for paste");
         return;
@@ -65,7 +76,7 @@ window.event_pasteKeyframe = function () {
 
     event_pushHistory();
     const layer = event_data.layers[targetLayerIdx];
-    const baseTime = event_currentTime;
+    const baseTime = event_currentTime; // 再生ヘッドの位置
 
     // 貼り付け後に選択状態にするためのリスト
     const newSelectedKeys = [];
@@ -75,7 +86,6 @@ window.event_pasteKeyframe = function () {
         if (!layer.tracks[item.prop]) return;
 
         const track = layer.tracks[item.prop];
-        // 再生ヘッド(現在時刻)を基準にオフセットを加算
         const pasteTime = event_snapTime(baseTime + item.offset);
         
         // 既存キーを検索して更新、なければ追加
@@ -97,6 +107,7 @@ window.event_pasteKeyframe = function () {
                 easeOut: !!item.easeOut
             };
             track.keys.push(newKey);
+            // 時間順にソート
             track.keys.sort((a, b) => a.time - b.time);
             newSelectedKeys.push({ layerIdx: targetLayerIdx, prop: item.prop, keyObj: newKey });
         }
@@ -106,10 +117,12 @@ window.event_pasteKeyframe = function () {
     if (newSelectedKeys.length > 0) {
         event_selectedKeys = newSelectedKeys;
         event_selectedKey = newSelectedKeys[0];
+        // ペースト先レイヤーを選択状態にする
+        event_selectedLayerIndex = targetLayerIdx;
     }
 
     event_draw();
-    console.log("Pasted keys");
+    console.log("Pasted keys to layer:", targetLayerIdx);
 };
 
 /**
@@ -208,7 +221,6 @@ window.event_addLayer = function (name, source) {
         outPoint: event_data.composition.duration,
         tracks: {
             "position": { label: "Position", type: "vector2", keys: [], step: 1, initialValue: { x: cx, y: cy } },
-            // Scaleに linked: true を追加
             "scale": { label: "Scale", type: "vector2", linked: true, keys: [], step: 1, initialValue: { x: 100, y: 100 } },
             "rotation": { label: "Rotation", type: "rotation", keys: [], min: -3600, max: 3600, step: 1, initialValue: 0 },
             "opacity": { label: "Opacity", type: "number", keys: [], min: 0, max: 100, step: 1, initialValue: 100 }
@@ -238,7 +250,6 @@ window.event_updateKeyframe = function (layerIndex, prop, time, value) {
         return existingKey;
     } else {
         // 新規キーフレーム作成
-        // デフォルトはリニア
         const newKey = {
             time: time,
             value: valToSave,
@@ -346,28 +357,25 @@ window.event_setLayerParent = function (childLayerIdx, parentLayerId) {
     }
 
     // 4. 新しいローカル値を逆算
-    // 回転
     const newLocalRot = world.rotation - parentWorld.rotation;
-    // スケール
+    
     const newLocalScale = {
         x: (parentWorld.scale.x !== 0) ? (world.scale.x / parentWorld.scale.x) * 100 : world.scale.x * 100,
         y: (parentWorld.scale.y !== 0) ? (world.scale.y / parentWorld.scale.y) * 100 : world.scale.y * 100
     };
-    // 位置
+    
     const dx = world.position.x - parentWorld.position.x;
     const dy = world.position.y - parentWorld.position.y;
-    const pRad = -parentWorld.rotation * Math.PI / 180; // 親の回転の逆向き
+    const pRad = -parentWorld.rotation * Math.PI / 180;
     const pCos = Math.cos(pRad);
     const pSin = Math.sin(pRad);
 
-    // 回転を戻してから親のスケールで割る
     let newLocalPos = {
         x: (dx * pCos - dy * pSin) / (parentWorld.scale.x || 1),
         y: (dx * pSin + dy * pCos) / (parentWorld.scale.y || 1)
     };
 
     // 5. 補正値を子レイヤーの全キーフレームと初期値に適用
-    // ここでは単純化のため、現在の見た目を維持するための「オフセット」を計算して適用する手法をとる
     const currentLocalPos = event_getInterpolatedValue(childLayerIdx, "position", event_currentTime);
     const currentLocalScale = event_getInterpolatedValue(childLayerIdx, "scale", event_currentTime);
     const currentLocalRot = event_getInterpolatedValue(childLayerIdx, "rotation", event_currentTime);
@@ -375,16 +383,13 @@ window.event_setLayerParent = function (childLayerIdx, parentLayerId) {
     const posOffset = { x: newLocalPos.x - currentLocalPos.x, y: newLocalPos.y - currentLocalPos.y };
     const rotOffset = newLocalRot - currentLocalRot;
 
-    // Position 補正
     childLayer.tracks["position"].keys.forEach(k => { k.value.x += posOffset.x; k.value.y += posOffset.y; });
     childLayer.tracks["position"].initialValue.x += posOffset.x;
     childLayer.tracks["position"].initialValue.y += posOffset.y;
 
-    // Rotation 補正
     childLayer.tracks["rotation"].keys.forEach(k => { k.value += rotOffset; });
     childLayer.tracks["rotation"].initialValue += rotOffset;
 
-    // Scale 補正 (加算ではなく比率で補正する必要がある)
     const scaleRatioX = newLocalScale.x / (currentLocalScale.x || 100);
     const scaleRatioY = newLocalScale.y / (currentLocalScale.y || 100);
     childLayer.tracks["scale"].keys.forEach(k => { k.value.x *= scaleRatioX; k.value.y *= scaleRatioY; });
@@ -407,7 +412,6 @@ window.event_getInterpolatedValue = function (layerIndex, prop, time) {
     const layer = event_data.layers[layerIndex];
     const track = layer.tracks[prop];
     if (!track) {
-        // トラックが存在しない場合のデフォルト値
         if (prop === 'position') return { x: 0, y: 0 };
         if (prop === 'scale') return { x: 100, y: 100 };
         if (prop === 'rotation') return 0;
@@ -426,25 +430,20 @@ window.event_getInterpolatedValue = function (layerIndex, prop, time) {
         const k1 = keys[i];
         const k2 = keys[i + 1];
         if (time >= k1.time && time < k2.time) {
-            // 停止キーフレーム (Hold)
             if (track.type === 'string' || k1.interpolation === 'Hold') {
                 return k1.value;
             }
 
             let t = (time - k1.time) / (k2.time - k1.time);
 
-            // イージング計算 (k1のアウトとk2のインを参照)
-            const easeIn = k2.easeIn;   // 終点側（入ってくる）設定
-            const easeOut = k1.easeOut; // 始点側（出ていく）設定
+            const easeIn = k2.easeIn;
+            const easeOut = k1.easeOut;
 
             if (easeIn && easeOut) {
-                // 両方: ゆっくり加速して始まり、ゆっくり減速して終わる (S字)
                 t = 0.5 * (1 - Math.cos(t * Math.PI));
             } else if (easeIn) {
-                // イーズインのみ: 終点に向かって減速（ゆっくり停車する）
                 t = 1 - (1 - t) * (1 - t);
             } else if (easeOut) {
-                // イーズアウトのみ: 始点から加速（ゆっくり発車する）
                 t = t * t;
             }
 
@@ -488,7 +487,6 @@ window.event_seekTo = function (time) {
     if (event_isPlaying) {
         event_syncAudio();
     } else {
-        // 再生中でない場合、一度止めてから同期（音だしはしない）
         event_stopAllAudio();
     }
     event_draw();
@@ -518,9 +516,6 @@ window.event_addAudioLayer = function (name, assetId) {
     event_draw();
 };
 
-/**
- * オーディオの再生状態を現在の時間に合わせて同期させる
- */
 window.event_syncAudio = function () {
     if (!event_audioCtx) return;
 
@@ -530,15 +525,11 @@ window.event_syncAudio = function () {
         const asset = event_findAssetById(layer.assetId);
         if (!asset || !asset.audioBuffer) return;
 
-        // 現在の相対再生位置
         const offset = event_currentTime - layer.startTime;
-
-        // 再生範囲内かチェック
         const isWithinRange = (event_currentTime >= layer.inPoint && event_currentTime < layer.outPoint);
         const isWithinBuffer = (offset >= 0 && offset < asset.audioBuffer.duration);
 
         if (event_isPlaying && isWithinRange && isWithinBuffer) {
-            // 再生中であるべき
             if (!event_audioLayers[layer.id]) {
                 const source = event_audioCtx.createBufferSource();
                 source.buffer = asset.audioBuffer;
@@ -546,11 +537,9 @@ window.event_syncAudio = function () {
                 source.connect(gainNode);
                 gainNode.connect(event_audioCtx.destination);
 
-                // 初期音量設定
                 const volDb = event_getInterpolatedValue(event_data.layers.indexOf(layer), "volume", event_currentTime);
                 gainNode.gain.setValueAtTime(event_dbToGain(volDb), event_audioCtx.currentTime);
 
-                // 開始位置と継続時間を計算
                 const startOff = Math.max(0, offset);
                 const duration = Math.min(asset.audioBuffer.duration - startOff, layer.outPoint - event_currentTime);
 
@@ -564,7 +553,6 @@ window.event_syncAudio = function () {
                 };
             }
         } else {
-            // 停止すべき
             if (event_audioLayers[layer.id]) {
                 try {
                     event_audioLayers[layer.id].source.stop();
@@ -584,9 +572,6 @@ window.event_stopAllAudio = function () {
     });
 };
 
-/**
- * 再生中のオーディオの音量をリアルタイム更新
- */
 window.event_updateAudioVolumes = function () {
     if (!event_audioCtx || !event_isPlaying) return;
 
@@ -594,17 +579,13 @@ window.event_updateAudioVolumes = function () {
         if (layer.type === 'audio' && event_audioLayers[layer.id]) {
             const volDb = event_getInterpolatedValue(idx, "volume", event_currentTime);
             const gainNode = event_audioLayers[layer.id].gain;
-            // 短いランプで滑らかに音量変更
             gainNode.gain.setTargetAtTime(event_dbToGain(volDb), event_audioCtx.currentTime, 0.05);
         }
     });
 };
 
-/**
- * デシベルをゲイン倍率に変換 (0dB = 1.0)
- */
 window.event_dbToGain = function (db) {
-    if (db <= -60) return 0; // -60dB以下はミュート
+    if (db <= -60) return 0;
     return Math.pow(10, db / 20);
 };
 
@@ -675,7 +656,6 @@ window.event_applyCompSettings = function (isInit = false) {
     event_draw();
 };
 
-// --- 新規コンポジション作成 ---
 window.event_createComp = function () {
     const name = prompt("コンポジション名", "Comp " + (event_data.assets.filter(a => a.type === 'comp').length + 1));
     if (name) {
@@ -699,13 +679,7 @@ window.event_createComp = function () {
     }
 };
 
-// --- アニメーション統合用ロジック ---
-
-/**
- * アニメーションエディタの全データをアセットとして登録
- */
 window.anim_integrateToEvent = function () {
-    // editor_anim.js のグローバル変数にアクセス
     if (!window.anim_data || Object.keys(window.anim_data).length === 0) {
         alert("アニメーションデータがありません");
         return;
@@ -713,7 +687,6 @@ window.anim_integrateToEvent = function () {
 
     const packName = document.getElementById('anim-pack-name').value || 'Animations';
 
-    // タイルセットのソースを取得
     let tilesetSrc = "";
     if (window.anim_img instanceof HTMLImageElement) {
         tilesetSrc = window.anim_img.getAttribute('src') || window.anim_img.src;
@@ -725,18 +698,17 @@ window.anim_integrateToEvent = function () {
         type: 'animation',
         name: packName,
         id: 'anim_asset_' + Date.now(),
-        data: JSON.parse(JSON.stringify(window.anim_data)), // ディープコピー
-        source: tilesetSrc, // タイルセット画像
+        data: JSON.parse(JSON.stringify(window.anim_data)),
+        source: tilesetSrc,
         _collapsed: false
     };
 
-    // 重複チェック (パック名が同じものを探す)
     const existing = event_data.assets.find(a => a.type === 'animation' && a.name === packName);
     if (existing) {
         if (confirm(`既存のアセット "${packName}" を上書きしますか？`)) {
             event_pushHistory();
             Object.assign(existing, newAsset);
-            existing.id = existing.id; // IDは維持
+            existing.id = existing.id;
             alert("アセットを更新しました");
             event_refreshProjectList();
             return;
@@ -751,20 +723,12 @@ window.anim_integrateToEvent = function () {
     alert(`アセットに "${packName}" を追加しました。`);
 };
 
-/**
- * アニメーションレイヤーを追加
- * @param {string} name レイヤー名
- * @param {string} animAssetId 参照するアセットのID
- * @param {string} animId 再生するアニメーション名 (オプション)
- */
 window.event_addAnimatedLayer = function (name, animAssetId, animId) {
     event_pushHistory();
 
-    // アセット情報の取得
     const asset = event_findAssetById(animAssetId);
     if (!asset || asset.type !== 'animation') return;
 
-    // 画像オブジェクト生成(表示用)
     const img = new Image();
     img.src = asset.source;
     img.onload = () => event_draw();
@@ -772,18 +736,17 @@ window.event_addAnimatedLayer = function (name, animAssetId, animId) {
     const cx = event_data.composition.width / 2;
     const cy = event_data.composition.height / 2;
 
-    // 再生するアニメーションキーの決定
     const targetAnimId = animId || Object.keys(asset.data)[0] || "idle";
 
     const newLayer = {
         id: 'layer_anim_' + Date.now(),
         type: 'animated_layer',
         name: name || (asset.name + " (" + targetAnimId + ")"),
-        animAssetId: animAssetId, // 参照アセットID
-        animId: targetAnimId,     // 実行するアニメーション名
-        startTime: event_currentTime, // 再生開始位置
+        animAssetId: animAssetId,
+        animId: targetAnimId,
+        startTime: event_currentTime,
         loop: true,
-        imgObj: img, // タイルセット画像
+        imgObj: img,
         source: asset.source,
         parent: null,
         expanded: true,
@@ -792,7 +755,6 @@ window.event_addAnimatedLayer = function (name, animAssetId, animId) {
         tracks: {
             "motion": { label: "Motion", type: "string", keys: [], step: 1, initialValue: targetAnimId },
             "position": { label: "Position", type: "vector2", keys: [], step: 1, initialValue: { x: cx, y: cy } },
-            // Scaleに linked: true を追加
             "scale": { label: "Scale", type: "vector2", linked: true, keys: [], step: 1, initialValue: { x: 100, y: 100 } },
             "rotation": { label: "Rotation", type: "rotation", keys: [], min: -3600, max: 3600, step: 1, initialValue: 0 },
             "opacity": { label: "Opacity", type: "number", keys: [], min: 0, max: 100, step: 1, initialValue: 100 }
@@ -804,10 +766,6 @@ window.event_addAnimatedLayer = function (name, animAssetId, animId) {
     event_draw();
 };
 
-/**
- * レイヤーが参照しているすべてのアニメーション名を取得
- * @param {number} layerIdx 
- */
 window.event_getLayerAnimationNames = function (layerIdx) {
     const layer = event_data.layers[layerIdx];
     if (!layer || !layer.animAssetId) return [];

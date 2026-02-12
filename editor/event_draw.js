@@ -1,6 +1,7 @@
 /**
  * イベントエディタ: 描画関連
- * Step 18 (Fix): 矩形選択描画修正
+ * Step 20: タイムラインの横スクロール対応（仮想スクロール実装）
+ * 固定ヘッダー・固定左パネル対応
  */
 
 // UI定数のオーバーライド
@@ -111,26 +112,63 @@ window.event_draw = function () {
         event_offscreenCtx = event_offscreenCanvas.getContext('2d');
     }
 
-    const scrollY = event_timelineContainer.scrollTop;
+    // --- Timeline スクロール・ズーム処理 ---
     const zoomInput = document.getElementById('event-zoom');
     if (zoomInput) {
         event_pixelsPerSec = parseInt(zoomInput.value);
     }
 
+    const scrollY = event_timelineContainer.scrollTop;
+    const scrollX = event_timelineContainer.scrollLeft;
+    event_viewStartTime = scrollX / event_pixelsPerSec;
+    
     const drawTime = event_snapTime(event_currentTime);
 
-    // --- Timeline Canvas リサイズ ---
+    // --- Timeline Canvas リサイズとスクロールダミー制御 (仮想スクロール) ---
     const containerW = event_timelineContainer.clientWidth;
+    const containerH = event_timelineContainer.clientHeight;
+
+    // スクロール用ダミー要素の生成・取得
+    let scrollDummy = document.getElementById('event-timeline-scroll-dummy');
+    if (!scrollDummy) {
+        scrollDummy = document.createElement('div');
+        scrollDummy.id = 'event-timeline-scroll-dummy';
+        scrollDummy.style.position = 'absolute';
+        scrollDummy.style.top = '0';
+        scrollDummy.style.left = '0';
+        scrollDummy.style.zIndex = '0'; // Canvasの下に配置
+        scrollDummy.style.pointerEvents = 'none'; // クリック透過
+        event_timelineContainer.appendChild(scrollDummy);
+
+        // Canvasをスティッキー配置にして常に画面内に留める
+        event_canvasTimeline.style.position = 'sticky';
+        event_canvasTimeline.style.left = '0';
+        event_canvasTimeline.style.top = '0';
+        event_canvasTimeline.style.zIndex = '1';
+
+        // スクロール時に再描画
+        event_timelineContainer.onscroll = () => {
+            window.event_draw();
+        };
+    }
+
+    // コンテンツ全体のサイズ計算
+    const totalContentWidth = EVENT_LEFT_PANEL_WIDTH + (event_data.composition.duration || 10) * event_pixelsPerSec + 400; // 余白多めに
     let totalTracks = 0;
     event_data.layers.forEach(l => {
         totalTracks++;
         if (l.expanded) totalTracks += Object.keys(l.tracks).length;
     });
-    const requiredHeight = Math.max(event_timelineContainer.clientHeight, EVENT_HEADER_HEIGHT + totalTracks * EVENT_TRACK_HEIGHT + 50);
+    const totalContentHeight = Math.max(containerH, EVENT_HEADER_HEIGHT + totalTracks * EVENT_TRACK_HEIGHT + 100);
 
-    if (event_canvasTimeline.width !== containerW || event_canvasTimeline.height !== requiredHeight) {
+    // ダミー要素のサイズ設定（これによりスクロールバーが出る）
+    scrollDummy.style.width = totalContentWidth + 'px';
+    scrollDummy.style.height = totalContentHeight + 'px';
+
+    // Canvasサイズは表示領域に合わせる
+    if (event_canvasTimeline.width !== containerW || event_canvasTimeline.height !== containerH) {
         event_canvasTimeline.width = containerW;
-        event_canvasTimeline.height = requiredHeight;
+        event_canvasTimeline.height = containerH;
     }
 
     const ctx = event_ctxTimeline;
@@ -268,12 +306,18 @@ window.event_draw = function () {
     const viewEndTime = event_viewStartTime + ((w - EVENT_LEFT_PANEL_WIDTH) / event_pixelsPerSec);
     const secStep = event_pixelsPerSec > 100 ? 0.5 : 1.0;
 
+    // トラックエリアの背景クリッピング
     ctx.save();
     ctx.beginPath(); ctx.rect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, h); ctx.clip();
     const compDurationX = EVENT_LEFT_PANEL_WIDTH + (event_data.composition.duration - event_viewStartTime) * event_pixelsPerSec;
-    ctx.fillStyle = '#111';
-    ctx.fillRect(compDurationX, 0, w - compDurationX, h);
+    
+    // 尺外のエリアを暗くする
+    if (compDurationX < w) {
+        ctx.fillStyle = '#111';
+        ctx.fillRect(compDurationX, 0, w - compDurationX, h);
+    }
 
+    // 縦グリッド線
     for (let t = Math.floor(event_viewStartTime); t <= viewEndTime; t += secStep) {
         if (t < 0) continue;
         if (t > event_data.composition.duration) break;
@@ -282,253 +326,265 @@ window.event_draw = function () {
     }
     ctx.restore();
 
-    // トラック描画
-    let currentY = EVENT_HEADER_HEIGHT;
+    // トラック描画ループ
+    let currentY = EVENT_HEADER_HEIGHT - scrollY; // 縦スクロール位置を適用
+    
     event_data.layers.forEach((layer, layerIdx) => {
-        ctx.fillStyle = (layerIdx === event_selectedLayerIndex) ? '#556' : '#3a3a3a';
-        ctx.fillRect(0, currentY, w, EVENT_TRACK_HEIGHT);
+        // 画面外（上または下）のトラックは描画スキップ（カリング）
+        // ただしトラック高さ計算のため currentY の加算は行う
+        const isVisible = (currentY + EVENT_TRACK_HEIGHT > EVENT_HEADER_HEIGHT && currentY < h);
+        
+        if (isVisible) {
+            ctx.fillStyle = (layerIdx === event_selectedLayerIndex) ? '#556' : '#3a3a3a';
+            ctx.fillRect(0, currentY, w, EVENT_TRACK_HEIGHT);
 
-        if (layerIdx === event_selectedLayerIndex) {
-            ctx.strokeStyle = '#88a';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(1, currentY + 1, EVENT_LEFT_PANEL_WIDTH - 2, EVENT_TRACK_HEIGHT - 2);
-            ctx.lineWidth = 1;
-        } else {
-            ctx.strokeStyle = '#222';
-            ctx.strokeRect(0, currentY, w, EVENT_TRACK_HEIGHT);
-        }
-
-        ctx.fillStyle = '#aaa';
-        ctx.font = '10px sans-serif';
-        const expandMark = layer.expanded ? "▼" : "▶";
-        ctx.fillText(expandMark, 5, currentY + 18);
-
-        const iconSize = 20;
-        const iconX = 25;
-        const iconY = currentY + 5;
-        if (event_isValidDrawable(layer.imgObj) && layer.imgObj.complete) {
-            try {
-                const aspect = layer.imgObj.width / layer.imgObj.height;
-                let dw = iconSize;
-                let dh = iconSize;
-                if (aspect > 1) dh = iconSize / aspect;
-                else dw = iconSize * aspect;
-                ctx.drawImage(layer.imgObj, iconX + (iconSize - dw) / 2, iconY + (iconSize - dh) / 2, dw, dh);
-            } catch (e) {
-                ctx.fillText("🖼️", iconX, currentY + 20);
+            if (layerIdx === event_selectedLayerIndex) {
+                ctx.strokeStyle = '#88a';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(1, currentY + 1, EVENT_LEFT_PANEL_WIDTH - 2, EVENT_TRACK_HEIGHT - 2);
+                ctx.lineWidth = 1;
+            } else {
+                ctx.strokeStyle = '#222';
+                ctx.strokeRect(0, currentY, w, EVENT_TRACK_HEIGHT);
             }
-        } else {
-            ctx.fillText(layer.type === 'audio' ? "🔊" : "📄", iconX, currentY + 20);
-        }
 
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 12px sans-serif';
-        const nameRightLimit = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PARENT_RIGHT - 10;
-        const nameStart = iconX + iconSize + 5;
-        const maxNameW = Math.max(10, nameRightLimit - nameStart);
-        let dName = layer.name;
-        if (ctx.measureText(dName).width > maxNameW) {
-            while (ctx.measureText(dName + '...').width > maxNameW && dName.length > 0) dName = dName.slice(0, -1);
-            dName += '...';
-        }
-        ctx.fillText(dName, nameStart, currentY + 20);
+            ctx.fillStyle = '#aaa';
+            ctx.font = '10px sans-serif';
+            const expandMark = layer.expanded ? "▼" : "▶";
+            ctx.fillText(expandMark, 5, currentY + 18);
 
-        const pickWhipX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PICK_RIGHT;
-        const parentSelX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PARENT_RIGHT;
-        const parentSelW = UI_LAYOUT.PARENT_RIGHT - UI_LAYOUT.PICK_RIGHT - 5;
-
-        ctx.strokeStyle = '#aaa';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(pickWhipX + 8, currentY + EVENT_TRACK_HEIGHT / 2, 6, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(pickWhipX + 8, currentY + EVENT_TRACK_HEIGHT / 2, 2, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = '#222';
-        ctx.fillRect(parentSelX, currentY + 4, parentSelW, EVENT_TRACK_HEIGHT - 8);
-        ctx.fillStyle = '#ccc';
-        ctx.font = '10px sans-serif';
-        let parentName = "なし";
-        if (layer.parent) {
-            const p = event_data.layers.find(l => l.id === layer.parent);
-            if (p) parentName = p.name;
-        }
-        if (ctx.measureText(parentName).width > parentSelW - 15) parentName = parentName.substring(0, 5) + '..';
-        ctx.fillText(parentName, parentSelX + 4, currentY + 18);
-        ctx.fillStyle = '#666';
-        ctx.fillText("▼", parentSelX + parentSelW - 12, currentY + 18);
-
-        const trashX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.TRASH_RIGHT;
-        const trashY = currentY + 5;
-        ctx.fillStyle = '#d44';
-        ctx.fillRect(trashX, trashY, 20, 20);
-        ctx.fillStyle = '#fff';
-        ctx.fillText("×", trashX + 6, trashY + 14);
-
-        const inX = EVENT_LEFT_PANEL_WIDTH + (layer.inPoint - event_viewStartTime) * event_pixelsPerSec;
-        const outX = EVENT_LEFT_PANEL_WIDTH + (layer.outPoint - event_viewStartTime) * event_pixelsPerSec;
-        const barX = Math.max(EVENT_LEFT_PANEL_WIDTH, inX);
-        const barW = Math.max(0, outX - barX);
-
-        ctx.save();
-        ctx.beginPath(); ctx.rect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, h); ctx.clip();
-
-        if (barW > 0) {
-            // 背景
-            ctx.fillStyle = 'rgba(100, 150, 255, 0.1)';
-            ctx.fillRect(barX, currentY + 4, barW, EVENT_TRACK_HEIGHT - 8);
-
-            // 波形描画
-            if (layer.type === 'audio') {
-                const asset = event_findAssetById(layer.assetId);
-                if (asset && asset.waveform) {
-                    const startT = layer.startTime;
-                    const wfCanvas = asset.waveform;
-                    // 波形全体のピクセル幅
-                    const waveformW = asset.duration * event_pixelsPerSec;
-                    const waveformX = EVENT_LEFT_PANEL_WIDTH + (startT - event_viewStartTime) * event_pixelsPerSec;
-
-                    // 描画範囲のクリッピング
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.rect(barX, currentY + 4, barW, EVENT_TRACK_HEIGHT - 8);
-                    ctx.clip();
-                    ctx.globalAlpha = 0.8;
-                    if (event_isValidDrawable(wfCanvas)) {
-                        try {
-                            ctx.drawImage(wfCanvas, waveformX, currentY + 4, waveformW, EVENT_TRACK_HEIGHT - 8);
-                        } catch (e) {
-                            console.error("Draw error (waveform):", e);
-                        }
-                    }
-                    ctx.restore();
+            const iconSize = 20;
+            const iconX = 25;
+            const iconY = currentY + 5;
+            if (event_isValidDrawable(layer.imgObj) && layer.imgObj.complete) {
+                try {
+                    const aspect = layer.imgObj.width / layer.imgObj.height;
+                    let dw = iconSize;
+                    let dh = iconSize;
+                    if (aspect > 1) dh = iconSize / aspect;
+                    else dw = iconSize * aspect;
+                    ctx.drawImage(layer.imgObj, iconX + (iconSize - dw) / 2, iconY + (iconSize - dh) / 2, dw, dh);
+                } catch (e) {
+                    ctx.fillText("🖼️", iconX, currentY + 20);
                 }
+            } else {
+                ctx.fillText(layer.type === 'audio' ? "🔊" : "📄", iconX, currentY + 20);
             }
 
-            // ハンドルと枠
-            ctx.fillStyle = 'rgba(100, 150, 255, 0.8)';
-            if (inX >= EVENT_LEFT_PANEL_WIDTH) ctx.fillRect(inX, currentY + 4, EVENT_LAYER_HANDLE_WIDTH, EVENT_TRACK_HEIGHT - 8);
-            if (outX >= EVENT_LEFT_PANEL_WIDTH) ctx.fillRect(outX - EVENT_LAYER_HANDLE_WIDTH, currentY + 4, EVENT_LAYER_HANDLE_WIDTH, EVENT_TRACK_HEIGHT - 8);
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 12px sans-serif';
+            const nameRightLimit = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PARENT_RIGHT - 10;
+            const nameStart = iconX + iconSize + 5;
+            const maxNameW = Math.max(10, nameRightLimit - nameStart);
+            let dName = layer.name;
+            if (ctx.measureText(dName).width > maxNameW) {
+                while (ctx.measureText(dName + '...').width > maxNameW && dName.length > 0) dName = dName.slice(0, -1);
+                dName += '...';
+            }
+            ctx.fillText(dName, nameStart, currentY + 20);
+
+            const pickWhipX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PICK_RIGHT;
+            const parentSelX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PARENT_RIGHT;
+            const parentSelW = UI_LAYOUT.PARENT_RIGHT - UI_LAYOUT.PICK_RIGHT - 5;
+
+            ctx.strokeStyle = '#aaa';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(pickWhipX + 8, currentY + EVENT_TRACK_HEIGHT / 2, 6, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(pickWhipX + 8, currentY + EVENT_TRACK_HEIGHT / 2, 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#222';
+            ctx.fillRect(parentSelX, currentY + 4, parentSelW, EVENT_TRACK_HEIGHT - 8);
+            ctx.fillStyle = '#ccc';
+            ctx.font = '10px sans-serif';
+            let parentName = "なし";
+            if (layer.parent) {
+                const p = event_data.layers.find(l => l.id === layer.parent);
+                if (p) parentName = p.name;
+            }
+            if (ctx.measureText(parentName).width > parentSelW - 15) parentName = parentName.substring(0, 5) + '..';
+            ctx.fillText(parentName, parentSelX + 4, currentY + 18);
+            ctx.fillStyle = '#666';
+            ctx.fillText("▼", parentSelX + parentSelW - 12, currentY + 18);
+
+            const trashX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.TRASH_RIGHT;
+            const trashY = currentY + 5;
+            ctx.fillStyle = '#d44';
+            ctx.fillRect(trashX, trashY, 20, 20);
+            ctx.fillStyle = '#fff';
+            ctx.fillText("×", trashX + 6, trashY + 14);
+
+            const inX = EVENT_LEFT_PANEL_WIDTH + (layer.inPoint - event_viewStartTime) * event_pixelsPerSec;
+            const outX = EVENT_LEFT_PANEL_WIDTH + (layer.outPoint - event_viewStartTime) * event_pixelsPerSec;
+            const barX = Math.max(EVENT_LEFT_PANEL_WIDTH, inX);
+            const barW = Math.max(0, outX - barX);
+
+            ctx.save();
+            ctx.beginPath(); ctx.rect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, h); ctx.clip();
+
+            if (barW > 0) {
+                // 背景
+                ctx.fillStyle = 'rgba(100, 150, 255, 0.1)';
+                ctx.fillRect(barX, currentY + 4, barW, EVENT_TRACK_HEIGHT - 8);
+
+                // 波形描画
+                if (layer.type === 'audio') {
+                    const asset = event_findAssetById(layer.assetId);
+                    if (asset && asset.waveform) {
+                        const startT = layer.startTime;
+                        const wfCanvas = asset.waveform;
+                        // 波形全体のピクセル幅
+                        const waveformW = asset.duration * event_pixelsPerSec;
+                        const waveformX = EVENT_LEFT_PANEL_WIDTH + (startT - event_viewStartTime) * event_pixelsPerSec;
+
+                        // 描画範囲のクリッピング
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.rect(barX, currentY + 4, barW, EVENT_TRACK_HEIGHT - 8);
+                        ctx.clip();
+                        ctx.globalAlpha = 0.8;
+                        if (event_isValidDrawable(wfCanvas)) {
+                            try {
+                                ctx.drawImage(wfCanvas, waveformX, currentY + 4, waveformW, EVENT_TRACK_HEIGHT - 8);
+                            } catch (e) {
+                                console.error("Draw error (waveform):", e);
+                            }
+                        }
+                        ctx.restore();
+                    }
+                }
+
+                // ハンドルと枠
+                ctx.fillStyle = 'rgba(100, 150, 255, 0.8)';
+                if (inX >= EVENT_LEFT_PANEL_WIDTH) ctx.fillRect(inX, currentY + 4, EVENT_LAYER_HANDLE_WIDTH, EVENT_TRACK_HEIGHT - 8);
+                if (outX >= EVENT_LEFT_PANEL_WIDTH) ctx.fillRect(outX - EVENT_LAYER_HANDLE_WIDTH, currentY + 4, EVENT_LAYER_HANDLE_WIDTH, EVENT_TRACK_HEIGHT - 8);
+            }
+            ctx.restore();
         }
-        ctx.restore();
         currentY += EVENT_TRACK_HEIGHT;
 
         if (layer.expanded) {
             Object.keys(layer.tracks).forEach(propName => {
                 const track = layer.tracks[propName];
-                ctx.fillStyle = '#2d2d2d'; ctx.fillRect(0, currentY, w, EVENT_TRACK_HEIGHT);
-                ctx.strokeStyle = '#222'; ctx.beginPath(); ctx.moveTo(0, currentY + EVENT_TRACK_HEIGHT); ctx.lineTo(w, currentY + EVENT_TRACK_HEIGHT); ctx.stroke();
-                ctx.fillStyle = '#ddd'; ctx.font = '11px sans-serif'; ctx.fillText(track.label, 30, currentY + 19);
+                const isTrackVisible = (currentY + EVENT_TRACK_HEIGHT > EVENT_HEADER_HEIGHT && currentY < h);
 
-                if (propName.startsWith('fx_')) {
-                    const delBtnX = 15;
-                    const delBtnY = currentY + 10;
-                    ctx.fillStyle = '#d44';
-                    ctx.fillRect(delBtnX, delBtnY, 12, 12);
-                    ctx.fillStyle = '#fff';
-                    ctx.font = 'bold 10px sans-serif';
-                    ctx.fillText('×', delBtnX + 2, delBtnY + 9);
-                }
+                if (isTrackVisible) {
+                    ctx.fillStyle = '#2d2d2d'; ctx.fillRect(0, currentY, w, EVENT_TRACK_HEIGHT);
+                    ctx.strokeStyle = '#222'; ctx.beginPath(); ctx.moveTo(0, currentY + EVENT_TRACK_HEIGHT); ctx.lineTo(w, currentY + EVENT_TRACK_HEIGHT); ctx.stroke();
+                    ctx.fillStyle = '#ddd'; ctx.font = '11px sans-serif'; ctx.fillText(track.label, 30, currentY + 19);
 
-                const val = event_getInterpolatedValue(layerIdx, propName, drawTime);
-
-                if (track.type === 'vector2') {
-                    if (propName === 'scale') {
-                        const checkXStart = EVENT_LEFT_PANEL_WIDTH - 220;
-                        ctx.fillStyle = (val.x < 0) ? '#0ff' : '#444';
-                        ctx.fillRect(checkXStart, currentY + 8, 12, 12);
-                        ctx.strokeStyle = '#888';
-                        ctx.strokeRect(checkXStart, currentY + 8, 12, 12);
-                        ctx.fillStyle = '#aaa';
-                        ctx.fillText("x", checkXStart + 15, currentY + 18);
-
-                        ctx.fillStyle = (val.y < 0) ? '#0ff' : '#444';
-                        ctx.fillRect(checkXStart + 30, currentY + 8, 12, 12);
-                        ctx.strokeStyle = '#888';
-                        ctx.strokeRect(checkXStart + 30, currentY + 8, 12, 12);
-                        ctx.fillStyle = '#aaa';
-                        ctx.fillText("y", checkXStart + 45, currentY + 18);
-
-                        const linkBtnX = EVENT_LEFT_PANEL_WIDTH - 113;
-                        const linkBtnY = currentY + 8;
-                        ctx.fillStyle = track.linked ? '#666' : '#444';
-                        ctx.fillRect(linkBtnX, linkBtnY, 10, 12);
-                        ctx.strokeStyle = '#888';
-                        ctx.strokeRect(linkBtnX, linkBtnY, 10, 12);
-                        ctx.fillStyle = track.linked ? '#fff' : '#888';
-                        ctx.fillText(track.linked ? "∞" : "-", linkBtnX + 1, currentY + 17);
+                    if (propName.startsWith('fx_')) {
+                        const delBtnX = 15;
+                        const delBtnY = currentY + 10;
+                        ctx.fillStyle = '#d44';
+                        ctx.fillRect(delBtnX, delBtnY, 12, 12);
+                        ctx.fillStyle = '#fff';
+                        ctx.font = 'bold 10px sans-serif';
+                        ctx.fillText('×', delBtnX + 2, delBtnY + 9);
                     }
 
-                    const valX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.VAL_VEC_X_RIGHT;
-                    ctx.fillStyle = '#3a2a2a';
-                    ctx.fillRect(valX, currentY + 4, UI_LAYOUT.VAL_VEC_WIDTH, EVENT_TRACK_HEIGHT - 8);
-                    ctx.fillStyle = '#f88';
-                    ctx.textAlign = 'right';
-                    ctx.fillText(Math.abs(val.x).toFixed(1), valX + UI_LAYOUT.VAL_VEC_WIDTH - 4, currentY + 19);
+                    const val = event_getInterpolatedValue(layerIdx, propName, drawTime);
 
-                    const valY = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.VAL_VEC_Y_RIGHT;
-                    ctx.fillStyle = '#2a3a2a';
-                    ctx.fillRect(valY, currentY + 4, UI_LAYOUT.VAL_VEC_WIDTH, EVENT_TRACK_HEIGHT - 8);
-                    ctx.fillStyle = '#8f8';
-                    ctx.textAlign = 'right';
-                    ctx.fillText(Math.abs(val.y).toFixed(1), valY + UI_LAYOUT.VAL_VEC_WIDTH - 4, currentY + 19);
-                    ctx.textAlign = 'left';
-                } else {
-                    const valText = event_formatValue(val, track.type);
-                    const valX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.VAL_SINGLE_RIGHT;
-                    ctx.fillStyle = '#3a3a3a';
-                    ctx.fillRect(valX, currentY + 4, UI_LAYOUT.VAL_SINGLE_WIDTH, EVENT_TRACK_HEIGHT - 8);
-                    ctx.fillStyle = '#eee';
-                    ctx.textAlign = 'right';
-                    ctx.fillText(valText, valX + UI_LAYOUT.VAL_SINGLE_WIDTH - 4, currentY + 19);
-                    ctx.textAlign = 'left';
-                }
+                    if (track.type === 'vector2') {
+                        if (propName === 'scale') {
+                            const checkXStart = EVENT_LEFT_PANEL_WIDTH - 220;
+                            ctx.fillStyle = (val.x < 0) ? '#0ff' : '#444';
+                            ctx.fillRect(checkXStart, currentY + 8, 12, 12);
+                            ctx.strokeStyle = '#888';
+                            ctx.strokeRect(checkXStart, currentY + 8, 12, 12);
+                            ctx.fillStyle = '#aaa';
+                            ctx.fillText("x", checkXStart + 15, currentY + 18);
 
-                const btnX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.KEY_ADD_RIGHT;
-                const btnY = currentY + EVENT_TRACK_HEIGHT / 2;
-                ctx.strokeStyle = '#aaa'; ctx.beginPath(); ctx.moveTo(btnX, btnY - 5); ctx.lineTo(btnX + 5, btnY); ctx.lineTo(btnX, btnY + 5); ctx.lineTo(btnX - 5, btnY); ctx.closePath(); ctx.stroke();
-                const hasKey = track.keys && track.keys.some(k => Math.abs(k.time - drawTime) < 0.001);
-                if (hasKey) { ctx.fillStyle = '#48f'; ctx.fill(); }
+                            ctx.fillStyle = (val.y < 0) ? '#0ff' : '#444';
+                            ctx.fillRect(checkXStart + 30, currentY + 8, 12, 12);
+                            ctx.strokeStyle = '#888';
+                            ctx.strokeRect(checkXStart + 30, currentY + 8, 12, 12);
+                            ctx.fillStyle = '#aaa';
+                            ctx.fillText("y", checkXStart + 45, currentY + 18);
 
-                ctx.save();
-                ctx.beginPath(); ctx.rect(EVENT_LEFT_PANEL_WIDTH, currentY, w - EVENT_LEFT_PANEL_WIDTH, EVENT_TRACK_HEIGHT); ctx.clip();
-                if (track.keys) {
-                    track.keys.forEach(key => {
-                        const kx = EVENT_LEFT_PANEL_WIDTH + (key.time - event_viewStartTime) * event_pixelsPerSec;
-                        const ky = currentY + EVENT_TRACK_HEIGHT / 2;
-                        const isSelected = (event_selectedKey && event_selectedKey.keyObj === key) || (event_selectedKeys && event_selectedKeys.some(sk => sk.keyObj === key));
-                        const isDragging = (event_dragTarget && event_dragTarget.type === 'key' && event_dragTarget.obj === key);
-                        const isHold = (key.interpolation === 'Hold');
-                        const isEase = (key.easeIn || key.easeOut);
-
-                        if (isSelected || isDragging) { ctx.fillStyle = '#ff0'; ctx.strokeStyle = '#fff'; }
-                        else { ctx.fillStyle = isHold ? '#f88' : '#ddd'; ctx.strokeStyle = '#000'; }
-
-                        ctx.beginPath();
-                        if (isHold) ctx.rect(kx - 4, ky - 4, 8, 8);
-                        else if (isEase) ctx.arc(kx, ky, EVENT_KEYFRAME_SIZE, 0, Math.PI * 2);
-                        else {
-                            ctx.moveTo(kx, ky - EVENT_KEYFRAME_SIZE);
-                            ctx.lineTo(kx + EVENT_KEYFRAME_SIZE, ky);
-                            ctx.lineTo(kx, ky + EVENT_KEYFRAME_SIZE);
-                            ctx.lineTo(kx - EVENT_KEYFRAME_SIZE, ky);
-                            ctx.closePath();
+                            const linkBtnX = EVENT_LEFT_PANEL_WIDTH - 113;
+                            const linkBtnY = currentY + 8;
+                            ctx.fillStyle = track.linked ? '#666' : '#444';
+                            ctx.fillRect(linkBtnX, linkBtnY, 10, 12);
+                            ctx.strokeStyle = '#888';
+                            ctx.strokeRect(linkBtnX, linkBtnY, 10, 12);
+                            ctx.fillStyle = track.linked ? '#fff' : '#888';
+                            ctx.fillText(track.linked ? "∞" : "-", linkBtnX + 1, currentY + 17);
                         }
-                        ctx.fill(); ctx.stroke();
-                    });
+
+                        const valX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.VAL_VEC_X_RIGHT;
+                        ctx.fillStyle = '#3a2a2a';
+                        ctx.fillRect(valX, currentY + 4, UI_LAYOUT.VAL_VEC_WIDTH, EVENT_TRACK_HEIGHT - 8);
+                        ctx.fillStyle = '#f88';
+                        ctx.textAlign = 'right';
+                        ctx.fillText(Math.abs(val.x).toFixed(1), valX + UI_LAYOUT.VAL_VEC_WIDTH - 4, currentY + 19);
+
+                        const valY = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.VAL_VEC_Y_RIGHT;
+                        ctx.fillStyle = '#2a3a2a';
+                        ctx.fillRect(valY, currentY + 4, UI_LAYOUT.VAL_VEC_WIDTH, EVENT_TRACK_HEIGHT - 8);
+                        ctx.fillStyle = '#8f8';
+                        ctx.textAlign = 'right';
+                        ctx.fillText(Math.abs(val.y).toFixed(1), valY + UI_LAYOUT.VAL_VEC_WIDTH - 4, currentY + 19);
+                        ctx.textAlign = 'left';
+                    } else {
+                        const valText = event_formatValue(val, track.type);
+                        const valX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.VAL_SINGLE_RIGHT;
+                        ctx.fillStyle = '#3a3a3a';
+                        ctx.fillRect(valX, currentY + 4, UI_LAYOUT.VAL_SINGLE_WIDTH, EVENT_TRACK_HEIGHT - 8);
+                        ctx.fillStyle = '#eee';
+                        ctx.textAlign = 'right';
+                        ctx.fillText(valText, valX + UI_LAYOUT.VAL_SINGLE_WIDTH - 4, currentY + 19);
+                        ctx.textAlign = 'left';
+                    }
+
+                    const btnX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.KEY_ADD_RIGHT;
+                    const btnY = currentY + EVENT_TRACK_HEIGHT / 2;
+                    ctx.strokeStyle = '#aaa'; ctx.beginPath(); ctx.moveTo(btnX, btnY - 5); ctx.lineTo(btnX + 5, btnY); ctx.lineTo(btnX, btnY + 5); ctx.lineTo(btnX - 5, btnY); ctx.closePath(); ctx.stroke();
+                    const hasKey = track.keys && track.keys.some(k => Math.abs(k.time - drawTime) < 0.001);
+                    if (hasKey) { ctx.fillStyle = '#48f'; ctx.fill(); }
+
+                    ctx.save();
+                    ctx.beginPath(); ctx.rect(EVENT_LEFT_PANEL_WIDTH, currentY, w - EVENT_LEFT_PANEL_WIDTH, EVENT_TRACK_HEIGHT); ctx.clip();
+                    if (track.keys) {
+                        track.keys.forEach(key => {
+                            const kx = EVENT_LEFT_PANEL_WIDTH + (key.time - event_viewStartTime) * event_pixelsPerSec;
+                            const ky = currentY + EVENT_TRACK_HEIGHT / 2;
+                            const isSelected = (event_selectedKey && event_selectedKey.keyObj === key) || (event_selectedKeys && event_selectedKeys.some(sk => sk.keyObj === key));
+                            const isDragging = (event_dragTarget && event_dragTarget.type === 'keys' && event_dragTarget.keys.some(k => k.key === key));
+                            const isHold = (key.interpolation === 'Hold');
+                            const isEase = (key.easeIn || key.easeOut);
+
+                            if (isSelected || isDragging) { ctx.fillStyle = '#ff0'; ctx.strokeStyle = '#fff'; }
+                            else { ctx.fillStyle = isHold ? '#f88' : '#ddd'; ctx.strokeStyle = '#000'; }
+
+                            ctx.beginPath();
+                            if (isHold) ctx.rect(kx - 4, ky - 4, 8, 8);
+                            else if (isEase) ctx.arc(kx, ky, EVENT_KEYFRAME_SIZE, 0, Math.PI * 2);
+                            else {
+                                ctx.moveTo(kx, ky - EVENT_KEYFRAME_SIZE);
+                                ctx.lineTo(kx + EVENT_KEYFRAME_SIZE, ky);
+                                ctx.lineTo(kx, ky + EVENT_KEYFRAME_SIZE);
+                                ctx.lineTo(kx - EVENT_KEYFRAME_SIZE, ky);
+                                ctx.closePath();
+                            }
+                            ctx.fill(); ctx.stroke();
+                        });
+                    }
+                    ctx.restore();
                 }
-                ctx.restore();
                 currentY += EVENT_TRACK_HEIGHT;
             });
         }
     });
 
     // --- 固定ヘッダーの描画 ---
+    // 固定ヘッダーはスクロールの影響を受けないように、絶対位置（Canvas上部）に描画
+    // ただし、Canvas自体はStickyなので常に画面上部にいる。
+    // 時間目盛り等のX軸は viewStartTime で調整済み。
     ctx.save();
-    ctx.translate(0, scrollY);
-
     // ヘッダー背景
     ctx.fillStyle = '#333';
     ctx.fillRect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT);
@@ -563,7 +619,7 @@ window.event_draw = function () {
     ctx.fillStyle = '#0ff'; ctx.font = 'bold 14px monospace';
     ctx.fillText(`${event_currentTime.toFixed(2)}s (${sec}s ${frame}f)`, 10, 20);
 
-    // 再生ヘッド (三角形)
+    // 再生ヘッド (三角形) - ヘッダー上
     const headX = EVENT_LEFT_PANEL_WIDTH + (drawTime - event_viewStartTime) * event_pixelsPerSec;
     if (headX >= EVENT_LEFT_PANEL_WIDTH && headX <= w) {
         ctx.fillStyle = '#f00';
@@ -575,14 +631,14 @@ window.event_draw = function () {
     }
     ctx.restore();
 
-    // 再生ヘッド (線)
+    // 再生ヘッド (線) - トラック上 (スクロールに関係なく表示位置はCanvas相対)
     const lineX = EVENT_LEFT_PANEL_WIDTH + (drawTime - event_viewStartTime) * event_pixelsPerSec;
     if (lineX >= EVENT_LEFT_PANEL_WIDTH && lineX <= w) {
         ctx.strokeStyle = '#f00'; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(lineX, scrollY + EVENT_HEADER_HEIGHT); ctx.lineTo(lineX, h); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(lineX, EVENT_HEADER_HEIGHT); ctx.lineTo(lineX, h); ctx.stroke();
     }
 
-    // --- 矩形選択範囲の描画 ---
+    // --- 矩形選択範囲の描画 (スクロール補正済み) ---
     if (event_state === 'rect-select') {
         const x1 = Math.min(event_rectStartPos.x, event_rectEndPos.x);
         const x2 = Math.max(event_rectStartPos.x, event_rectEndPos.x);
@@ -592,10 +648,10 @@ window.event_draw = function () {
         ctx.strokeStyle = '#0ff';
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]);
-        // ここでの y は論理座標なので、そのまま描画してOK（canvas自体が全高を持つため）
-        ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+        // y は絶対座標(scrollY込み)なので、Canvas上の描画位置に変換するには -scrollY
+        ctx.strokeRect(x1, y1 - scrollY, x2 - x1, y2 - y1);
         ctx.fillStyle = 'rgba(0, 255, 255, 0.1)';
-        ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+        ctx.fillRect(x1, y1 - scrollY, x2 - x1, y2 - y1);
         ctx.setLineDash([]);
     }
 };
