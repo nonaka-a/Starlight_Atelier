@@ -1,6 +1,6 @@
 /**
  * イベントエディタ: 入力処理
- * Step 21: 矩形選択・スクロール座標補正・操作判定の適正化
+ * Step 22 (Fix): レイヤー移動時にstartTimeも更新し、波形やアニメ開始位置を同期させる
  */
 
 // Pick Whip用ステート変数
@@ -134,8 +134,8 @@ window.event_onTimelineDblClick = function (e) {
     const clickY = e.clientY - rect.top; 
     const scrollY = event_timelineContainer.scrollTop;
 
-    // ヘッダー判定 (View座標)
-    if (clickY < EVENT_HEADER_HEIGHT) return;
+    // ヘッダー判定
+    if ((clickY - scrollY) < EVENT_HEADER_HEIGHT) return;
 
     // 絶対Y座標
     const absoluteY = clickY + scrollY;
@@ -147,8 +147,6 @@ window.event_onTimelineDblClick = function (e) {
             const nameStart = 50;
             const nameEnd = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PARENT_RIGHT - 10;
             if (x >= nameStart && x <= nameEnd) {
-                // インプット表示位置はスクロールを考慮して渡す
-                // clickYは画面座標なので、inputの配置には rect.top + clickY でOK
                 event_showInlineInput(x, clickY, layer.name, 'string', (newName) => {
                     if (newName && newName.trim() !== "") {
                         event_pushHistory();
@@ -176,12 +174,11 @@ window.event_updateSeekFromMouse = function (x) {
 window.event_onTimelineMouseDown = function (e) {
     const rect = event_canvasTimeline.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top; // View Y (Canvas内の表示位置)
+    const clickY = e.clientY - rect.top; // Absolute Y
     const scrollY = event_timelineContainer.scrollTop;
 
-    // --- 1. ヘッダー判定 (固定エリア) ---
-    // clickY は画面上の座標なので、これがヘッダー高さ以下ならヘッダー操作
-    if (clickY < EVENT_HEADER_HEIGHT) {
+    // ヘッダー判定 (見た目Y座標)
+    if ((clickY - scrollY) < EVENT_HEADER_HEIGHT) {
         if (e.button === 0 && x > EVENT_LEFT_PANEL_WIDTH) {
             event_state = 'scrub-time';
             event_updateSeekFromMouse(x);
@@ -189,23 +186,20 @@ window.event_onTimelineMouseDown = function (e) {
         return;
     }
 
-    // --- 2. トラックコンテンツ判定 ---
-    // 絶対座標 (スクロール考慮)
-    const absoluteY = clickY + scrollY;
+    const y = clickY;
 
     // 右クリック判定
     if (e.button === 2) {
         let curY = EVENT_HEADER_HEIGHT;
         for (let i = 0; i < event_data.layers.length; i++) {
             const layer = event_data.layers[i];
-            curY += EVENT_TRACK_HEIGHT; // レイヤー行スキップ
+            curY += EVENT_TRACK_HEIGHT;
             if (layer.expanded) {
                 for (let prop of Object.keys(layer.tracks)) {
-                    if (absoluteY >= curY && absoluteY < curY + EVENT_TRACK_HEIGHT) {
+                    if (y >= curY && y < curY + EVENT_TRACK_HEIGHT) {
                         for (let key of layer.tracks[prop].keys) {
                             const kx = EVENT_LEFT_PANEL_WIDTH + (key.time - event_viewStartTime) * event_pixelsPerSec;
                             if (Math.abs(x - kx) <= EVENT_KEYFRAME_HIT_RADIUS) {
-                                // 選択更新
                                 const isSelected = event_selectedKeys.some(k => k.keyObj === key);
                                 if (!isSelected) {
                                     event_selectedKeys = [{ layerIdx: i, prop: prop, keyObj: key }];
@@ -226,19 +220,16 @@ window.event_onTimelineMouseDown = function (e) {
     }
 
     let currentY = EVENT_HEADER_HEIGHT;
-    // 「何かを操作したか」フラグ。falseなら矩形選択へ。
     let hitSomething = false;
 
     for (let i = 0; i < event_data.layers.length; i++) {
         const layer = event_data.layers[i];
 
-        // --- レイヤーメイン行 ---
-        if (absoluteY >= currentY && absoluteY < currentY + EVENT_TRACK_HEIGHT) {
+        // レイヤー行
+        if (y >= currentY && y < currentY + EVENT_TRACK_HEIGHT) {
             if (x < EVENT_LEFT_PANEL_WIDTH) {
-                // 左パネル操作は常にヒット扱い
                 hitSomething = true;
                 const fromRight = EVENT_LEFT_PANEL_WIDTH - x;
-                // ゴミ箱
                 if (fromRight >= UI_LAYOUT.TRASH_RIGHT - 20 && fromRight <= UI_LAYOUT.TRASH_RIGHT) {
                     if (confirm("レイヤーを削除しますか？")) {
                         event_pushHistory();
@@ -248,23 +239,19 @@ window.event_onTimelineMouseDown = function (e) {
                     }
                     return;
                 }
-                // 親選択 PickWhip
                 if (fromRight >= UI_LAYOUT.PICK_RIGHT - 16 && fromRight <= UI_LAYOUT.PICK_RIGHT) {
                     event_state = 'drag-pickwhip';
                     event_pickWhipSourceLayerIdx = i;
                     event_dragStartPos = { x: e.clientX, y: e.clientY };
                     return;
                 }
-                // 親プルダウン
                 if (fromRight >= UI_LAYOUT.PICK_RIGHT + 5 && fromRight <= UI_LAYOUT.PARENT_RIGHT) {
                     event_showParentSelect(e.clientX, e.clientY, i);
                     return;
                 }
-                // 展開/折りたたみ
                 if (x < 25) {
                     layer.expanded = !layer.expanded;
                 } else {
-                    // レイヤー順序入れ替えドラッグ
                     event_pushHistory();
                     event_state = 'drag-layer-order';
                     event_selectedLayerIndex = i;
@@ -276,11 +263,10 @@ window.event_onTimelineMouseDown = function (e) {
                 if (!e.shiftKey) event_selectedKeys = [];
                 event_draw();
             } else {
-                // 右パネル（バー操作エリア）
+                // 右パネル（バー操作）
                 const inX = EVENT_LEFT_PANEL_WIDTH + (layer.inPoint - event_viewStartTime) * event_pixelsPerSec;
                 const outX = EVENT_LEFT_PANEL_WIDTH + (layer.outPoint - event_viewStartTime) * event_pixelsPerSec;
                 
-                // バー上の操作か判定
                 if (Math.abs(x - inX) <= EVENT_LAYER_HANDLE_WIDTH) {
                     hitSomething = true;
                     event_pushHistory(); event_state = 'drag-layer-in'; event_dragTarget = { layerIdx: i };
@@ -291,8 +277,13 @@ window.event_onTimelineMouseDown = function (e) {
                     hitSomething = true;
                     event_pushHistory(); event_state = 'drag-layer-move'; event_dragTarget = { layerIdx: i, startIn: layer.inPoint, startOut: layer.outPoint };
                 } else {
-                    // バー以外の空白部分 -> 矩形選択させたいので hitSomething = false のまま
-                    // ただし、選択状態のリセット等は最後に行う
+                    // バー外の空白クリック -> レイヤー選択はするが矩形選択も許可したい場合はここを調整
+                    hitSomething = true;
+                    event_selectedLayerIndex = i; 
+                    if (!e.shiftKey) {
+                        event_selectedKey = null;
+                        event_selectedKeys = [];
+                    }
                 }
                 event_dragStartPos = { x: e.clientX, y: e.clientY };
                 event_draw();
@@ -301,12 +292,12 @@ window.event_onTimelineMouseDown = function (e) {
         }
         currentY += EVENT_TRACK_HEIGHT;
 
-        // --- プロパティトラック行 ---
+        // トラック行
         if (layer.expanded) {
             const props = Object.keys(layer.tracks);
             for (let prop of props) {
                 const track = layer.tracks[prop];
-                if (absoluteY >= currentY && absoluteY < currentY + EVENT_TRACK_HEIGHT) {
+                if (y >= currentY && y < currentY + EVENT_TRACK_HEIGHT) {
                     if (x < EVENT_LEFT_PANEL_WIDTH) {
                         hitSomething = true;
                         const fromRight = EVENT_LEFT_PANEL_WIDTH - x;
@@ -325,7 +316,6 @@ window.event_onTimelineMouseDown = function (e) {
                             return;
                         }
 
-                        // 数値編集
                         if (track.type === 'vector2') {
                             if (prop === 'scale') {
                                 const cx = EVENT_LEFT_PANEL_WIDTH - 220;
@@ -384,7 +374,6 @@ window.event_onTimelineMouseDown = function (e) {
                                         event_selectedKey = event_selectedKeys.find(sk => sk.keyObj === key);
                                     }
 
-                                    // ドラッグ開始
                                     event_pushHistory();
                                     event_state = 'drag-key';
                                     event_dragStartPos = { x: e.clientX, y: e.clientY };
@@ -402,7 +391,6 @@ window.event_onTimelineMouseDown = function (e) {
                                 }
                             }
                         }
-                        // 空白部分は hitSomething = false のまま -> 矩形選択へ
                     }
                 }
                 currentY += EVENT_TRACK_HEIGHT;
@@ -410,19 +398,17 @@ window.event_onTimelineMouseDown = function (e) {
         }
     }
 
-    // 矩形選択開始（何もヒットしなかった場合）
+    // 矩形選択開始
     if (!hitSomething && x > EVENT_LEFT_PANEL_WIDTH) {
         event_state = 'rect-select';
-        // 矩形選択の開始位置は絶対座標で記録する
-        event_rectStartPos = { x: x, y: absoluteY };
-        event_rectEndPos = { x: x, y: absoluteY };
+        event_rectStartPos = { x: x, y: y };
+        event_rectEndPos = { x: x, y: y };
         if (!e.shiftKey) {
             event_selectedKeys = [];
             event_selectedKey = null;
         }
         event_draw();
     } else if (!hitSomething) {
-        // 左パネルの空白クリック等
         if (!e.shiftKey) {
             event_selectedLayerIndex = -1;
             event_selectedKey = null;
@@ -440,16 +426,15 @@ window.event_onGlobalMouseMove = function (e) {
 
     const rect = event_canvasTimeline.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top; // View Y
+    const clickY = e.clientY - rect.top; // Absolute Y
     const scrollY = event_timelineContainer.scrollTop;
-    const absoluteY = clickY + scrollY; // Absolute Y
 
     if (event_state === 'idle') {
         let cursor = 'default';
         if (x > EVENT_LEFT_PANEL_WIDTH && clickY > EVENT_HEADER_HEIGHT) {
             let currentY = EVENT_HEADER_HEIGHT;
             for (let layer of event_data.layers) {
-                if (absoluteY >= currentY && absoluteY < currentY + EVENT_TRACK_HEIGHT) {
+                if (clickY >= currentY && clickY < currentY + EVENT_TRACK_HEIGHT) { // スクロール考慮済みの座標で比較
                     const inX = EVENT_LEFT_PANEL_WIDTH + (layer.inPoint - event_viewStartTime) * event_pixelsPerSec;
                     const outX = EVENT_LEFT_PANEL_WIDTH + (layer.outPoint - event_viewStartTime) * event_pixelsPerSec;
                     if (Math.abs(x - inX) <= EVENT_LAYER_HANDLE_WIDTH || Math.abs(x - outX) <= EVENT_LAYER_HANDLE_WIDTH) cursor = 'ew-resize';
@@ -504,16 +489,15 @@ window.event_onGlobalMouseMove = function (e) {
         });
         event_draw();
     } else if (event_state === 'rect-select') {
-        // 矩形選択中は絶対座標で更新
-        event_rectEndPos = { x: x, y: absoluteY };
+        event_rectEndPos = { x: x, y: clickY };
         event_draw();
     } else if (event_state === 'drag-layer-order') {
         let curY = EVENT_HEADER_HEIGHT;
         let targetIdx = -1;
-        // absoluteY で比較
+        // clickY (absoluteY) で比較
         for (let i = 0; i < event_data.layers.length; i++) {
             const h = EVENT_TRACK_HEIGHT + (event_data.layers[i].expanded ? Object.keys(event_data.layers[i].tracks).length * EVENT_TRACK_HEIGHT : 0);
-            if (absoluteY >= curY && absoluteY < curY + h) { targetIdx = i; break; }
+            if (clickY >= curY && clickY < curY + h) { targetIdx = i; break; }
             curY += h;
         }
         if (targetIdx !== -1 && targetIdx !== event_dragTarget.layerIdx) {
@@ -567,7 +551,12 @@ window.event_onGlobalMouseMove = function (e) {
         if (event_state === 'drag-layer-in') layer.inPoint = Math.min(event_snapTime(layer.inPoint + dt), layer.outPoint);
         else if (event_state === 'drag-layer-out') layer.outPoint = Math.max(event_snapTime(layer.outPoint + dt), layer.inPoint);
         else {
-            layer.inPoint += dt; layer.outPoint += dt;
+            layer.inPoint += dt; 
+            layer.outPoint += dt;
+            // 修正: 音やアニメーションの開始位置もずらす
+            if (layer.startTime !== undefined) {
+                layer.startTime += dt;
+            }
             Object.values(layer.tracks).forEach(tr => tr.keys && tr.keys.forEach(k => k.time += dt));
         }
         event_dragStartPos = { x: e.clientX, y: e.clientY };
@@ -579,14 +568,11 @@ window.event_onGlobalMouseUp = function (e) {
     if (event_state === 'drag-pickwhip') {
         const rect = event_canvasTimeline.getBoundingClientRect();
         const x = e.clientX - rect.left;
-        const clickY = e.clientY - rect.top; 
-        const scrollY = event_timelineContainer.scrollTop;
-        const absoluteY = clickY + scrollY;
-
+        const y = e.clientY - rect.top; // Absolute Y
         let curY = EVENT_HEADER_HEIGHT;
         let targetIdx = -1;
         for (let i = 0; i < event_data.layers.length; i++) {
-            if (absoluteY >= curY && absoluteY < curY + EVENT_TRACK_HEIGHT && x < EVENT_LEFT_PANEL_WIDTH) { targetIdx = i; break; }
+            if (y >= curY && y < curY + EVENT_TRACK_HEIGHT && x < EVENT_LEFT_PANEL_WIDTH) { targetIdx = i; break; }
             curY += EVENT_TRACK_HEIGHT + (event_data.layers[i].expanded ? Object.keys(event_data.layers[i].tracks).length * EVENT_TRACK_HEIGHT : 0);
         }
         if (targetIdx !== -1 && targetIdx !== event_pickWhipSourceLayerIdx) {
@@ -605,13 +591,11 @@ window.event_onGlobalMouseUp = function (e) {
             if (iLayer.expanded) {
                 Object.keys(iLayer.tracks).forEach(prop => {
                     const track = iLayer.tracks[prop];
-                    // トラック行が矩形範囲内か判定
                     if (curY + EVENT_TRACK_HEIGHT > y1 && curY < y2) {
                         if (track.keys) {
                             track.keys.forEach(key => {
                                 const kx = EVENT_LEFT_PANEL_WIDTH + (key.time - event_viewStartTime) * event_pixelsPerSec;
                                 const ky = curY + EVENT_TRACK_HEIGHT / 2;
-                                // キーフレーム位置が矩形内か
                                 if (kx >= x1 && kx <= x2 && ky >= y1 && ky <= y2) {
                                     if (!event_selectedKeys.some(sk => sk.keyObj === key)) {
                                         event_selectedKeys.push({ layerIdx: i, prop: prop, keyObj: key });
@@ -638,8 +622,6 @@ window.event_onGlobalMouseUp = function (e) {
             });
         } else {
             const initVal = (t.trackType === 'vector2') ? Math.abs(t.startVal).toFixed(1) : t.startVal.toString();
-            // インライン入力は画面座標で表示したいが、dragTargetに保存したoriginYは絶対座標かもしれない
-            // check-value-edit時の originY は clickY (View Y) なのでそのまま使用可
             event_showInlineInput(t.originX - 40, t.originY, initVal, t.trackType, (val) => {
                 event_pushHistory();
                 if (t.trackType === 'vector2') {
@@ -667,7 +649,6 @@ window.event_onPreviewMouseDown = function (e) {
     const mx = (e.clientX - rect.left) / event_previewScale;
     const my = (e.clientY - rect.top) / event_previewScale;
 
-    // 前面（インデックスが小さい方）から判定
     for (let i = 0; i < event_data.layers.length; i++) {
         const layer = event_data.layers[i];
         if (event_currentTime < layer.inPoint || event_currentTime > layer.outPoint || layer.type === 'audio') continue;
@@ -752,8 +733,6 @@ window.event_showInlineInput = function (x, y, initialValue, trackType, callback
     input.style.position = 'absolute';
     const rect = event_canvasTimeline.getBoundingClientRect();
     input.style.left = (rect.left + x) + 'px';
-    // inline inputは画面上の絶対位置(yはView Yで渡される想定)
-    // dblClickなどから呼ばれるときは clickY (View Y) が渡されている
     input.style.top = (rect.top + y) + 'px';
     input.style.width = '80px'; input.style.zIndex = '3000';
     const commit = () => {
