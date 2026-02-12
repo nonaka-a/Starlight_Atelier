@@ -1,11 +1,11 @@
 /**
  * イベントエディタ: ロジック
- * Step 16: コピー＆ペースト対応
+ * Step 19: キーフレーム複数選択コピペ対応
  * Step 1 (Update): イージング機能（AE準拠）、親子関係、スケール連動初期値
  */
 
 // クリップボード (メモリ内)
-let event_clipboardKey = null; // { value: ..., type: ... }
+let event_clipboard = null; // { type: 'keys', items: [...] }
 
 // イージング関数定義 (基本計算用)
 const event_easingFunctions = {
@@ -26,33 +26,90 @@ window.event_findAssetById = function (id, list = event_data.assets) {
 };
 
 window.event_copySelectedKeyframe = function () {
-    if (!event_selectedKey) return;
-    // キーフレームオブジェクト全体をコピー
-    event_clipboardKey = JSON.parse(JSON.stringify(event_selectedKey.keyObj));
-    console.log("Keyframe copied");
+    if (!event_selectedKeys || event_selectedKeys.length === 0) return;
+
+    // 選択されたキーの中で最小の時間を基準とする
+    const minTime = Math.min(...event_selectedKeys.map(k => k.keyObj.time));
+
+    event_clipboard = {
+        type: 'keys',
+        items: event_selectedKeys.map(sk => ({
+            prop: sk.prop, // プロパティ名
+            // 値とイージング情報をディープコピー
+            value: JSON.parse(JSON.stringify(sk.keyObj.value)),
+            interpolation: sk.keyObj.interpolation,
+            easeIn: sk.keyObj.easeIn,
+            easeOut: sk.keyObj.easeOut,
+            // 基準時間からのオフセット
+            offset: sk.keyObj.time - minTime
+        }))
+    };
+    console.log(`Copied ${event_selectedKeys.length} keys`);
 };
 
 window.event_pasteKeyframe = function () {
-    if (!event_clipboardKey || event_selectedLayerIndex === -1) return;
+    if (!event_clipboard || event_clipboard.type !== 'keys') return;
 
-    if (event_selectedKey) {
-        // 同じプロパティにペースト
-        const { layerIdx, prop } = event_selectedKey;
-        const val = event_clipboardKey.value; // 値
-
-        // 値を更新
-        const key = event_updateKeyframe(layerIdx, prop, event_currentTime, val);
-
-        // イージング・補間設定もペースト
-        key.easeIn = event_clipboardKey.easeIn;
-        key.easeOut = event_clipboardKey.easeOut;
-        key.interpolation = event_clipboardKey.interpolation;
-
-        event_draw();
-        console.log("Keyframe pasted");
-    } else {
-        console.log("No track selected for paste");
+    // ペースト先のレイヤー決定
+    let targetLayerIdx = event_selectedLayerIndex;
+    
+    // レイヤーが選択されていない場合、コピー元のレイヤー(選択中のキーがあればそのレイヤー)を優先
+    if (targetLayerIdx === -1 && event_selectedKeys.length > 0) {
+        targetLayerIdx = event_selectedKeys[0].layerIdx;
     }
+
+    if (targetLayerIdx === -1 || !event_data.layers[targetLayerIdx]) {
+        console.log("No layer selected for paste");
+        return;
+    }
+
+    event_pushHistory();
+    const layer = event_data.layers[targetLayerIdx];
+    const baseTime = event_currentTime;
+
+    // 貼り付け後に選択状態にするためのリスト
+    const newSelectedKeys = [];
+
+    event_clipboard.items.forEach(item => {
+        // ターゲットレイヤーに同じ名前のトラックがあるか確認
+        if (!layer.tracks[item.prop]) return;
+
+        const track = layer.tracks[item.prop];
+        // 再生ヘッド(現在時刻)を基準にオフセットを加算
+        const pasteTime = event_snapTime(baseTime + item.offset);
+        
+        // 既存キーを検索して更新、なければ追加
+        let existingKey = track.keys.find(k => Math.abs(k.time - pasteTime) < 0.001);
+        const valCopy = JSON.parse(JSON.stringify(item.value));
+        
+        if (existingKey) {
+            existingKey.value = valCopy;
+            existingKey.interpolation = item.interpolation;
+            existingKey.easeIn = item.easeIn;
+            existingKey.easeOut = item.easeOut;
+            newSelectedKeys.push({ layerIdx: targetLayerIdx, prop: item.prop, keyObj: existingKey });
+        } else {
+            const newKey = {
+                time: pasteTime,
+                value: valCopy,
+                interpolation: item.interpolation || 'Linear',
+                easeIn: !!item.easeIn,
+                easeOut: !!item.easeOut
+            };
+            track.keys.push(newKey);
+            track.keys.sort((a, b) => a.time - b.time);
+            newSelectedKeys.push({ layerIdx: targetLayerIdx, prop: item.prop, keyObj: newKey });
+        }
+    });
+
+    // ペーストしたキーを選択状態にする
+    if (newSelectedKeys.length > 0) {
+        event_selectedKeys = newSelectedKeys;
+        event_selectedKey = newSelectedKeys[0];
+    }
+
+    event_draw();
+    console.log("Pasted keys");
 };
 
 /**
@@ -83,6 +140,7 @@ window.event_duplicateLayer = function (layerIdx) {
     // 複製したレイヤーを選択状態にする
     event_selectedLayerIndex = layerIdx;
     event_selectedKey = null;
+    event_selectedKeys = [];
 
     event_draw();
     console.log("Layer duplicated:", clone.name);
@@ -658,11 +716,8 @@ window.anim_integrateToEvent = function () {
     // タイルセットのソースを取得
     let tilesetSrc = "";
     if (window.anim_img instanceof HTMLImageElement) {
-        // すでにパス（../image/...等）を持っている場合はそれを使う
-        // DataURL(data:image/...)の場合はそのまま保持される
         tilesetSrc = window.anim_img.getAttribute('src') || window.anim_img.src;
     } else if (window.anim_img instanceof HTMLCanvasElement) {
-        // キャンバス（連結画像等）の場合は現状Base64化せざるを得ない
         tilesetSrc = window.anim_img.toDataURL();
     }
 
