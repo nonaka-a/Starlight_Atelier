@@ -1,6 +1,6 @@
 /**
  * イベントエディタ: 描画関連
- * Step 17: 矩形選択の描画追加
+ * Step 18 (Fix): 矩形選択描画修正
  */
 
 // UI定数のオーバーライド
@@ -582,7 +582,7 @@ window.event_draw = function () {
         ctx.beginPath(); ctx.moveTo(lineX, scrollY + EVENT_HEADER_HEIGHT); ctx.lineTo(lineX, h); ctx.stroke();
     }
 
-    // --- 矩形選択範囲の描画 (スクロール補正済み) ---
+    // --- 矩形選択範囲の描画 ---
     if (event_state === 'rect-select') {
         const x1 = Math.min(event_rectStartPos.x, event_rectEndPos.x);
         const x2 = Math.max(event_rectStartPos.x, event_rectEndPos.x);
@@ -592,9 +592,10 @@ window.event_draw = function () {
         ctx.strokeStyle = '#0ff';
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]);
-        ctx.strokeRect(x1, y1 - scrollY, x2 - x1, y2 - y1);
+        // ここでの y は論理座標なので、そのまま描画してOK（canvas自体が全高を持つため）
+        ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
         ctx.fillStyle = 'rgba(0, 255, 255, 0.1)';
-        ctx.fillRect(x1, y1 - scrollY, x2 - x1, y2 - y1);
+        ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
         ctx.setLineDash([]);
     }
 };

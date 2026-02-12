@@ -1,6 +1,6 @@
 /**
  * イベントエディタ: 入力処理
- * Step 17 (Fix): 複数選択・移動対応、および関数定義の欠落修正
+ * Step 18: 矩形選択の判定ロジック修正
  */
 
 // Pick Whip用ステート変数
@@ -52,7 +52,6 @@ window.event_showKeyframeMenu = function (x, y, layerIdx, prop, keyObj) {
     menu.style.zIndex = '2000';
     menu.style.boxShadow = '0 2px 10px rgba(0,0,0,0.5)';
 
-    // 選択中のキーフレームすべてに対して適用するために対象リストを作成
     const targets = event_selectedKeys.length > 0 && event_selectedKeys.some(k => k.keyObj === keyObj)
         ? event_selectedKeys.map(k => k.keyObj)
         : [keyObj];
@@ -116,7 +115,6 @@ window.event_showKeyframeMenu = function (x, y, layerIdx, prop, keyObj) {
     document.body.appendChild(menu);
 };
 
-// --- ボタンからメニューを開く ---
 window.event_openKeyframeMenuFromButton = function (e) {
     if (!event_selectedKey) {
         alert("キーフレームを選択してください");
@@ -130,17 +128,14 @@ window.event_openKeyframeMenuFromButton = function (e) {
     event_showKeyframeMenu(x, y, layerIdx, prop, keyObj);
 };
 
-// --- ダブルクリック処理 ---
 window.event_onTimelineDblClick = function (e) {
     const rect = event_canvasTimeline.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top; // キャンバス内絶対Y座標
+    const clickY = e.clientY - rect.top; 
     const scrollY = event_timelineContainer.scrollTop;
 
-    // ヘッダー固定エリア(見た目)はガード
     if ((clickY - scrollY) < EVENT_HEADER_HEIGHT) return;
 
-    // トラック判定は絶対座標 clickY をそのまま使用
     let currentY = EVENT_HEADER_HEIGHT;
     for (let i = 0; i < event_data.layers.length; i++) {
         const layer = event_data.layers[i];
@@ -175,10 +170,10 @@ window.event_updateSeekFromMouse = function (x) {
 window.event_onTimelineMouseDown = function (e) {
     const rect = event_canvasTimeline.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top; // キャンバス内絶対Y座標
+    const clickY = e.clientY - rect.top; // Absolute Y
     const scrollY = event_timelineContainer.scrollTop;
 
-    // --- 1. ヘッダー判定 (固定エリア) ---
+    // ヘッダー判定 (見た目Y座標)
     if ((clickY - scrollY) < EVENT_HEADER_HEIGHT) {
         if (e.button === 0 && x > EVENT_LEFT_PANEL_WIDTH) {
             event_state = 'scrub-time';
@@ -187,7 +182,6 @@ window.event_onTimelineMouseDown = function (e) {
         return;
     }
 
-    // --- 2. トラックコンテンツ判定 ---
     const y = clickY;
 
     // 右クリック判定
@@ -202,7 +196,6 @@ window.event_onTimelineMouseDown = function (e) {
                         for (let key of layer.tracks[prop].keys) {
                             const kx = EVENT_LEFT_PANEL_WIDTH + (key.time - event_viewStartTime) * event_pixelsPerSec;
                             if (Math.abs(x - kx) <= EVENT_KEYFRAME_HIT_RADIUS) {
-                                // 選択に含まれていなければ単一選択にする
                                 const isSelected = event_selectedKeys.some(k => k.keyObj === key);
                                 if (!isSelected) {
                                     event_selectedKeys = [{ layerIdx: i, prop: prop, keyObj: key }];
@@ -223,17 +216,17 @@ window.event_onTimelineMouseDown = function (e) {
     }
 
     let currentY = EVENT_HEADER_HEIGHT;
+    // トラック内での操作があったかどうか（無ければ矩形選択へ）
     let hitSomething = false;
 
     for (let i = 0; i < event_data.layers.length; i++) {
         const layer = event_data.layers[i];
 
-        // レイヤーメイン行
+        // レイヤー行
         if (y >= currentY && y < currentY + EVENT_TRACK_HEIGHT) {
-            hitSomething = true;
             if (x < EVENT_LEFT_PANEL_WIDTH) {
+                hitSomething = true;
                 const fromRight = EVENT_LEFT_PANEL_WIDTH - x;
-                // ゴミ箱
                 if (fromRight >= UI_LAYOUT.TRASH_RIGHT - 20 && fromRight <= UI_LAYOUT.TRASH_RIGHT) {
                     if (confirm("レイヤーを削除しますか？")) {
                         event_pushHistory();
@@ -243,19 +236,16 @@ window.event_onTimelineMouseDown = function (e) {
                     }
                     return;
                 }
-                // 親選択 ◎
                 if (fromRight >= UI_LAYOUT.PICK_RIGHT - 16 && fromRight <= UI_LAYOUT.PICK_RIGHT) {
                     event_state = 'drag-pickwhip';
                     event_pickWhipSourceLayerIdx = i;
                     event_dragStartPos = { x: e.clientX, y: e.clientY };
                     return;
                 }
-                // 親プルダウン
                 if (fromRight >= UI_LAYOUT.PICK_RIGHT + 5 && fromRight <= UI_LAYOUT.PARENT_RIGHT) {
                     event_showParentSelect(e.clientX, e.clientY, i);
                     return;
                 }
-                // 展開
                 if (x < 25) {
                     layer.expanded = !layer.expanded;
                 } else {
@@ -270,38 +260,48 @@ window.event_onTimelineMouseDown = function (e) {
                 if (!e.shiftKey) event_selectedKeys = [];
                 event_draw();
             } else {
-                // タイムラインバー操作
+                // 右パネル（バー操作）
                 const inX = EVENT_LEFT_PANEL_WIDTH + (layer.inPoint - event_viewStartTime) * event_pixelsPerSec;
                 const outX = EVENT_LEFT_PANEL_WIDTH + (layer.outPoint - event_viewStartTime) * event_pixelsPerSec;
+                
+                // バー操作判定
                 if (Math.abs(x - inX) <= EVENT_LAYER_HANDLE_WIDTH) {
+                    hitSomething = true;
                     event_pushHistory(); event_state = 'drag-layer-in'; event_dragTarget = { layerIdx: i };
                 } else if (Math.abs(x - outX) <= EVENT_LAYER_HANDLE_WIDTH) {
+                    hitSomething = true;
                     event_pushHistory(); event_state = 'drag-layer-out'; event_dragTarget = { layerIdx: i };
                 } else if (x > inX && x < outX) {
+                    hitSomething = true;
                     event_pushHistory(); event_state = 'drag-layer-move'; event_dragTarget = { layerIdx: i, startIn: layer.inPoint, startOut: layer.outPoint };
                 } else {
-                    event_selectedLayerIndex = i; event_selectedKey = null;
-                    if (!e.shiftKey) event_selectedKeys = [];
+                    // バー外の空白クリック -> レイヤー選択はするが矩形選択も許可したい場合はここを調整
+                    // ここではレイヤー選択として処理し、hitSomething=trueとする
+                    hitSomething = true;
+                    event_selectedLayerIndex = i; 
+                    if (!e.shiftKey) {
+                        event_selectedKey = null;
+                        event_selectedKeys = [];
+                    }
                 }
                 event_dragStartPos = { x: e.clientX, y: e.clientY };
                 event_draw();
             }
-            return;
+            if (hitSomething) return;
         }
         currentY += EVENT_TRACK_HEIGHT;
 
-        // プロパティトラック行
+        // トラック行
         if (layer.expanded) {
             const props = Object.keys(layer.tracks);
             for (let prop of props) {
                 const track = layer.tracks[prop];
                 if (y >= currentY && y < currentY + EVENT_TRACK_HEIGHT) {
-                    hitSomething = true;
                     if (x < EVENT_LEFT_PANEL_WIDTH) {
+                        hitSomething = true;
                         const fromRight = EVENT_LEFT_PANEL_WIDTH - x;
                         const curVal = event_getInterpolatedValue(i, prop, event_currentTime);
 
-                        // エフェクト削除
                         if (prop.startsWith('fx_') && x >= 15 && x <= 27) {
                             if (confirm(`エフェクト削除: ${track.label}?`)) {
                                 event_pushHistory();
@@ -315,7 +315,6 @@ window.event_onTimelineMouseDown = function (e) {
                             return;
                         }
 
-                        // 数値編集
                         if (track.type === 'vector2') {
                             if (prop === 'scale') {
                                 const cx = EVENT_LEFT_PANEL_WIDTH - 220;
@@ -323,13 +322,11 @@ window.event_onTimelineMouseDown = function (e) {
                                 if (x >= cx + 30 && x <= cx + 55) { event_pushHistory(); event_updateKeyframe(i, prop, event_currentTime, { ...curVal, y: curVal.y * -1 }); event_draw(); return; }
                                 if (x >= EVENT_LEFT_PANEL_WIDTH - 113 && x <= EVENT_LEFT_PANEL_WIDTH - 103) { track.linked = !track.linked; event_draw(); return; }
                             }
-                            // X値
                             if (fromRight >= UI_LAYOUT.VAL_VEC_X_RIGHT - UI_LAYOUT.VAL_VEC_WIDTH && fromRight <= UI_LAYOUT.VAL_VEC_X_RIGHT) {
                                 event_pushHistory(); event_state = 'check-value-edit'; event_dragStartPos = { x: e.clientX, y: e.clientY };
                                 event_dragTarget = { type: 'value', layerIdx: i, prop: prop, subProp: 'x', startVal: curVal.x, step: track.step, trackType: 'vector2', originX: x, originY: clickY, min: track.min, max: track.max, currentRatio: (curVal.x !== 0 ? curVal.y / curVal.x : 1) };
                                 return;
                             }
-                            // Y値
                             if (fromRight >= UI_LAYOUT.VAL_VEC_Y_RIGHT - UI_LAYOUT.VAL_VEC_WIDTH && fromRight <= UI_LAYOUT.VAL_VEC_Y_RIGHT) {
                                 event_pushHistory(); event_state = 'check-value-edit'; event_dragStartPos = { x: e.clientX, y: e.clientY };
                                 event_dragTarget = { type: 'value', layerIdx: i, prop: prop, subProp: 'y', startVal: curVal.y, step: track.step, trackType: 'vector2', originX: x, originY: clickY, min: track.min, max: track.max, currentRatio: (curVal.y !== 0 ? curVal.x / curVal.y : 1) };
@@ -342,7 +339,6 @@ window.event_onTimelineMouseDown = function (e) {
                                 return;
                             }
                         }
-                        // キー追加
                         if (fromRight >= UI_LAYOUT.KEY_ADD_RIGHT - 10 && fromRight <= UI_LAYOUT.KEY_ADD_RIGHT + 10) {
                             event_pushHistory(); const v = event_getInterpolatedValue(i, prop, event_currentTime);
                             const nk = event_updateKeyframe(i, prop, event_currentTime, v);
@@ -351,42 +347,36 @@ window.event_onTimelineMouseDown = function (e) {
                             event_draw(); return;
                         }
                     } else {
-                        // --- キーフレームクリック判定 ---
+                        // 右パネル（キーフレーム）
                         if (track.keys) {
                             for (let key of track.keys) {
                                 const kx = EVENT_LEFT_PANEL_WIDTH + (key.time - event_viewStartTime) * event_pixelsPerSec;
                                 if (Math.abs(x - kx) <= EVENT_KEYFRAME_HIT_RADIUS) {
+                                    hitSomething = true;
                                     
                                     const isSelected = event_selectedKeys.some(sk => sk.keyObj === key);
-                                    
                                     if (e.shiftKey) {
                                         if (isSelected) {
-                                            // 選択解除
                                             event_selectedKeys = event_selectedKeys.filter(sk => sk.keyObj !== key);
                                             event_selectedKey = null;
                                         } else {
-                                            // 追加選択
                                             const newSel = { layerIdx: i, prop, keyObj: key };
                                             event_selectedKeys.push(newSel);
                                             event_selectedKey = newSel;
                                         }
                                     } else {
                                         if (!isSelected) {
-                                            // 新規単一選択
                                             const newSel = { layerIdx: i, prop, keyObj: key };
                                             event_selectedKeys = [newSel];
                                             event_selectedKey = newSel;
                                         }
-                                        // 既に選択済みの場合は選択状態を維持（ドラッグでまとめて移動するため）
                                         event_selectedKey = event_selectedKeys.find(sk => sk.keyObj === key);
                                     }
 
-                                    // ドラッグ開始準備
+                                    // ドラッグ開始
                                     event_pushHistory();
                                     event_state = 'drag-key';
                                     event_dragStartPos = { x: e.clientX, y: e.clientY };
-                                    
-                                    // 選択中の全キーの初期時刻を保存
                                     event_dragTarget = { 
                                         type: 'keys', 
                                         keys: event_selectedKeys.map(sk => ({
@@ -401,6 +391,7 @@ window.event_onTimelineMouseDown = function (e) {
                                 }
                             }
                         }
+                        // ここで hitSomething = true にしないことで、トラック上の空白クリックで矩形選択に流す
                     }
                 }
                 currentY += EVENT_TRACK_HEIGHT;
@@ -408,7 +399,7 @@ window.event_onTimelineMouseDown = function (e) {
         }
     }
 
-    // 何もないところをクリック -> 矩形選択開始
+    // 矩形選択開始（右パネルかつ何もヒットしなかった場合）
     if (!hitSomething && x > EVENT_LEFT_PANEL_WIDTH) {
         event_state = 'rect-select';
         event_rectStartPos = { x: x, y: clickY };
@@ -419,7 +410,7 @@ window.event_onTimelineMouseDown = function (e) {
         }
         event_draw();
     } else if (!hitSomething) {
-        // 左パネルの空白クリックなど
+        // 左パネルの空白クリック等
         if (!e.shiftKey) {
             event_selectedLayerIndex = -1;
             event_selectedKey = null;
@@ -429,7 +420,6 @@ window.event_onTimelineMouseDown = function (e) {
     }
 };
 
-// --- マウス移動処理 ---
 window.event_onGlobalMouseMove = function (e) {
     if (!document.getElementById('mode-event').classList.contains('active')) return;
     window.event_currentMouseX = e.clientX;
@@ -485,27 +475,20 @@ window.event_onGlobalMouseMove = function (e) {
         event_updateKeyframe(t.layerIdx, t.prop, event_currentTime, newVal);
         event_draw();
     } else if (event_state === 'drag-key') {
-        // 相対移動
         const dt = (e.clientX - event_dragStartPos.x) / event_pixelsPerSec;
-        
         event_dragTarget.keys.forEach(item => {
             let newTime = item.startTime + dt;
             newTime = Math.max(0, event_snapTime(newTime));
             item.key.time = newTime;
         });
-
-        // 影響を受けたトラックをソート
         const affectedTracks = new Set();
         event_dragTarget.keys.forEach(item => {
             const layer = event_data.layers[item.layerIdx];
-            if (layer && layer.tracks[item.prop]) {
-                affectedTracks.add(layer.tracks[item.prop]);
-            }
+            if (layer && layer.tracks[item.prop]) affectedTracks.add(layer.tracks[item.prop]);
         });
         affectedTracks.forEach(track => {
             if (track.keys) track.keys.sort((a, b) => a.time - b.time);
         });
-
         event_draw();
     } else if (event_state === 'rect-select') {
         event_rectEndPos = { x: x, y: clickY };
@@ -545,13 +528,9 @@ window.event_onGlobalMouseMove = function (e) {
     } else if (event_state === 'drag-preview') {
         const dx = (e.clientX - event_dragStartPos.x) / event_previewScale;
         const dy = (e.clientY - event_dragStartPos.y) / event_previewScale;
-
         const layerIdx = event_dragTarget.layerIdx;
         const layer = event_data.layers[layerIdx];
-
-        let moveX = dx;
-        let moveY = dy;
-
+        let moveX = dx; let moveY = dy;
         if (layer.parent) {
             const pIdx = event_data.layers.findIndex(l => l.id === layer.parent);
             if (pIdx !== -1) {
@@ -559,14 +538,11 @@ window.event_onGlobalMouseMove = function (e) {
                 const pRad = -pWorld.rotation * Math.PI / 180;
                 const pCos = Math.cos(pRad);
                 const pSin = Math.sin(pRad);
-
                 const lx = (dx * pCos - dy * pSin) / (pWorld.scale.x || 1);
                 const ly = (dx * pSin + dy * pCos) / (pWorld.scale.y || 1);
-                moveX = lx;
-                moveY = ly;
+                moveX = lx; moveY = ly;
             }
         }
-
         const newX = event_dragTarget.startX + moveX;
         const newY = event_dragTarget.startY + moveY;
         event_updateKeyframe(layerIdx, 'position', event_currentTime, { x: newX, y: newY });
@@ -589,7 +565,7 @@ window.event_onGlobalMouseUp = function (e) {
     if (event_state === 'drag-pickwhip') {
         const rect = event_canvasTimeline.getBoundingClientRect();
         const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top; // Absolute Y
+        const y = e.clientY - rect.top; 
         let curY = EVENT_HEADER_HEIGHT;
         let targetIdx = -1;
         for (let i = 0; i < event_data.layers.length; i++) {
@@ -670,26 +646,21 @@ window.event_onPreviewMouseDown = function (e) {
     const mx = (e.clientX - rect.left) / event_previewScale;
     const my = (e.clientY - rect.top) / event_previewScale;
 
-    // 前面（インデックスが小さい方）から判定
     for (let i = 0; i < event_data.layers.length; i++) {
         const layer = event_data.layers[i];
         if (event_currentTime < layer.inPoint || event_currentTime > layer.outPoint || layer.type === 'audio') continue;
 
-        // 画像オブジェクトの取得（アニメーションレイヤー対応）
         let img = layer.imgObj;
         if (layer.type === 'animated_layer') {
             const asset = event_findAssetById(layer.animAssetId);
             if (!img && asset) img = asset.imgObj;
         }
-
         if (!img) continue;
 
-        // ワールドトランスフォームを取得して当たり判定
         const world = event_getLayerWorldTransform(i, event_currentTime);
         const iw = img.naturalWidth || 64;
         const ih = img.naturalHeight || 64;
 
-        // マウス座標をレイヤーのローカル空間に変換
         const dx = mx - world.position.x;
         const dy = my - world.position.y;
         const rad = -world.rotation * Math.PI / 180;
@@ -699,9 +670,7 @@ window.event_onPreviewMouseDown = function (e) {
         const lx = (dx * cos - dy * sin) / (world.scale.x || 1);
         const ly = (dx * sin + dy * cos) / (world.scale.y || 1);
 
-        // アニメーションレイヤーならフレームサイズを参照
-        let hitW = iw;
-        let hitH = ih;
+        let hitW = iw; let hitH = ih;
         if (layer.type === 'animated_layer') {
             const asset = event_findAssetById(layer.animAssetId);
             const currentAnimId = event_getInterpolatedValue(i, "motion", event_currentTime);
@@ -733,12 +702,9 @@ window.event_onKeyDown = function (e) {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
     if (!document.getElementById('mode-event').classList.contains('active')) return;
 
-    // Ctrl+D / Cmd+D (レイヤー複製)
     if ((e.ctrlKey || e.metaKey) && e.code === 'KeyD') {
         e.preventDefault();
-        if (event_selectedLayerIndex !== -1) {
-            event_duplicateLayer(event_selectedLayerIndex);
-        }
+        if (event_selectedLayerIndex !== -1) event_duplicateLayer(event_selectedLayerIndex);
         return;
     }
 
@@ -801,12 +767,9 @@ window.event_showParentSelect = function (x, y, childIdx) {
     menu.style.borderRadius = '4px';
 
     const currentParentId = event_data.layers[childIdx].parent;
-
     const options = [
         { id: null, name: "なし" },
-        ...event_data.layers
-            .filter(l => l.id !== event_data.layers[childIdx].id)
-            .map(l => ({ id: l.id, name: l.name }))
+        ...event_data.layers.filter(l => l.id !== event_data.layers[childIdx].id).map(l => ({ id: l.id, name: l.name }))
     ];
 
     options.forEach(opt => {
@@ -815,13 +778,7 @@ window.event_showParentSelect = function (x, y, childIdx) {
         item.style.cursor = 'pointer';
         item.style.fontSize = '12px';
         item.style.color = (opt.id === currentParentId) ? '#66aa44' : '#fff';
-        item.style.display = 'flex';
-        item.style.alignItems = 'center';
-
-        let label = opt.name;
-        if (opt.id === currentParentId) label = '✓ ' + label;
-        item.textContent = label;
-
+        item.textContent = (opt.id === currentParentId ? '✓ ' : '') + opt.name;
         item.onmouseover = () => item.style.backgroundColor = '#444';
         item.onmouseout = () => item.style.backgroundColor = '';
         item.onclick = (e) => {
