@@ -1,13 +1,13 @@
 /**
  * イベントエディタ: 描画関連
- * Step 28 (Fix): drawImageエラー対策、トラック選択UI位置調整
+ * Step 29: 親レイヤー名の表示対応
  */
 
 // UI定数のオーバーライド
 Object.assign(UI_LAYOUT, {
     VAL_VEC_X_RIGHT: 175,
     VAL_VEC_Y_RIGHT: 100,
-    AUDIO_TRACK_SEL_RIGHT: 180, // 230 -> 180 (右へ移動: 左パネル幅からの距離)
+    AUDIO_TRACK_SEL_RIGHT: 180, // 右へ移動
     AUDIO_TRACK_SEL_WIDTH: 50
 });
 
@@ -101,8 +101,6 @@ let event_offscreenCtx = null;
 // 厳密なチェック関数
 function event_isValidDrawable(obj) {
     if (!obj) return false;
-    // HTMLImageElement, HTMLCanvasElement, ImageBitmap, OffscreenCanvas のいずれかであることを確認
-    // かつ、幅・高さが0でないこと
     try {
         if (obj instanceof HTMLImageElement) {
             return obj.complete && obj.naturalWidth > 0 && obj.naturalHeight > 0;
@@ -350,9 +348,27 @@ window.event_draw = function () {
             
             const pickX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PICK_RIGHT;
             ctx.strokeStyle = '#aaa'; ctx.beginPath(); ctx.arc(pickX+8, currentY+15, 6, 0, Math.PI*2); ctx.stroke();
+            
             const parentX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PARENT_RIGHT;
-            ctx.fillStyle = '#222'; ctx.fillRect(parentX, currentY+4, 85, EVENT_TRACK_HEIGHT-8);
-            ctx.fillStyle = '#ccc'; ctx.fillText(layer.parent ? "親あり" : "なし", parentX+4, currentY+18);
+            const parentW = UI_LAYOUT.PARENT_RIGHT - UI_LAYOUT.PICK_RIGHT - 5;
+            ctx.fillStyle = '#222'; ctx.fillRect(parentX, currentY+4, parentW, EVENT_TRACK_HEIGHT-8);
+            
+            // ★親レイヤー名の表示
+            let parentLabel = "なし";
+            if (layer.parent) {
+                const p = event_data.layers.find(l => l.id === layer.parent);
+                if (p) parentLabel = p.name;
+                else parentLabel = "?";
+            }
+            ctx.fillStyle = '#ccc'; 
+            let dispParent = parentLabel;
+            const maxPW = parentW - 10;
+            if (ctx.measureText(dispParent).width > maxPW) {
+                while (ctx.measureText(dispParent + '..').width > maxPW && dispParent.length > 0) dispParent = dispParent.slice(0, -1);
+                dispParent += '..';
+            }
+            ctx.fillText(dispParent, parentX+4, currentY+18);
+
             const trashX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.TRASH_RIGHT;
             ctx.fillStyle = '#d44'; ctx.fillRect(trashX, currentY+5, 20, 20); ctx.fillStyle = '#fff'; ctx.fillText("×", trashX+6, currentY+19);
 
@@ -374,8 +390,6 @@ window.event_draw = function () {
                         const wfX = EVENT_LEFT_PANEL_WIDTH + (layer.inPoint - startT - event_viewStartTime) * event_pixelsPerSec;
                         ctx.save(); ctx.beginPath(); ctx.rect(barX, currentY+4, barW, EVENT_TRACK_HEIGHT-8); ctx.clip();
                         ctx.globalAlpha=0.8; 
-                        
-                        // エラー対策: drawImage前にチェック
                         if (event_isValidDrawable(asset.waveform)) {
                             try {
                                 ctx.drawImage(asset.waveform, wfX, currentY+4, asset.duration*event_pixelsPerSec, EVENT_TRACK_HEIGHT-8);
@@ -405,7 +419,6 @@ window.event_draw = function () {
                         ctx.fillStyle = '#fff'; ctx.font = 'bold 10px sans-serif'; ctx.fillText('×', delBtnX + 2, delBtnY + 9);
                     }
 
-                    // 音声レイヤーのトラック選択UI
                     if (layer.type === 'audio' && propName === 'volume') {
                         const trX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.AUDIO_TRACK_SEL_RIGHT;
                         const currentTrack = (layer.trackIdx !== undefined ? layer.trackIdx : 0) + 1;
@@ -507,8 +520,6 @@ window.event_draw = function () {
                         const wfX = EVENT_LEFT_PANEL_WIDTH + (layer.inPoint - startT - event_viewStartTime) * event_pixelsPerSec;
                         ctx.globalAlpha = 0.5;
                         ctx.save(); ctx.beginPath(); ctx.rect(barX, trackY+4, barW, EVENT_TRACK_HEIGHT-8); ctx.clip();
-                        
-                        // エラー対策
                         if (event_isValidDrawable(asset.waveform)) {
                             try {
                                 ctx.drawImage(asset.waveform, wfX, trackY+4, asset.duration*event_pixelsPerSec, EVENT_TRACK_HEIGHT-8);

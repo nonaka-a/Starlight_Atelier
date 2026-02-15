@@ -11,27 +11,6 @@
       "fps": 30,
       "layers": [
         {
-          "id": "layer_audio_1771141528802",
-          "type": "audio",
-          "name": "jump.mp3",
-          "assetId": "audio_17707274773710.4861996141200261",
-          "startTime": 0.6166666666666666,
-          "inPoint": 0.6166666666666666,
-          "outPoint": 0.7721315192743763,
-          "expanded": false,
-          "tracks": {
-            "volume": {
-              "label": "Volume (dB)",
-              "type": "number",
-              "keys": [],
-              "min": -60,
-              "max": 12,
-              "step": 0.1,
-              "initialValue": 0
-            }
-          }
-        },
-        {
           "id": "layer_text_1771140084310",
           "type": "text",
           "name": "Text Layer",
@@ -44,15 +23,15 @@
           "shadowOpacity": 0,
           "parent": null,
           "expanded": false,
-          "inPoint": 3,
-          "outPoint": 10,
+          "inPoint": 0.9351351351351329,
+          "outPoint": 7.93513513513514,
           "tracks": {
             "position": {
               "label": "Position",
               "type": "vector2",
               "keys": [
                 {
-                  "time": 3.2333333333333334,
+                  "time": 1.168468468468467,
                   "value": {
                     "x": 495.1807228915663,
                     "y": 66.26506024096383
@@ -600,6 +579,27 @@
           }
         },
         {
+          "id": "layer_1771154011469_778",
+          "type": "audio",
+          "name": "jump.mp3 コピー",
+          "assetId": "audio_17707274773710.4861996141200261",
+          "startTime": 0.6166666666666666,
+          "inPoint": 0.6333333333333333,
+          "outPoint": 0.7721315192743763,
+          "expanded": false,
+          "tracks": {
+            "volume": {
+              "label": "Volume (dB)",
+              "type": "number",
+              "keys": [],
+              "min": -60,
+              "max": 12,
+              "step": 0.1,
+              "initialValue": 0
+            }
+          }
+        },
+        {
           "id": "layer_audio_1770701295286",
           "type": "audio",
           "name": "fire.mp3",
@@ -633,7 +633,8 @@
               "step": 0.1,
               "initialValue": 0
             }
-          }
+          },
+          "trackIdx": 1
         },
         {
           "id": "layer_audio_1770701264560",
@@ -662,7 +663,8 @@
               "step": 0.1,
               "initialValue": 0
             }
-          }
+          },
+          "trackIdx": 3
         }
       ]
     },
