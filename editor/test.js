@@ -69,7 +69,7 @@ async function loadProject(json) {
 
     info.textContent = "Loading assets...";
     await restoreAssetsRecursive(projectData.assets);
-    
+
     // フォント読み込み待ち
     await document.fonts.ready;
 
@@ -127,7 +127,7 @@ async function restoreAssetsRecursive(items) {
 
     async function loadAudio(url) {
         if (!audioCtx) return null;
-        
+
         const fetchAudio = async (path) => {
             const response = await fetch(path);
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -242,7 +242,7 @@ function syncAudio(activeComp, time) {
         let audioState = audioLayers[layer.id];
 
         if (isActive) {
-            const offset = (time - inPoint) + (layer.startTime || 0);
+            const offset = time - (layer.startTime !== undefined ? layer.startTime : inPoint);
             const volumeDb = getInterpolatedValue(layer, "volume", time);
             const gain = Math.pow(10, volumeDb / 20);
 
@@ -259,7 +259,7 @@ function syncAudio(activeComp, time) {
 
                 let startOffset = offset;
                 if (layer.loop) startOffset = offset % asset.audioBuffer.duration;
-                
+
                 if (startOffset < asset.audioBuffer.duration) {
                     source.start(0, startOffset);
                     audioLayers[layer.id] = { source, gainNode, lastPlayedTime: time };
@@ -297,7 +297,7 @@ function applyTransform(ctx, layer, layers, time) {
     const pos = getInterpolatedValue(layer, "position", time);
     const lScale = getInterpolatedValue(layer, "scale", time);
     const rot = getInterpolatedValue(layer, "rotation", time);
-    
+
     ctx.translate(pos.x, pos.y);
     ctx.rotate(rot * Math.PI / 180);
     ctx.scale((lScale.x || 100) / 100, (lScale.y || 100) / 100);
@@ -307,7 +307,7 @@ let lastTime = 0;
 
 function update(now) {
     if (!isLoaded || !activeComp) return;
-    
+
     const elapsed = (now - startTime) / 1000;
     const duration = activeComp.duration || 10;
     const time = elapsed % duration;
@@ -330,13 +330,13 @@ function update(now) {
     for (let i = layers.length - 1; i >= 0; i--) {
         const layer = layers[i];
         if (layer.type === 'audio') continue;
-        
+
         const inP = layer.inPoint || 0;
         const outP = layer.outPoint || duration;
         if (time < inP || time > outP) continue;
 
         ctx.save();
-        
+
         const opacity = getInterpolatedValue(layer, "opacity", time);
         ctx.globalAlpha = opacity / 100;
 
@@ -362,14 +362,14 @@ function update(now) {
             const strokeColor = layer.strokeColor || '#000000';
             const strokeWidth = layer.strokeWidth || 0;
             const shadowOpacity = layer.shadowOpacity || 0;
-            
+
             const typewriter = getInterpolatedValue(layer, "typewriter", time);
             const letterSpacing = getInterpolatedValue(layer, "letterSpacing", time);
 
             ctx.font = `bold ${fontSize}px ${fontFamily}`;
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            
+
             const lines = text.split('\n');
             const lineHeight = fontSize * 1.2;
             const totalHeight = lines.length * lineHeight;
@@ -377,7 +377,7 @@ function update(now) {
 
             const totalChars = text.replace(/\n/g, '').length;
             const visibleCharCount = Math.floor(totalChars * (Math.max(0, Math.min(100, typewriter)) / 100));
-            
+
             let charCounter = 0;
 
             lines.forEach((line, lineIdx) => {
@@ -391,7 +391,7 @@ function update(now) {
                 if (chars.length > 0) lineWidth -= letterSpacing;
 
                 let currentX = -lineWidth / 2;
-                
+
                 chars.forEach((char, charIdx) => {
                     if (charCounter < visibleCharCount) {
                         const cw = charWidths[charIdx];
@@ -419,7 +419,7 @@ function update(now) {
 
                         ctx.fillStyle = color;
                         ctx.fillText(char, drawX, drawY);
-                        
+
                         currentX += cw + letterSpacing;
                         charCounter++;
                     }

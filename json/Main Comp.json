@@ -11,27 +11,6 @@
       "fps": 30,
       "layers": [
         {
-          "id": "layer_audio_1771141575243",
-          "type": "audio",
-          "name": "fire.mp3",
-          "assetId": "audio_17707012899660.7578531144581818",
-          "startTime": -0.027211111111859733,
-          "inPoint": -0.027211111111859733,
-          "outPoint": 60.132788888888136,
-          "expanded": true,
-          "tracks": {
-            "volume": {
-              "label": "Volume (dB)",
-              "type": "number",
-              "keys": [],
-              "min": -60,
-              "max": 12,
-              "step": 0.1,
-              "initialValue": 0
-            }
-          }
-        },
-        {
           "id": "layer_audio_1771141528802",
           "type": "audio",
           "name": "jump.mp3",
