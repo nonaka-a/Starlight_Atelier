@@ -2,6 +2,7 @@
  * イベントエディタ: コア (変数定義・初期化・ループ)
  * Step 14: コンポジション切り替え対応、初期画像読み込み修正
  * Step 1 (Update): レイアウト定数変更
+ * Text Layer 対応: フォント読み込み待ち追加
  */
 
 // --- 変数定義 ---
@@ -178,7 +179,7 @@ const UI_LAYOUT = {
     VAL_SINGLE_RIGHT: 120,
     VAL_SINGLE_WIDTH: 80,
     VAL_VEC_Y_RIGHT: 100,
-    VAL_VEC_X_RIGHT: 170,
+    VAL_VEC_X_RIGHT: 175,
     VAL_VEC_WIDTH: 60
 };
 
@@ -201,6 +202,12 @@ let event_selectedKey = null;
 // --- 初期化 ---
 window.initEventEditor = function () {
     if (event_initialized) return;
+
+    // フォント読み込み待ち (これがないと初回描画でフォントが適用されない)
+    document.fonts.ready.then(() => {
+        console.log("Fonts loaded.");
+        if (event_initialized) event_draw(); 
+    });
 
     event_canvasPreview = document.getElementById('event-preview-canvas');
     event_canvasTimeline = document.getElementById('event-timeline-canvas');
@@ -296,11 +303,15 @@ function event_loop(timestamp) {
                 event_currentTime = 0;
             }
 
-            const canvasW = event_canvasTimeline ? event_canvasTimeline.width : 0;
+            // 再生中はヘッド追従 (簡易スクロール)
+            // 仮想スクロール化してもここでの計算は同じ
+            const canvasW = event_timelineContainer.clientWidth;
             const timelineW = canvasW - EVENT_LEFT_PANEL_WIDTH;
             const headScreenX = (event_currentTime - event_viewStartTime) * event_pixelsPerSec;
             if (headScreenX > timelineW * 0.9) {
                 event_viewStartTime = event_currentTime - (timelineW * 0.1) / event_pixelsPerSec;
+                // スクロールバーの位置も更新
+                event_timelineContainer.scrollLeft = event_viewStartTime * event_pixelsPerSec;
             }
             // オーディオの同期
             event_syncAudio();

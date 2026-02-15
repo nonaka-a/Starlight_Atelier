@@ -5,6 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>開発統合エディタ (Map & Anim & Chart & Event)</title>
+    <!-- Google Fonts for Text Layers -->
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: sans-serif;
@@ -701,10 +703,26 @@
                         style="padding: 5px 10px; font-size: 0.9rem;">ブラー (Blur)</div>
                 </div>
             </div>
+            <!-- テキスト追加ボタンをここに移動し、ラベルを短縮 -->
+            <button onclick="event_addTextLayer()" style="background:#d84; width:30px; padding:5px 0;">T</button>
         </div>
         <div class="tool-group">
             <button onclick="event_exportJSON()" style="background:#6a4;">💾 JSON書出</button>
             <button onclick="event_importJSON()" style="background:#559;">📂 JSON読込</button>
+        </div>
+        
+        <!-- 元のテキスト追加ボタンがあった tool-group は削除または空なら削除 -->
+        
+        <div id="event-text-props" class="tool-group" style="display:none; align-items: center; gap: 5px; background: #444; padding: 2px 8px; border-radius: 4px;">
+            <!-- (中身は変更なし) -->
+            <span style="font-size:0.8rem; color:#aaa;">Text:</span>
+            <input type="text" id="inp-text-content" style="width: 120px;" oninput="event_onTextPropertyChange('text')">
+            <input type="number" id="inp-text-size" value="40" style="width: 40px;" onchange="event_onTextPropertyChange('fontSize')">
+            <span style="font-size:0.8rem; color:#aaa;">px</span>
+            <input type="color" id="inp-text-color" value="#ffffff" onchange="event_onTextPropertyChange('color')" style="width:24px; height:24px; padding:0; border:none;">
+            <span style="font-size:0.8rem; color:#aaa;">Str:</span>
+            <input type="color" id="inp-text-stroke-color" value="#000000" onchange="event_onTextPropertyChange('strokeColor')" style="width:24px; height:24px; padding:0; border:none;">
+            <input type="number" id="inp-text-stroke-w" value="0" style="width: 30px;" onchange="event_onTextPropertyChange('strokeWidth')">
         </div>
         <div class="tool-group">
             <button id="btn-event-play" onclick="event_togglePlay()">▶ 再生</button>

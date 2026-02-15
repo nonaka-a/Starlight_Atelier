@@ -775,3 +775,87 @@ window.event_getLayerAnimationNames = function (layerIdx) {
 
     return Object.keys(asset.data);
 };
+
+// --- テキストレイヤーを追加 ---
+window.event_addTextLayer = function () {
+    event_pushHistory();
+
+    const cx = event_data.composition.width / 2;
+    const cy = event_data.composition.height / 2;
+
+    const newLayer = {
+        id: 'layer_text_' + Date.now(),
+        type: 'text',
+        name: 'Text Layer',
+        // テキスト固有プロパティ (非アニメーション)
+        text: "テキストを入力\n改行も可能",
+        fontSize: 60,
+        fontFamily: '"M PLUS Rounded 1c", sans-serif',
+        color: '#ffffff',
+        strokeColor: '#000000',
+        strokeWidth: 0,
+        
+        parent: null,
+        expanded: true,
+        inPoint: 0,
+        outPoint: event_data.composition.duration,
+        tracks: {
+            "position": { label: "Position", type: "vector2", keys: [], step: 1, initialValue: { x: cx, y: cy } },
+            "scale": { label: "Scale", type: "vector2", linked: true, keys: [], step: 1, initialValue: { x: 100, y: 100 } },
+            "rotation": { label: "Rotation", type: "rotation", keys: [], min: -3600, max: 3600, step: 1, initialValue: 0 },
+            "opacity": { label: "Opacity", type: "number", keys: [], min: 0, max: 100, step: 1, initialValue: 100 },
+            // テキスト固有トラック
+            "typewriter": { label: "Typewriter (%)", type: "number", keys: [], min: 0, max: 100, step: 1, initialValue: 100 },
+            "letterSpacing": { label: "Tracking (px)", type: "number", keys: [], step: 1, initialValue: 0 }
+        }
+    };
+
+    event_data.layers.unshift(newLayer);
+    event_selectedLayerIndex = 0;
+    event_draw();
+};
+
+/**
+ * UIからのテキストプロパティ変更反映
+ */
+window.event_onTextPropertyChange = function (prop) {
+    if (event_selectedLayerIndex === -1) return;
+    const layer = event_data.layers[event_selectedLayerIndex];
+    if (layer.type !== 'text') return;
+
+    let val;
+    if (prop === 'text') val = document.getElementById('inp-text-content').value;
+    else if (prop === 'fontSize') val = parseInt(document.getElementById('inp-text-size').value);
+    else if (prop === 'color') val = document.getElementById('inp-text-color').value;
+    else if (prop === 'strokeColor') val = document.getElementById('inp-text-stroke-color').value;
+    else if (prop === 'strokeWidth') val = parseInt(document.getElementById('inp-text-stroke-w').value);
+
+    layer[prop] = val;
+    event_draw();
+};
+
+/**
+ * 選択レイヤーに応じてテキストUIの状態を更新
+ * (event_drawなどで呼ばれる)
+ */
+window.event_updateTextPropertyUI = function () {
+    const ui = document.getElementById('event-text-props');
+    if (!ui) return;
+
+    // 編集中（フォーカス中）は更新しない
+    if (document.activeElement && ui.contains(document.activeElement)) return;
+
+    if (event_selectedLayerIndex !== -1) {
+        const layer = event_data.layers[event_selectedLayerIndex];
+        if (layer && layer.type === 'text') {
+            ui.style.display = 'flex';
+            document.getElementById('inp-text-content').value = layer.text;
+            document.getElementById('inp-text-size').value = layer.fontSize;
+            document.getElementById('inp-text-color').value = layer.color;
+            document.getElementById('inp-text-stroke-color').value = layer.strokeColor;
+            document.getElementById('inp-text-stroke-w').value = layer.strokeWidth;
+            return;
+        }
+    }
+    ui.style.display = 'none';
+};

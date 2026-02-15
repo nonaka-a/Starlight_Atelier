@@ -1,7 +1,6 @@
 /**
  * イベントエディタ: 描画関連
- * Step 20: タイムラインの横スクロール対応（仮想スクロール実装）
- * 固定ヘッダー・固定左パネル対応
+ * 仮想スクロール、テキストレイヤー描画、矩形選択描画
  */
 
 // UI定数のオーバーライド
@@ -18,7 +17,9 @@ function event_formatValue(val, type) {
         return `${rev}x ${deg}°`;
     }
     if (type === 'string') return val;
-    return val.toFixed(1);
+    if (typeof val === 'number') return val.toFixed(1);
+    if (val && typeof val === 'object') return "[Vec]";
+    return val;
 }
 
 // プレビューズーム計算
@@ -128,7 +129,7 @@ window.event_draw = function () {
     const containerW = event_timelineContainer.clientWidth;
     const containerH = event_timelineContainer.clientHeight;
 
-    // スクロール用ダミー要素の生成・取得
+    // スクロール用ダミー要素
     let scrollDummy = document.getElementById('event-timeline-scroll-dummy');
     if (!scrollDummy) {
         scrollDummy = document.createElement('div');
@@ -136,24 +137,21 @@ window.event_draw = function () {
         scrollDummy.style.position = 'absolute';
         scrollDummy.style.top = '0';
         scrollDummy.style.left = '0';
-        scrollDummy.style.zIndex = '0'; // Canvasの下に配置
-        scrollDummy.style.pointerEvents = 'none'; // クリック透過
+        scrollDummy.style.zIndex = '0';
+        scrollDummy.style.pointerEvents = 'none';
         event_timelineContainer.appendChild(scrollDummy);
 
-        // Canvasをスティッキー配置にして常に画面内に留める
         event_canvasTimeline.style.position = 'sticky';
         event_canvasTimeline.style.left = '0';
         event_canvasTimeline.style.top = '0';
         event_canvasTimeline.style.zIndex = '1';
 
-        // スクロール時に再描画
         event_timelineContainer.onscroll = () => {
             window.event_draw();
         };
     }
 
-    // コンテンツ全体のサイズ計算
-    const totalContentWidth = EVENT_LEFT_PANEL_WIDTH + (event_data.composition.duration || 10) * event_pixelsPerSec + 400; // 余白多めに
+    const totalContentWidth = EVENT_LEFT_PANEL_WIDTH + (event_data.composition.duration || 10) * event_pixelsPerSec + 400; 
     let totalTracks = 0;
     event_data.layers.forEach(l => {
         totalTracks++;
@@ -161,11 +159,9 @@ window.event_draw = function () {
     });
     const totalContentHeight = Math.max(containerH, EVENT_HEADER_HEIGHT + totalTracks * EVENT_TRACK_HEIGHT + 100);
 
-    // ダミー要素のサイズ設定（これによりスクロールバーが出る）
     scrollDummy.style.width = totalContentWidth + 'px';
     scrollDummy.style.height = totalContentHeight + 'px';
 
-    // Canvasサイズは表示領域に合わせる
     if (event_canvasTimeline.width !== containerW || event_canvasTimeline.height !== containerH) {
         event_canvasTimeline.width = containerW;
         event_canvasTimeline.height = containerH;
@@ -216,7 +212,77 @@ window.event_draw = function () {
         let drawW = 0, drawH = 0;
         let drawAnchorX = 0, drawAnchorY = 0;
 
-        if (layer.type === 'animated_layer') {
+        // --- テキストレイヤー描画 ---
+        if (layer.type === 'text') {
+            const text = layer.text || "";
+            const fontSize = layer.fontSize || 40;
+            const fontFamily = layer.fontFamily || 'sans-serif';
+            const color = layer.color || '#ffffff';
+            const strokeColor = layer.strokeColor || '#000000';
+            const strokeWidth = layer.strokeWidth || 0;
+            
+            const typewriter = event_getInterpolatedValue(idx, "typewriter", drawTime);
+            const letterSpacing = event_getInterpolatedValue(idx, "letterSpacing", drawTime);
+
+            osCtx.font = `bold ${fontSize}px ${fontFamily}`;
+            osCtx.textAlign = "center";
+            osCtx.textBaseline = "middle";
+            
+            const lines = text.split('\n');
+            const lineHeight = fontSize * 1.2;
+            const totalHeight = lines.length * lineHeight;
+            let startY = -(totalHeight / 2) + (lineHeight / 2);
+
+            const totalChars = text.replace(/\n/g, '').length;
+            const visibleCharCount = Math.floor(totalChars * (Math.max(0, Math.min(100, typewriter)) / 100));
+            
+            let charCounter = 0;
+
+            lines.forEach((line, lineIdx) => {
+                let lineWidth = 0;
+                const chars = line.split('');
+                const charWidths = chars.map(c => {
+                    const w = osCtx.measureText(c).width;
+                    lineWidth += w + letterSpacing;
+                    return w;
+                });
+                if (chars.length > 0) lineWidth -= letterSpacing;
+
+                let currentX = -lineWidth / 2;
+                
+                chars.forEach((char, charIdx) => {
+                    if (charCounter < visibleCharCount) {
+                        const cw = charWidths[charIdx];
+                        const drawX = currentX + cw / 2;
+                        const drawY = startY + lineIdx * lineHeight;
+
+                        osCtx.fillStyle = color;
+                        osCtx.fillText(char, drawX, drawY);
+                        
+                        if (strokeWidth > 0) {
+                            osCtx.lineWidth = strokeWidth;
+                            osCtx.strokeStyle = strokeColor;
+                            osCtx.lineJoin = 'round';
+                            osCtx.strokeText(char, drawX, drawY);
+                        }
+                        
+                        currentX += cw + letterSpacing;
+                        charCounter++;
+                    }
+                });
+            });
+
+            let maxW = 0;
+            lines.forEach(l => {
+                const w = osCtx.measureText(l).width + (l.length - 1) * letterSpacing;
+                if (w > maxW) maxW = w;
+            });
+            drawW = maxW + strokeWidth; 
+            drawH = totalHeight + strokeWidth;
+            drawAnchorX = -drawW / 2;
+            drawAnchorY = -drawH / 2;
+
+        } else if (layer.type === 'animated_layer') {
             const asset = event_findAssetById(layer.animAssetId);
             const currentAnimId = event_getInterpolatedValue(idx, "motion", drawTime);
             if (asset && asset.data[currentAnimId]) {
@@ -311,7 +377,6 @@ window.event_draw = function () {
     ctx.beginPath(); ctx.rect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, h); ctx.clip();
     const compDurationX = EVENT_LEFT_PANEL_WIDTH + (event_data.composition.duration - event_viewStartTime) * event_pixelsPerSec;
     
-    // 尺外のエリアを暗くする
     if (compDurationX < w) {
         ctx.fillStyle = '#111';
         ctx.fillRect(compDurationX, 0, w - compDurationX, h);
@@ -326,12 +391,11 @@ window.event_draw = function () {
     }
     ctx.restore();
 
-    // トラック描画ループ
+    // トラック描画
     let currentY = EVENT_HEADER_HEIGHT - scrollY; // 縦スクロール位置を適用
     
     event_data.layers.forEach((layer, layerIdx) => {
-        // 画面外（上または下）のトラックは描画スキップ（カリング）
-        // ただしトラック高さ計算のため currentY の加算は行う
+        // カリング（画面外は描画スキップ）
         const isVisible = (currentY + EVENT_TRACK_HEIGHT > EVENT_HEADER_HEIGHT && currentY < h);
         
         if (isVisible) {
@@ -368,7 +432,7 @@ window.event_draw = function () {
                     ctx.fillText("🖼️", iconX, currentY + 20);
                 }
             } else {
-                ctx.fillText(layer.type === 'audio' ? "🔊" : "📄", iconX, currentY + 20);
+                ctx.fillText(layer.type === 'audio' ? "🔊" : (layer.type === 'text' ? "T" : "📄"), iconX, currentY + 20);
             }
 
             ctx.fillStyle = '#fff';
@@ -436,11 +500,9 @@ window.event_draw = function () {
                     if (asset && asset.waveform) {
                         const startT = layer.startTime;
                         const wfCanvas = asset.waveform;
-                        // 波形全体のピクセル幅
                         const waveformW = asset.duration * event_pixelsPerSec;
                         const waveformX = EVENT_LEFT_PANEL_WIDTH + (startT - event_viewStartTime) * event_pixelsPerSec;
 
-                        // 描画範囲のクリッピング
                         ctx.save();
                         ctx.beginPath();
                         ctx.rect(barX, currentY + 4, barW, EVENT_TRACK_HEIGHT - 8);
@@ -553,6 +615,7 @@ window.event_draw = function () {
                             const kx = EVENT_LEFT_PANEL_WIDTH + (key.time - event_viewStartTime) * event_pixelsPerSec;
                             const ky = currentY + EVENT_TRACK_HEIGHT / 2;
                             const isSelected = (event_selectedKey && event_selectedKey.keyObj === key) || (event_selectedKeys && event_selectedKeys.some(sk => sk.keyObj === key));
+                            // ドラッグ中のハイライト
                             const isDragging = (event_dragTarget && event_dragTarget.type === 'keys' && event_dragTarget.keys.some(k => k.key === key));
                             const isHold = (key.interpolation === 'Hold');
                             const isEase = (key.easeIn || key.easeOut);
@@ -581,10 +644,12 @@ window.event_draw = function () {
     });
 
     // --- 固定ヘッダーの描画 ---
-    // 固定ヘッダーはスクロールの影響を受けないように、絶対位置（Canvas上部）に描画
-    // ただし、Canvas自体はStickyなので常に画面上部にいる。
-    // 時間目盛り等のX軸は viewStartTime で調整済み。
     ctx.save();
+    // 固定ヘッダーはスクロールの影響を受けないように、絶対位置（Canvas上部）に描画
+    // ただし、トラック描画で translate してないので、ヘッダー描画はそのまま
+    // *重要* scrollYはトラック描画には影響するが、ヘッダーは常に上部に張り付く必要がある
+    // ここで一旦クリップを解除して上書き描画
+    
     // ヘッダー背景
     ctx.fillStyle = '#333';
     ctx.fillRect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT);
@@ -654,4 +719,6 @@ window.event_draw = function () {
         ctx.fillRect(x1, y1 - scrollY, x2 - x1, y2 - y1);
         ctx.setLineDash([]);
     }
+
+    if (window.event_updateTextPropertyUI) window.event_updateTextPropertyUI();
 };
