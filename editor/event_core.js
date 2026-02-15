@@ -3,6 +3,7 @@
  * Step 14: コンポジション切り替え対応、初期画像読み込み修正
  * Step 1 (Update): レイアウト定数変更
  * Text Layer 対応: フォント読み込み待ち追加
+ * Audio Track: 結合モードフラグ追加
  */
 
 // --- 変数定義 ---
@@ -17,6 +18,7 @@ let event_initialized = false;
 let event_isPlaying = false;
 let event_currentTime = 0;
 let event_lastTimestamp = 0;
+let event_audioCompactMode = true; // ★追加: 音声トラック結合モード (true: プレミア風, false: AE風)
 
 // 表示設定
 let event_pixelsPerSec = 50;
@@ -203,7 +205,7 @@ let event_selectedKey = null;
 window.initEventEditor = function () {
     if (event_initialized) return;
 
-    // フォント読み込み待ち (これがないと初回描画でフォントが適用されない)
+    // フォント読み込み待ち
     document.fonts.ready.then(() => {
         console.log("Fonts loaded.");
         if (event_initialized) event_draw(); 
@@ -304,13 +306,11 @@ function event_loop(timestamp) {
             }
 
             // 再生中はヘッド追従 (簡易スクロール)
-            // 仮想スクロール化してもここでの計算は同じ
             const canvasW = event_timelineContainer.clientWidth;
             const timelineW = canvasW - EVENT_LEFT_PANEL_WIDTH;
             const headScreenX = (event_currentTime - event_viewStartTime) * event_pixelsPerSec;
             if (headScreenX > timelineW * 0.9) {
                 event_viewStartTime = event_currentTime - (timelineW * 0.1) / event_pixelsPerSec;
-                // スクロールバーの位置も更新
                 event_timelineContainer.scrollLeft = event_viewStartTime * event_pixelsPerSec;
             }
             // オーディオの同期

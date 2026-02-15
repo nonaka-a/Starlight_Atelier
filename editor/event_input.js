@@ -1,6 +1,6 @@
 /**
  * イベントエディタ: 入力処理
- * Step 25 (Fix): レイヤー移動時のstartTime更新復活、スクロール挙動修正
+ * Step 29 (Fix): クリック判定ロジックを描画ロジック(View座標)と統一してズレを解消
  */
 
 // Pick Whip用ステート変数
@@ -134,21 +134,27 @@ window.event_onTimelineDblClick = function (e) {
     const clickY = e.clientY - rect.top; 
     const scrollY = event_timelineContainer.scrollTop;
 
-    // ヘッダー判定
-    if ((clickY - scrollY) < EVENT_HEADER_HEIGHT) return;
+    // ヘッダー判定 (見た目Y座標)
+    if (clickY < EVENT_HEADER_HEIGHT) return;
 
-    // 絶対Y座標
-    const absoluteY = clickY + scrollY;
+    // View座標系 (描画ロジックと同じ基準)
+    let currentY = EVENT_HEADER_HEIGHT - scrollY;
 
-    let currentY = EVENT_HEADER_HEIGHT;
     for (let i = 0; i < event_data.layers.length; i++) {
         const layer = event_data.layers[i];
-        if (absoluteY >= currentY && absoluteY < currentY + EVENT_TRACK_HEIGHT) {
+        
+        // 結合モード時は音声レイヤーをスキップ
+        if (event_audioCompactMode && layer.type === 'audio') continue;
+
+        if (clickY >= currentY && clickY < currentY + EVENT_TRACK_HEIGHT) {
             const nameStart = 50;
             const nameEnd = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PARENT_RIGHT - 10;
             if (x >= nameStart && x <= nameEnd) {
-                // インプット表示位置はスクロールを考慮して渡す
-                const inputY = currentY - scrollY + 4; 
+                // インプット表示位置
+                const inputY = currentY + 4; // View座標
+                // ただし showInlineInput に渡すYは、rect.top からのオフセットなので clickY ベースでOKだが、
+                // トラックの上端に合わせるために currentY を使う
+                // event_showInlineInputは (rect.top + y) で表示するので、View座標(currentY)を渡せばOK
                 event_showInlineInput(x, inputY, layer.name, 'string', (newName) => {
                     if (newName && newName.trim() !== "") {
                         event_pushHistory();
@@ -176,7 +182,7 @@ window.event_updateSeekFromMouse = function (x) {
 window.event_onTimelineMouseDown = function (e) {
     const rect = event_canvasTimeline.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top; // Absolute Y
+    const clickY = e.clientY - rect.top; // View Y (Canvas内の表示位置)
     const scrollY = event_timelineContainer.scrollTop;
 
     // ヘッダー判定 (見た目Y座標)
@@ -188,18 +194,23 @@ window.event_onTimelineMouseDown = function (e) {
         return;
     }
 
-    // コンテンツの絶対座標
-    const absoluteY = clickY + scrollY;
+    const absoluteY = clickY + scrollY; // 矩形選択やドラッグ計算用には絶対座標も保持
+
+    // 判定用変数: 描画ロジックと同じ View座標系 (currentScreenY) を使う
+    let currentScreenY = EVENT_HEADER_HEIGHT - scrollY;
 
     // 右クリック判定
     if (e.button === 2) {
-        let curY = EVENT_HEADER_HEIGHT;
         for (let i = 0; i < event_data.layers.length; i++) {
             const layer = event_data.layers[i];
-            curY += EVENT_TRACK_HEIGHT;
+            
+            // 結合モード時は音声レイヤーをスキップ
+            if (event_audioCompactMode && layer.type === 'audio') continue;
+
+            currentScreenY += EVENT_TRACK_HEIGHT; // レイヤー行スキップ
             if (layer.expanded) {
                 for (let prop of Object.keys(layer.tracks)) {
-                    if (absoluteY >= curY && absoluteY < curY + EVENT_TRACK_HEIGHT) {
+                    if (clickY >= currentScreenY && clickY < currentScreenY + EVENT_TRACK_HEIGHT) {
                         for (let key of layer.tracks[prop].keys) {
                             const kx = EVENT_LEFT_PANEL_WIDTH + (key.time - event_viewStartTime) * event_pixelsPerSec;
                             if (Math.abs(x - kx) <= EVENT_KEYFRAME_HIT_RADIUS) {
@@ -215,21 +226,26 @@ window.event_onTimelineMouseDown = function (e) {
                             }
                         }
                     }
-                    curY += EVENT_TRACK_HEIGHT;
+                    currentScreenY += EVENT_TRACK_HEIGHT;
                 }
             }
         }
         return;
     }
 
-    let currentY = EVENT_HEADER_HEIGHT;
+    // 左クリック判定リセット
+    currentScreenY = EVENT_HEADER_HEIGHT - scrollY;
     let hitSomething = false;
 
+    // --- 通常レイヤー判定 ---
     for (let i = 0; i < event_data.layers.length; i++) {
         const layer = event_data.layers[i];
 
+        // 結合モード時は音声レイヤーをスキップ
+        if (event_audioCompactMode && layer.type === 'audio') continue;
+
         // レイヤー行
-        if (absoluteY >= currentY && absoluteY < currentY + EVENT_TRACK_HEIGHT) {
+        if (clickY >= currentScreenY && clickY < currentScreenY + EVENT_TRACK_HEIGHT) {
             if (x < EVENT_LEFT_PANEL_WIDTH) {
                 hitSomething = true;
                 const fromRight = EVENT_LEFT_PANEL_WIDTH - x;
@@ -249,6 +265,7 @@ window.event_onTimelineMouseDown = function (e) {
                     return;
                 }
                 if (fromRight >= UI_LAYOUT.PICK_RIGHT + 5 && fromRight <= UI_LAYOUT.PARENT_RIGHT) {
+                    // 親選択メニューはView座標でOK（メニュー表示関数内でfixed配置するならclientX/Yを使う）
                     event_showParentSelect(e.clientX, e.clientY, i);
                     return;
                 }
@@ -258,7 +275,7 @@ window.event_onTimelineMouseDown = function (e) {
                     event_pushHistory();
                     event_state = 'drag-layer-order';
                     event_selectedLayerIndex = i;
-                    event_dragTarget = { layerIdx: i };
+                    event_dragTarget = { layerIdx: i, originScreenY: currentScreenY }; // View座標を保存
                     event_dragStartPos = { x: e.clientX, y: e.clientY };
                 }
                 event_selectedLayerIndex = i;
@@ -292,14 +309,14 @@ window.event_onTimelineMouseDown = function (e) {
             }
             if (hitSomething) return;
         }
-        currentY += EVENT_TRACK_HEIGHT;
+        currentScreenY += EVENT_TRACK_HEIGHT;
 
         // トラック行
         if (layer.expanded) {
             const props = Object.keys(layer.tracks);
             for (let prop of props) {
                 const track = layer.tracks[prop];
-                if (absoluteY >= currentY && absoluteY < currentY + EVENT_TRACK_HEIGHT) {
+                if (clickY >= currentScreenY && clickY < currentScreenY + EVENT_TRACK_HEIGHT) {
                     if (x < EVENT_LEFT_PANEL_WIDTH) {
                         hitSomething = true;
                         const fromRight = EVENT_LEFT_PANEL_WIDTH - x;
@@ -318,8 +335,22 @@ window.event_onTimelineMouseDown = function (e) {
                             return;
                         }
 
+                        // 音声トラック選択UI
+                        if (layer.type === 'audio' && prop === 'volume') {
+                            if (fromRight >= UI_LAYOUT.AUDIO_TRACK_SEL_RIGHT - UI_LAYOUT.AUDIO_TRACK_SEL_WIDTH && fromRight <= UI_LAYOUT.AUDIO_TRACK_SEL_RIGHT) {
+                                const currentTrack = (layer.trackIdx !== undefined ? layer.trackIdx : 0) + 1;
+                                // View座標 (currentScreenY) + 4px をY座標として渡す
+                                event_showTrackSelectMenu(e.clientX, currentScreenY + 4 + rect.top, currentTrack, (newTrackVal) => {
+                                    event_pushHistory();
+                                    layer.trackIdx = newTrackVal - 1;
+                                    event_draw();
+                                });
+                                return;
+                            }
+                        }
+
                         // 数値入力位置 (View Y)
-                        const inputY = currentY - scrollY + 4;
+                        const inputY = currentScreenY + 4;
 
                         if (track.type === 'vector2') {
                             if (prop === 'scale') {
@@ -396,11 +427,50 @@ window.event_onTimelineMouseDown = function (e) {
                         }
                     }
                 }
-                currentY += EVENT_TRACK_HEIGHT;
+                currentScreenY += EVENT_TRACK_HEIGHT;
             }
         }
     }
 
+    // --- 音声トラックエリア判定 (Compact Mode) ---
+    if (event_audioCompactMode) {
+        for (let t = 0; t < 4; t++) {
+            if (clickY >= currentScreenY && clickY < currentScreenY + EVENT_TRACK_HEIGHT) {
+                // このトラック(t)内のレイヤーを探す
+                for (let i = 0; i < event_data.layers.length; i++) {
+                    const layer = event_data.layers[i];
+                    if (layer.type !== 'audio') continue;
+                    const tr = (layer.trackIdx !== undefined) ? layer.trackIdx : 0;
+                    if (tr !== t) continue;
+
+                    const inX = EVENT_LEFT_PANEL_WIDTH + (layer.inPoint - event_viewStartTime) * event_pixelsPerSec;
+                    const outX = EVENT_LEFT_PANEL_WIDTH + (layer.outPoint - event_viewStartTime) * event_pixelsPerSec;
+                    
+                    if (x >= inX && x <= outX && x > EVENT_LEFT_PANEL_WIDTH) {
+                        hitSomething = true;
+                        // 端か中か
+                        if (Math.abs(x - inX) <= EVENT_LAYER_HANDLE_WIDTH) {
+                            event_pushHistory(); event_state = 'drag-layer-in'; event_dragTarget = { layerIdx: i };
+                        } else if (Math.abs(x - outX) <= EVENT_LAYER_HANDLE_WIDTH) {
+                            event_pushHistory(); event_state = 'drag-layer-out'; event_dragTarget = { layerIdx: i };
+                        } else {
+                            event_pushHistory(); 
+                            event_state = 'drag-layer-move'; 
+                            // ★ドラッグ開始時のView座標(currentScreenY)を基準点として保存
+                            event_dragTarget = { layerIdx: i, startIn: layer.inPoint, startOut: layer.outPoint, startTrack: t, originScreenY: currentScreenY };
+                        }
+                        event_selectedLayerIndex = i;
+                        event_dragStartPos = { x: e.clientX, y: e.clientY };
+                        event_draw();
+                        return; // ヒットしたら終了
+                    }
+                }
+            }
+            currentScreenY += EVENT_TRACK_HEIGHT;
+        }
+    }
+
+    // 矩形選択開始 (絶対座標を使用)
     if (!hitSomething && x > EVENT_LEFT_PANEL_WIDTH) {
         event_state = 'rect-select';
         event_rectStartPos = { x: x, y: absoluteY };
@@ -435,15 +505,30 @@ window.event_onGlobalMouseMove = function (e) {
     if (event_state === 'idle') {
         let cursor = 'default';
         if (x > EVENT_LEFT_PANEL_WIDTH && clickY > EVENT_HEADER_HEIGHT) {
-            let currentY = EVENT_HEADER_HEIGHT;
+            let currentScreenY = EVENT_HEADER_HEIGHT - scrollY;
             for (let layer of event_data.layers) {
-                if (absoluteY >= currentY && absoluteY < currentY + EVENT_TRACK_HEIGHT) {
+                // 通常レイヤー判定
+                if (event_audioCompactMode && layer.type === 'audio') continue;
+
+                if (clickY >= currentScreenY && clickY < currentScreenY + EVENT_TRACK_HEIGHT) {
                     const inX = EVENT_LEFT_PANEL_WIDTH + (layer.inPoint - event_viewStartTime) * event_pixelsPerSec;
                     const outX = EVENT_LEFT_PANEL_WIDTH + (layer.outPoint - event_viewStartTime) * event_pixelsPerSec;
                     if (Math.abs(x - inX) <= EVENT_LAYER_HANDLE_WIDTH || Math.abs(x - outX) <= EVENT_LAYER_HANDLE_WIDTH) cursor = 'ew-resize';
                     else if (x > inX && x < outX) cursor = 'move';
                 }
-                currentY += EVENT_TRACK_HEIGHT + (layer.expanded ? Object.keys(layer.tracks).length * EVENT_TRACK_HEIGHT : 0);
+                currentScreenY += EVENT_TRACK_HEIGHT + (layer.expanded ? Object.keys(layer.tracks).length * EVENT_TRACK_HEIGHT : 0);
+            }
+            
+            // Audio Compact Mode判定
+            if (event_audioCompactMode) {
+                // 線
+                if (currentScreenY > EVENT_HEADER_HEIGHT) { /* Divider */ }
+                for (let t = 0; t < 4; t++) {
+                     if (clickY >= currentScreenY && clickY < currentScreenY + EVENT_TRACK_HEIGHT) {
+                         // クリップ上なら move/resize (簡易判定: トラック内全クリップをループするのは重いので省略か、必要なら実装)
+                     }
+                     currentScreenY += EVENT_TRACK_HEIGHT;
+                }
             }
         }
         event_canvasTimeline.style.cursor = cursor;
@@ -495,13 +580,20 @@ window.event_onGlobalMouseMove = function (e) {
         event_rectEndPos = { x: x, y: absoluteY };
         event_draw();
     } else if (event_state === 'drag-layer-order') {
-        let curY = EVENT_HEADER_HEIGHT;
+        let currentScreenY = EVENT_HEADER_HEIGHT - scrollY;
         let targetIdx = -1;
+        
+        // clickY (View Y) で比較
         for (let i = 0; i < event_data.layers.length; i++) {
-            const h = EVENT_TRACK_HEIGHT + (event_data.layers[i].expanded ? Object.keys(event_data.layers[i].tracks).length * EVENT_TRACK_HEIGHT : 0);
-            if (absoluteY >= curY && absoluteY < curY + h) { targetIdx = i; break; }
-            curY += h;
+             // Compact Mode スキップは本来ここにも必要だが、並べ替え中は全レイヤー計算対象にするのが自然か？
+             // いや、見えているものだけで判定すべき。
+             if (event_audioCompactMode && event_data.layers[i].type === 'audio') continue;
+             
+             const h = EVENT_TRACK_HEIGHT + (event_data.layers[i].expanded ? Object.keys(event_data.layers[i].tracks).length * EVENT_TRACK_HEIGHT : 0);
+             if (clickY >= currentScreenY && clickY < currentScreenY + h) { targetIdx = i; break; }
+             currentScreenY += h;
         }
+        
         if (targetIdx !== -1 && targetIdx !== event_dragTarget.layerIdx) {
             const item = event_data.layers.splice(event_dragTarget.layerIdx, 1)[0];
             event_data.layers.splice(targetIdx, 0, item);
@@ -550,18 +642,34 @@ window.event_onGlobalMouseMove = function (e) {
     } else if (event_state === 'drag-layer-in' || event_state === 'drag-layer-out' || event_state === 'drag-layer-move') {
         const dt = (e.clientX - event_dragStartPos.x) / event_pixelsPerSec;
         const layer = event_data.layers[event_dragTarget.layerIdx];
-        if (event_state === 'drag-layer-in') layer.inPoint = Math.min(event_snapTime(layer.inPoint + dt), layer.outPoint);
-        else if (event_state === 'drag-layer-out') layer.outPoint = Math.max(event_snapTime(layer.outPoint + dt), layer.inPoint);
-        else {
+        
+        if (event_state === 'drag-layer-in') {
+            layer.inPoint = Math.min(event_snapTime(layer.inPoint + dt), layer.outPoint);
+        } else if (event_state === 'drag-layer-out') {
+            layer.outPoint = Math.max(event_snapTime(layer.outPoint + dt), layer.inPoint);
+        } else {
+            // move
             layer.inPoint += dt; 
             layer.outPoint += dt;
-            // ★重要: 移動時は startTime もずらす（音/アニメの再生開始位置を維持するため）
             if (layer.startTime !== undefined) {
                 layer.startTime += dt;
             }
             Object.values(layer.tracks).forEach(tr => tr.keys && tr.keys.forEach(k => k.time += dt));
+
+            // 音声トラック間の移動 (Compact Mode時)
+            if (event_audioCompactMode && layer.type === 'audio' && event_dragTarget.startTrack !== undefined) {
+                // View座標同士の差分 (clickY - originScreenY) を使う
+                // ※ absoluteY - originY だと、スクロールしたときにずれる可能性があるため、View座標で統一
+                const dy = clickY - event_dragTarget.originScreenY; 
+                const trackDiff = Math.round(dy / EVENT_TRACK_HEIGHT);
+                const newTrack = event_dragTarget.startTrack + trackDiff;
+                if (newTrack >= 0 && newTrack < 4) {
+                    layer.trackIdx = newTrack;
+                }
+            }
         }
         event_dragStartPos = { x: e.clientX, y: e.clientY };
+        
         event_draw();
     }
 };
@@ -570,9 +678,9 @@ window.event_onGlobalMouseUp = function (e) {
     if (event_state === 'drag-pickwhip') {
         const rect = event_canvasTimeline.getBoundingClientRect();
         const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top; 
+        const clickY = e.clientY - rect.top; 
         const scrollY = event_timelineContainer.scrollTop;
-        const absoluteY = y + scrollY;
+        const absoluteY = clickY + scrollY;
 
         let curY = EVENT_HEADER_HEIGHT;
         let targetIdx = -1;
@@ -627,6 +735,11 @@ window.event_onGlobalMouseUp = function (e) {
             });
         } else {
             const initVal = (t.trackType === 'vector2') ? Math.abs(t.startVal).toFixed(1) : t.startVal.toString();
+            // originY は View座標 で渡されている
+            const inputY = t.originY + (event_canvasTimeline.getBoundingClientRect().top);
+            // event_showInlineInput は絶対座標(screen)を期待する実装になっているか？ 
+            // -> event_input.js冒頭の実装では `rect.top + y` としている。
+            // つまり t.originY が「Canvas内Y」ならOK。
             event_showInlineInput(t.originX - 40, t.originY, initVal, t.trackType, (val) => {
                 event_pushHistory();
                 if (t.trackType === 'vector2') {
@@ -670,7 +783,6 @@ window.event_onPreviewMouseDown = function (e) {
         let hitW = 64, hitH = 64;
         
         if (layer.type === 'text') {
-            // テキストのヒット判定 (簡易計測 + プレビューコンテキスト利用)
             const fontSize = layer.fontSize || 40;
             const text = layer.text || "";
             const fontFamily = layer.fontFamily || 'sans-serif';
@@ -684,7 +796,6 @@ window.event_onPreviewMouseDown = function (e) {
                     const w = event_ctxPreview.measureText(line).width;
                     if (w > maxW) maxW = w;
                 });
-                // 字間
                 const letterSpacing = event_getInterpolatedValue(i, "letterSpacing", event_currentTime) || 0;
                 if (letterSpacing !== 0) {
                     let maxLen = 0;
@@ -835,6 +946,49 @@ window.event_showParentSelect = function (x, y, childIdx) {
         menu.appendChild(item);
     });
 
+    const closeMenu = (e) => {
+        if (!menu.contains(e.target)) {
+            if (menu.parentNode) menu.remove();
+            window.removeEventListener('mousedown', closeMenu);
+        }
+    };
+    setTimeout(() => window.addEventListener('mousedown', closeMenu), 10);
+    document.body.appendChild(menu);
+};
+
+window.event_showTrackSelectMenu = function(x, y, currentTrack, callback) {
+    const oldMenu = document.getElementById('event-track-select-menu');
+    if (oldMenu) oldMenu.remove();
+
+    const menu = document.createElement('div');
+    menu.id = 'event-track-select-menu';
+    menu.style.position = 'fixed';
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+    menu.style.backgroundColor = '#333';
+    menu.style.border = '1px solid #666';
+    menu.style.padding = '5px 0';
+    menu.style.zIndex = '3000';
+    menu.style.boxShadow = '0 4px 12px rgba(0,0,0,0.5)';
+    
+    [1, 2, 3, 4].forEach(tNum => {
+        const item = document.createElement('div');
+        item.style.padding = '6px 15px';
+        item.style.cursor = 'pointer';
+        item.style.fontSize = '12px';
+        item.style.color = (tNum === currentTrack) ? '#66aa44' : '#fff';
+        item.textContent = `Track ${tNum}` + (tNum === currentTrack ? ' ✓' : '');
+        
+        item.onmouseover = () => item.style.backgroundColor = '#444';
+        item.onmouseout = () => item.style.backgroundColor = '';
+        item.onclick = (e) => {
+            e.stopPropagation();
+            callback(tNum);
+            menu.remove();
+        };
+        menu.appendChild(item);
+    });
+    
     const closeMenu = (e) => {
         if (!menu.contains(e.target)) {
             if (menu.parentNode) menu.remove();

@@ -497,15 +497,35 @@ window.event_addAudioLayer = function (name, assetId) {
     const asset = event_findAssetById(assetId);
     if (!asset || asset.type !== 'audio') return;
 
+    const startT = event_currentTime;
+    const dur = asset.duration || 5;
+
+    // 空いているトラックを探す (簡易ロジック: 0番から順に、時間が被らないトラックを探す)
+    let assignedTrack = 0;
+    for (let t = 0; t < 4; t++) {
+        const isOverlap = event_data.layers.some(l => {
+            if (l.type === 'audio' && (l.trackIdx === undefined ? 0 : l.trackIdx) === t) {
+                // 時間の重なり判定
+                return !(startT + dur <= l.inPoint || startT >= l.outPoint);
+            }
+            return false;
+        });
+        if (!isOverlap) {
+            assignedTrack = t;
+            break;
+        }
+    }
+
     const newLayer = {
         id: 'layer_audio_' + Date.now(),
         type: 'audio',
         name: name,
         assetId: assetId,
-        startTime: event_currentTime,
-        inPoint: event_currentTime,
-        outPoint: event_currentTime + (asset.duration || 5),
+        startTime: startT,
+        inPoint: startT,
+        outPoint: startT + dur,
         expanded: true,
+        trackIdx: assignedTrack, // ★トラック番号 (0~3)
         tracks: {
             "volume": { label: "Volume (dB)", type: "number", keys: [], min: -60, max: 12, step: 0.1, initialValue: 0 }
         }
@@ -513,6 +533,14 @@ window.event_addAudioLayer = function (name, assetId) {
 
     event_data.layers.unshift(newLayer);
     event_selectedLayerIndex = 0;
+    event_draw();
+};
+
+/**
+ * 音声トラックの表示モード切り替え
+ */
+window.event_toggleAudioMode = function() {
+    event_audioCompactMode = !event_audioCompactMode;
     event_draw();
 };
 

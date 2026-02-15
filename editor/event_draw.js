@@ -1,12 +1,14 @@
 /**
  * イベントエディタ: 描画関連
- * Step 25 (Fix): 固定ヘッダー描画位置修正、波形表示位置修正
+ * Step 28 (Fix): drawImageエラー対策、トラック選択UI位置調整
  */
 
 // UI定数のオーバーライド
 Object.assign(UI_LAYOUT, {
     VAL_VEC_X_RIGHT: 175,
-    VAL_VEC_Y_RIGHT: 100
+    VAL_VEC_Y_RIGHT: 100,
+    AUDIO_TRACK_SEL_RIGHT: 180, // 230 -> 180 (右へ移動: 左パネル幅からの距離)
+    AUDIO_TRACK_SEL_WIDTH: 50
 });
 
 // 値フォーマット
@@ -96,12 +98,25 @@ function event_applyLayerTransform(ctx, layerIdx, time) {
 let event_offscreenCanvas = null;
 let event_offscreenCtx = null;
 
+// 厳密なチェック関数
 function event_isValidDrawable(obj) {
     if (!obj) return false;
-    if (obj instanceof HTMLImageElement) {
-        return obj.complete && obj.naturalWidth > 0;
+    // HTMLImageElement, HTMLCanvasElement, ImageBitmap, OffscreenCanvas のいずれかであることを確認
+    // かつ、幅・高さが0でないこと
+    try {
+        if (obj instanceof HTMLImageElement) {
+            return obj.complete && obj.naturalWidth > 0 && obj.naturalHeight > 0;
+        }
+        if (obj instanceof HTMLCanvasElement || obj instanceof OffscreenCanvas) {
+            return obj.width > 0 && obj.height > 0;
+        }
+        if (typeof ImageBitmap !== 'undefined' && obj instanceof ImageBitmap) {
+            return obj.width > 0 && obj.height > 0;
+        }
+    } catch (e) {
+        return false;
     }
-    return (obj instanceof HTMLCanvasElement || obj instanceof OffscreenCanvas || obj instanceof ImageBitmap);
+    return false;
 }
 
 // --- 描画メイン ---
@@ -124,8 +139,19 @@ window.event_draw = function () {
     
     const drawTime = event_snapTime(event_currentTime);
 
-    const containerW = event_timelineContainer.clientWidth;
+    // --- コンテンツ高さ計算 (仮想スクロール用) ---
+    let totalTracksHeight = 0;
+    event_data.layers.forEach(l => {
+        if (event_audioCompactMode && l.type === 'audio') return;
+        totalTracksHeight += EVENT_TRACK_HEIGHT;
+        if (l.expanded) totalTracksHeight += Object.keys(l.tracks).length * EVENT_TRACK_HEIGHT;
+    });
+    const audioAreaHeight = event_audioCompactMode ? (4 * EVENT_TRACK_HEIGHT + 20) : 0;
+    
     const containerH = event_timelineContainer.clientHeight;
+    const containerW = event_timelineContainer.clientWidth;
+    const totalContentHeight = Math.max(containerH, EVENT_HEADER_HEIGHT + totalTracksHeight + audioAreaHeight + 100);
+    const totalContentWidth = EVENT_LEFT_PANEL_WIDTH + (event_data.composition.duration || 10) * event_pixelsPerSec + 400;
 
     let scrollDummy = document.getElementById('event-timeline-scroll-dummy');
     if (!scrollDummy) {
@@ -137,25 +163,12 @@ window.event_draw = function () {
         scrollDummy.style.zIndex = '0';
         scrollDummy.style.pointerEvents = 'none';
         event_timelineContainer.appendChild(scrollDummy);
-
         event_canvasTimeline.style.position = 'sticky';
         event_canvasTimeline.style.left = '0';
         event_canvasTimeline.style.top = '0';
         event_canvasTimeline.style.zIndex = '1';
-
-        event_timelineContainer.onscroll = () => {
-            window.event_draw();
-        };
+        event_timelineContainer.onscroll = () => window.event_draw();
     }
-
-    const totalContentWidth = EVENT_LEFT_PANEL_WIDTH + (event_data.composition.duration || 10) * event_pixelsPerSec + 400; 
-    let totalTracks = 0;
-    event_data.layers.forEach(l => {
-        totalTracks++;
-        if (l.expanded) totalTracks += Object.keys(l.tracks).length;
-    });
-    const totalContentHeight = Math.max(containerH, EVENT_HEADER_HEIGHT + totalTracks * EVENT_TRACK_HEIGHT + 100);
-
     scrollDummy.style.width = totalContentWidth + 'px';
     scrollDummy.style.height = totalContentHeight + 'px';
 
@@ -174,40 +187,27 @@ window.event_draw = function () {
     // --- プレビュー描画 ---
     event_calcPreviewScale();
     const scale = event_previewScale;
-
     const pW = event_data.composition.width * scale;
     const pH = event_data.composition.height * scale;
     if (event_canvasPreview.width !== pW || event_canvasPreview.height !== pH) {
-        event_canvasPreview.width = pW;
-        event_canvasPreview.height = pH;
+        event_canvasPreview.width = pW; event_canvasPreview.height = pH;
     }
-
     if (event_offscreenCanvas.width !== event_data.composition.width || event_offscreenCanvas.height !== event_data.composition.height) {
-        event_offscreenCanvas.width = event_data.composition.width || 100;
-        event_offscreenCanvas.height = event_data.composition.height || 100;
+        event_offscreenCanvas.width = event_data.composition.width || 100; event_offscreenCanvas.height = event_data.composition.height || 100;
     }
-
-    event_ctxPreview.fillStyle = '#000';
-    event_ctxPreview.fillRect(0, 0, pW, pH);
-
-    event_ctxPreview.save();
-    event_ctxPreview.scale(scale, scale);
-
-    const osCtx = event_offscreenCtx;
-    const cw = event_data.composition.width;
-    const ch = event_data.composition.height;
+    event_ctxPreview.fillStyle = '#000'; event_ctxPreview.fillRect(0, 0, pW, pH);
+    event_ctxPreview.save(); event_ctxPreview.scale(scale, scale);
+    const osCtx = event_offscreenCtx; const cw = event_data.composition.width; const ch = event_data.composition.height;
 
     for (let i = event_data.layers.length - 1; i >= 0; i--) {
         const idx = i;
         const layer = event_data.layers[idx];
         if (drawTime < layer.inPoint || drawTime > layer.outPoint || layer.type === 'audio') continue;
 
-        osCtx.clearRect(0, 0, cw, ch);
-        osCtx.save();
+        osCtx.clearRect(0, 0, cw, ch); osCtx.save();
         event_applyLayerTransform(osCtx, idx, drawTime);
 
-        let drawW = 0, drawH = 0;
-        let drawAnchorX = 0, drawAnchorY = 0;
+        let drawW = 0, drawH = 0, drawAnchorX = 0, drawAnchorY = 0;
 
         if (layer.type === 'text') {
             const text = layer.text || "";
@@ -224,75 +224,43 @@ window.event_draw = function () {
             osCtx.font = `bold ${fontSize}px ${fontFamily}`;
             osCtx.textAlign = "center";
             osCtx.textBaseline = "middle";
-            
             const lines = text.split('\n');
             const lineHeight = fontSize * 1.2;
             const totalHeight = lines.length * lineHeight;
             let startY = -(totalHeight / 2) + (lineHeight / 2);
-
             const totalChars = text.replace(/\n/g, '').length;
             const visibleCharCount = Math.floor(totalChars * (Math.max(0, Math.min(100, typewriter)) / 100));
-            
             let charCounter = 0;
 
             lines.forEach((line, lineIdx) => {
                 let lineWidth = 0;
                 const chars = line.split('');
-                const charWidths = chars.map(c => {
-                    const w = osCtx.measureText(c).width;
-                    lineWidth += w + letterSpacing;
-                    return w;
-                });
+                const charWidths = chars.map(c => { const w = osCtx.measureText(c).width; lineWidth += w + letterSpacing; return w; });
                 if (chars.length > 0) lineWidth -= letterSpacing;
-
                 let currentX = -lineWidth / 2;
-                
                 chars.forEach((char, charIdx) => {
                     if (charCounter < visibleCharCount) {
                         const cw = charWidths[charIdx];
                         const drawX = currentX + cw / 2;
                         const drawY = startY + lineIdx * lineHeight;
-
                         if (shadowOpacity > 0) {
                             osCtx.shadowColor = `rgba(0, 0, 0, ${shadowOpacity / 100})`;
                             osCtx.shadowBlur = fontSize * 0.15;
-                            osCtx.shadowOffsetX = 0;
-                            osCtx.shadowOffsetY = 0;
-                        } else {
-                            osCtx.shadowColor = 'transparent';
-                            osCtx.shadowBlur = 0;
-                        }
-
+                            osCtx.shadowOffsetX = 0; osCtx.shadowOffsetY = 0;
+                        } else { osCtx.shadowColor = 'transparent'; }
                         if (strokeWidth > 0) {
-                            osCtx.lineWidth = strokeWidth;
-                            osCtx.strokeStyle = strokeColor;
-                            osCtx.lineJoin = 'round';
+                            osCtx.lineWidth = strokeWidth; osCtx.strokeStyle = strokeColor; osCtx.lineJoin = 'round';
                             osCtx.strokeText(char, drawX, drawY);
                             osCtx.shadowColor = 'transparent';
-                            osCtx.shadowBlur = 0;
                         }
-
-                        osCtx.fillStyle = color;
-                        osCtx.fillText(char, drawX, drawY);
-                        
-                        currentX += cw + letterSpacing;
-                        charCounter++;
+                        osCtx.fillStyle = color; osCtx.fillText(char, drawX, drawY);
+                        currentX += cw + letterSpacing; charCounter++;
                     }
                 });
             });
-
             osCtx.shadowColor = 'transparent';
-            osCtx.shadowBlur = 0;
-
-            let maxW = 0;
-            lines.forEach(l => {
-                const w = osCtx.measureText(l).width + (l.length - 1) * letterSpacing;
-                if (w > maxW) maxW = w;
-            });
-            drawW = maxW + strokeWidth; 
-            drawH = totalHeight + strokeWidth;
-            drawAnchorX = -drawW / 2;
-            drawAnchorY = -drawH / 2;
+            let maxW = 0; lines.forEach(l => { const w = osCtx.measureText(l).width + (l.length - 1) * letterSpacing; if (w > maxW) maxW = w; });
+            drawW = maxW + strokeWidth; drawH = totalHeight + strokeWidth; drawAnchorX = -drawW / 2; drawAnchorY = -drawH / 2;
 
         } else if (layer.type === 'animated_layer') {
             const asset = event_findAssetById(layer.animAssetId);
@@ -305,430 +273,294 @@ window.event_draw = function () {
                     const actualIdx = layer.loop ? (frameIdx % anim.frames.length) : Math.min(frameIdx, anim.frames.length - 1);
                     const frame = anim.frames[actualIdx];
                     const imgToDraw = (event_isValidDrawable(layer.imgObj) && layer.imgObj.complete) ? layer.imgObj : asset.imgObj;
-                    if (frame && event_isValidDrawable(imgToDraw) && imgToDraw.complete) {
+                    if (frame && event_isValidDrawable(imgToDraw)) {
                         try {
                             osCtx.drawImage(imgToDraw, frame.x, frame.y, frame.w, frame.h, -frame.w / 2, -frame.h / 2, frame.w, frame.h);
-                            drawW = frame.w; drawH = frame.h;
-                            drawAnchorX = -frame.w / 2; drawAnchorY = -frame.h / 2;
-                        } catch (e) {
-                            console.error("Draw error (animated_layer):", e, layer);
-                        }
+                            drawW = frame.w; drawH = frame.h; drawAnchorX = -frame.w / 2; drawAnchorY = -frame.h / 2;
+                        } catch (e) { console.warn("Anim Draw Error", e); }
                     }
                 }
             }
-        } else if (event_isValidDrawable(layer.imgObj) && layer.imgObj.complete && layer.imgObj.naturalWidth > 0) {
+        } else if (event_isValidDrawable(layer.imgObj)) {
             try {
-                const iw = layer.imgObj.naturalWidth;
-                const ih = layer.imgObj.naturalHeight;
+                const iw = layer.imgObj.naturalWidth; const ih = layer.imgObj.naturalHeight;
                 osCtx.drawImage(layer.imgObj, -iw / 2, -ih / 2);
-                drawW = iw; drawH = ih;
-                drawAnchorX = -iw / 2; drawAnchorY = -ih / 2;
-            } catch (e) {
-                console.error("Draw error (image):", e, layer);
-            }
+                drawW = iw; drawH = ih; drawAnchorX = -iw / 2; drawAnchorY = -ih / 2;
+            } catch (e) { console.warn("Img Draw Error", e); }
         } else {
-            osCtx.fillStyle = '#48f';
-            osCtx.fillRect(-32, -32, 64, 64);
-            drawW = 64; drawH = 64;
-            drawAnchorX = -32; drawAnchorY = -32;
+            osCtx.fillStyle = '#48f'; osCtx.fillRect(-32, -32, 64, 64);
+            drawW = 64; drawH = 64; drawAnchorX = -32; drawAnchorY = -32;
         }
         osCtx.restore();
 
         event_ctxPreview.save();
-        const opacity = event_getInterpolatedValue(idx, "opacity", drawTime);
-        event_ctxPreview.globalAlpha = opacity / 100;
-
+        event_ctxPreview.globalAlpha = event_getInterpolatedValue(idx, "opacity", drawTime) / 100;
         let filterStr = "";
-        if (layer.effects) {
-            layer.effects.forEach(fx => {
-                if (fx.type === 'blur') {
-                    let val = 0;
-                    if (fx.trackName && layer.tracks[fx.trackName]) {
-                        val = event_getInterpolatedValue(idx, fx.trackName, drawTime);
-                    } else {
-                        val = fx.blur || 0;
-                    }
-                    filterStr += ` blur(${val}px)`;
-                }
-            });
-        }
-        if (event_ctxPreview.filter !== undefined) {
-            event_ctxPreview.filter = filterStr.trim() || 'none';
-        }
-
-        if (event_isValidDrawable(event_offscreenCanvas) && event_offscreenCanvas.width > 0 && event_offscreenCanvas.height > 0) {
+        if (layer.effects) layer.effects.forEach(fx => { if (fx.type === 'blur') filterStr += ` blur(${event_getInterpolatedValue(idx, fx.trackName, drawTime)}px)`; });
+        event_ctxPreview.filter = filterStr.trim() || 'none';
+        
+        if (event_isValidDrawable(event_offscreenCanvas)) {
             try {
                 event_ctxPreview.drawImage(event_offscreenCanvas, 0, 0);
-            } catch (e) {
-                console.error("Draw error (offscreen):", e);
-            }
+            } catch(e) {}
         }
-
-        if (event_ctxPreview.filter !== undefined) {
-            event_ctxPreview.filter = 'none';
-        }
-
+        event_ctxPreview.filter = 'none';
+        
         if (idx === event_selectedLayerIndex) {
             event_applyLayerTransform(event_ctxPreview, idx, drawTime);
             const currentTransform = event_ctxPreview.getTransform();
             const pixelRatio = 1 / Math.sqrt(currentTransform.a * currentTransform.a + currentTransform.b * currentTransform.b);
-            event_ctxPreview.strokeStyle = '#0ff';
-            event_ctxPreview.lineWidth = 2 * pixelRatio;
+            event_ctxPreview.strokeStyle = '#0ff'; event_ctxPreview.lineWidth = 2 * pixelRatio;
             event_ctxPreview.strokeRect(drawAnchorX, drawAnchorY, drawW, drawH);
         }
         event_ctxPreview.restore();
     }
     event_ctxPreview.restore();
 
-    // --- タイムライン描画 (コンテンツ部分) ---
+    // --- タイムライン描画 ---
     const viewEndTime = event_viewStartTime + ((w - EVENT_LEFT_PANEL_WIDTH) / event_pixelsPerSec);
     const secStep = event_pixelsPerSec > 100 ? 0.5 : 1.0;
 
-    // トラックエリアの背景クリッピング
     ctx.save();
     ctx.beginPath(); ctx.rect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, h); ctx.clip();
     const compDurationX = EVENT_LEFT_PANEL_WIDTH + (event_data.composition.duration - event_viewStartTime) * event_pixelsPerSec;
-    
-    if (compDurationX < w) {
-        ctx.fillStyle = '#111';
-        ctx.fillRect(compDurationX, 0, w - compDurationX, h);
-    }
-
-    // 縦グリッド線
+    if (compDurationX < w) { ctx.fillStyle = '#111'; ctx.fillRect(compDurationX, 0, w - compDurationX, h); }
     for (let t = Math.floor(event_viewStartTime); t <= viewEndTime; t += secStep) {
-        if (t < 0) continue;
-        if (t > event_data.composition.duration) break;
+        if (t < 0) continue; if (t > event_data.composition.duration) break;
         const x = EVENT_LEFT_PANEL_WIDTH + (t - event_viewStartTime) * event_pixelsPerSec;
         ctx.strokeStyle = '#333'; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
     }
     ctx.restore();
 
-    // トラック描画ループ
-    let currentY = EVENT_HEADER_HEIGHT - scrollY; // 縦スクロール位置を適用
-    
+    let currentY = EVENT_HEADER_HEIGHT - scrollY;
+
+    // --- 通常レイヤー描画ループ ---
     event_data.layers.forEach((layer, layerIdx) => {
-        // カリング
+        if (event_audioCompactMode && layer.type === 'audio') return;
+
         const isVisible = (currentY + EVENT_TRACK_HEIGHT > EVENT_HEADER_HEIGHT && currentY < h);
-        
         if (isVisible) {
             ctx.fillStyle = (layerIdx === event_selectedLayerIndex) ? '#556' : '#3a3a3a';
             ctx.fillRect(0, currentY, w, EVENT_TRACK_HEIGHT);
+            if (layerIdx === event_selectedLayerIndex) { ctx.strokeStyle = '#88a'; ctx.lineWidth = 2; ctx.strokeRect(1, currentY+1, EVENT_LEFT_PANEL_WIDTH-2, EVENT_TRACK_HEIGHT-2); ctx.lineWidth = 1; }
+            else { ctx.strokeStyle = '#222'; ctx.strokeRect(0, currentY, w, EVENT_TRACK_HEIGHT); }
 
-            if (layerIdx === event_selectedLayerIndex) {
-                ctx.strokeStyle = '#88a';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(1, currentY + 1, EVENT_LEFT_PANEL_WIDTH - 2, EVENT_TRACK_HEIGHT - 2);
-                ctx.lineWidth = 1;
-            } else {
-                ctx.strokeStyle = '#222';
-                ctx.strokeRect(0, currentY, w, EVENT_TRACK_HEIGHT);
-            }
-
-            ctx.fillStyle = '#aaa';
-            ctx.font = '10px sans-serif';
-            const expandMark = layer.expanded ? "▼" : "▶";
-            ctx.fillText(expandMark, 5, currentY + 18);
-
-            const iconSize = 20;
-            const iconX = 25;
-            const iconY = currentY + 5;
-            if (event_isValidDrawable(layer.imgObj) && layer.imgObj.complete) {
-                try {
-                    const aspect = layer.imgObj.width / layer.imgObj.height;
-                    let dw = iconSize;
-                    let dh = iconSize;
-                    if (aspect > 1) dh = iconSize / aspect;
-                    else dw = iconSize * aspect;
-                    ctx.drawImage(layer.imgObj, iconX + (iconSize - dw) / 2, iconY + (iconSize - dh) / 2, dw, dh);
-                } catch (e) {
-                    ctx.fillText("🖼️", iconX, currentY + 20);
-                }
-            } else {
-                ctx.fillText(layer.type === 'audio' ? "🔊" : (layer.type === 'text' ? "T" : "📄"), iconX, currentY + 20);
-            }
-
-            ctx.fillStyle = '#fff';
-            ctx.font = 'bold 12px sans-serif';
-            const nameRightLimit = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PARENT_RIGHT - 10;
-            const nameStart = iconX + iconSize + 5;
-            const maxNameW = Math.max(10, nameRightLimit - nameStart);
-            let dName = layer.name;
-            if (ctx.measureText(dName).width > maxNameW) {
-                while (ctx.measureText(dName + '...').width > maxNameW && dName.length > 0) dName = dName.slice(0, -1);
-                dName += '...';
-            }
-            ctx.fillText(dName, nameStart, currentY + 20);
-
-            const pickWhipX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PICK_RIGHT;
-            const parentSelX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PARENT_RIGHT;
-            const parentSelW = UI_LAYOUT.PARENT_RIGHT - UI_LAYOUT.PICK_RIGHT - 5;
-
-            ctx.strokeStyle = '#aaa';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.arc(pickWhipX + 8, currentY + EVENT_TRACK_HEIGHT / 2, 6, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.arc(pickWhipX + 8, currentY + EVENT_TRACK_HEIGHT / 2, 2, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.fillStyle = '#222';
-            ctx.fillRect(parentSelX, currentY + 4, parentSelW, EVENT_TRACK_HEIGHT - 8);
-            ctx.fillStyle = '#ccc';
-            ctx.font = '10px sans-serif';
-            let parentName = "なし";
-            if (layer.parent) {
-                const p = event_data.layers.find(l => l.id === layer.parent);
-                if (p) parentName = p.name;
-            }
-            if (ctx.measureText(parentName).width > parentSelW - 15) parentName = parentName.substring(0, 5) + '..';
-            ctx.fillText(parentName, parentSelX + 4, currentY + 18);
-            ctx.fillStyle = '#666';
-            ctx.fillText("▼", parentSelX + parentSelW - 12, currentY + 18);
-
+            ctx.fillStyle = '#aaa'; ctx.font = '10px sans-serif'; ctx.fillText(layer.expanded?"▼":"▶", 5, currentY+18);
+            ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.fillText(layer.name, 50, currentY+20);
+            
+            const pickX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PICK_RIGHT;
+            ctx.strokeStyle = '#aaa'; ctx.beginPath(); ctx.arc(pickX+8, currentY+15, 6, 0, Math.PI*2); ctx.stroke();
+            const parentX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PARENT_RIGHT;
+            ctx.fillStyle = '#222'; ctx.fillRect(parentX, currentY+4, 85, EVENT_TRACK_HEIGHT-8);
+            ctx.fillStyle = '#ccc'; ctx.fillText(layer.parent ? "親あり" : "なし", parentX+4, currentY+18);
             const trashX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.TRASH_RIGHT;
-            const trashY = currentY + 5;
-            ctx.fillStyle = '#d44';
-            ctx.fillRect(trashX, trashY, 20, 20);
-            ctx.fillStyle = '#fff';
-            ctx.fillText("×", trashX + 6, trashY + 14);
+            ctx.fillStyle = '#d44'; ctx.fillRect(trashX, currentY+5, 20, 20); ctx.fillStyle = '#fff'; ctx.fillText("×", trashX+6, currentY+19);
 
             const inX = EVENT_LEFT_PANEL_WIDTH + (layer.inPoint - event_viewStartTime) * event_pixelsPerSec;
             const outX = EVENT_LEFT_PANEL_WIDTH + (layer.outPoint - event_viewStartTime) * event_pixelsPerSec;
             const barX = Math.max(EVENT_LEFT_PANEL_WIDTH, inX);
             const barW = Math.max(0, outX - barX);
 
-            ctx.save();
-            ctx.beginPath(); ctx.rect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, h); ctx.clip();
-
             if (barW > 0) {
-                // 背景色分岐
-                let r = 100, g = 150, b = 255;
-                if (layer.type === 'animated_layer') { r = 230; g = 200; b = 20; }
-                else if (layer.type === 'text') { r = 255; g = 80; b = 80; }
-                else if (layer.type === 'audio') { r = 80; g = 200; b = 80; }
+                let r=100, g=150, b=255;
+                if (layer.type==='animated_layer'){r=230;g=200;b=20;} else if(layer.type==='text'){r=255;g=80;b=80;} else if(layer.type==='audio'){r=80;g=200;b=80;}
+                ctx.fillStyle = `rgba(${r},${g},${b},0.2)`;
+                ctx.fillRect(barX, currentY+4, barW, EVENT_TRACK_HEIGHT-8);
 
-                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.2)`;
-                ctx.fillRect(barX, currentY + 4, barW, EVENT_TRACK_HEIGHT - 8);
-
-                // 波形描画
                 if (layer.type === 'audio') {
                     const asset = event_findAssetById(layer.assetId);
                     if (asset && asset.waveform) {
                         const startT = layer.startTime || 0;
-                        const wfCanvas = asset.waveform;
-                        const waveformW = asset.duration * event_pixelsPerSec;
-                        const waveformX = EVENT_LEFT_PANEL_WIDTH + (startT - event_viewStartTime) * event_pixelsPerSec;
-
-                        ctx.save();
-                        ctx.beginPath();
-                        ctx.rect(barX, currentY + 4, barW, EVENT_TRACK_HEIGHT - 8);
-                        ctx.clip();
-                        ctx.globalAlpha = 0.8;
-                        if (event_isValidDrawable(wfCanvas)) {
+                        const wfX = EVENT_LEFT_PANEL_WIDTH + (layer.inPoint - startT - event_viewStartTime) * event_pixelsPerSec;
+                        ctx.save(); ctx.beginPath(); ctx.rect(barX, currentY+4, barW, EVENT_TRACK_HEIGHT-8); ctx.clip();
+                        ctx.globalAlpha=0.8; 
+                        
+                        // エラー対策: drawImage前にチェック
+                        if (event_isValidDrawable(asset.waveform)) {
                             try {
-                                ctx.drawImage(wfCanvas, waveformX, currentY + 4, waveformW, EVENT_TRACK_HEIGHT - 8);
-                            } catch (e) {
-                                console.error("Draw error (waveform):", e);
-                            }
+                                ctx.drawImage(asset.waveform, wfX, currentY+4, asset.duration*event_pixelsPerSec, EVENT_TRACK_HEIGHT-8);
+                            } catch(e) { console.warn("Waveform draw error", e); }
                         }
                         ctx.restore();
                     }
                 }
-
-                // ハンドルと枠
-                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.8)`;
-                if (inX >= EVENT_LEFT_PANEL_WIDTH) ctx.fillRect(inX, currentY + 4, EVENT_LAYER_HANDLE_WIDTH, EVENT_TRACK_HEIGHT - 8);
-                if (outX >= EVENT_LEFT_PANEL_WIDTH) ctx.fillRect(outX - EVENT_LAYER_HANDLE_WIDTH, currentY + 4, EVENT_LAYER_HANDLE_WIDTH, EVENT_TRACK_HEIGHT - 8);
+                ctx.fillStyle = `rgba(${r},${g},${b},0.8)`;
+                if(inX >= EVENT_LEFT_PANEL_WIDTH) ctx.fillRect(inX, currentY+4, 6, EVENT_TRACK_HEIGHT-8);
+                if(outX >= EVENT_LEFT_PANEL_WIDTH) ctx.fillRect(outX-6, currentY+4, 6, EVENT_TRACK_HEIGHT-8);
             }
-            ctx.restore();
         }
         currentY += EVENT_TRACK_HEIGHT;
 
         if (layer.expanded) {
             Object.keys(layer.tracks).forEach(propName => {
                 const track = layer.tracks[propName];
-                const isTrackVisible = (currentY + EVENT_TRACK_HEIGHT > EVENT_HEADER_HEIGHT && currentY < h);
-
-                if (isTrackVisible) {
+                if (currentY + EVENT_TRACK_HEIGHT > EVENT_HEADER_HEIGHT && currentY < h) {
                     ctx.fillStyle = '#2d2d2d'; ctx.fillRect(0, currentY, w, EVENT_TRACK_HEIGHT);
-                    ctx.strokeStyle = '#222'; ctx.beginPath(); ctx.moveTo(0, currentY + EVENT_TRACK_HEIGHT); ctx.lineTo(w, currentY + EVENT_TRACK_HEIGHT); ctx.stroke();
-                    ctx.fillStyle = '#ddd'; ctx.font = '11px sans-serif'; ctx.fillText(track.label, 30, currentY + 19);
+                    ctx.strokeStyle = '#222'; ctx.strokeRect(0, currentY, w, EVENT_TRACK_HEIGHT);
+                    ctx.fillStyle = '#ddd'; ctx.fillText(track.label, 30, currentY+19);
 
                     if (propName.startsWith('fx_')) {
-                        const delBtnX = 15;
-                        const delBtnY = currentY + 10;
-                        ctx.fillStyle = '#d44';
-                        ctx.fillRect(delBtnX, delBtnY, 12, 12);
-                        ctx.fillStyle = '#fff';
-                        ctx.font = 'bold 10px sans-serif';
-                        ctx.fillText('×', delBtnX + 2, delBtnY + 9);
+                        const delBtnX = 15; const delBtnY = currentY + 10;
+                        ctx.fillStyle = '#d44'; ctx.fillRect(delBtnX, delBtnY, 12, 12);
+                        ctx.fillStyle = '#fff'; ctx.font = 'bold 10px sans-serif'; ctx.fillText('×', delBtnX + 2, delBtnY + 9);
                     }
 
+                    // 音声レイヤーのトラック選択UI
+                    if (layer.type === 'audio' && propName === 'volume') {
+                        const trX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.AUDIO_TRACK_SEL_RIGHT;
+                        const currentTrack = (layer.trackIdx !== undefined ? layer.trackIdx : 0) + 1;
+                        ctx.fillStyle = '#3a3a3a'; ctx.fillRect(trX, currentY + 4, UI_LAYOUT.AUDIO_TRACK_SEL_WIDTH, 22);
+                        ctx.strokeStyle = '#555'; ctx.strokeRect(trX, currentY + 4, UI_LAYOUT.AUDIO_TRACK_SEL_WIDTH, 22);
+                        ctx.fillStyle = '#aaa'; ctx.textAlign = 'center';
+                        ctx.fillText("Tr: " + currentTrack + " ▼", trX + UI_LAYOUT.AUDIO_TRACK_SEL_WIDTH / 2, currentY + 19);
+                        ctx.textAlign = 'left';
+                    }
+                    
                     const val = event_getInterpolatedValue(layerIdx, propName, drawTime);
-
                     if (track.type === 'vector2') {
+                        const vx = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.VAL_VEC_X_RIGHT;
+                        ctx.fillStyle = '#3a2a2a'; ctx.fillRect(vx, currentY+4, UI_LAYOUT.VAL_VEC_WIDTH, 22);
+                        ctx.fillStyle = '#f88'; ctx.textAlign='right'; ctx.fillText(Math.abs(val.x).toFixed(1), vx+UI_LAYOUT.VAL_VEC_WIDTH-4, currentY+19);
+                        const vy = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.VAL_VEC_Y_RIGHT;
+                        ctx.fillStyle = '#2a3a2a'; ctx.fillRect(vy, currentY+4, UI_LAYOUT.VAL_VEC_WIDTH, 22);
+                        ctx.fillStyle = '#8f8'; ctx.fillText(Math.abs(val.y).toFixed(1), vy+UI_LAYOUT.VAL_VEC_WIDTH-4, currentY+19);
+                        ctx.textAlign='left';
                         if (propName === 'scale') {
-                            const checkXStart = EVENT_LEFT_PANEL_WIDTH - 220;
-                            ctx.fillStyle = (val.x < 0) ? '#0ff' : '#444';
-                            ctx.fillRect(checkXStart, currentY + 8, 12, 12);
-                            ctx.strokeStyle = '#888';
-                            ctx.strokeRect(checkXStart, currentY + 8, 12, 12);
-                            ctx.fillStyle = '#aaa';
-                            ctx.fillText("x", checkXStart + 15, currentY + 18);
-
-                            ctx.fillStyle = (val.y < 0) ? '#0ff' : '#444';
-                            ctx.fillRect(checkXStart + 30, currentY + 8, 12, 12);
-                            ctx.strokeStyle = '#888';
-                            ctx.strokeRect(checkXStart + 30, currentY + 8, 12, 12);
-                            ctx.fillStyle = '#aaa';
-                            ctx.fillText("y", checkXStart + 45, currentY + 18);
-
-                            const linkBtnX = EVENT_LEFT_PANEL_WIDTH - 113;
-                            const linkBtnY = currentY + 8;
-                            ctx.fillStyle = track.linked ? '#666' : '#444';
-                            ctx.fillRect(linkBtnX, linkBtnY, 10, 12);
-                            ctx.strokeStyle = '#888';
-                            ctx.strokeRect(linkBtnX, linkBtnY, 10, 12);
-                            ctx.fillStyle = track.linked ? '#fff' : '#888';
-                            ctx.fillText(track.linked ? "∞" : "-", linkBtnX + 1, currentY + 17);
+                             const checkXStart = EVENT_LEFT_PANEL_WIDTH - 220;
+                             ctx.fillStyle = (val.x < 0) ? '#0ff' : '#444'; ctx.fillRect(checkXStart, currentY + 8, 12, 12);
+                             ctx.strokeStyle = '#888'; ctx.strokeRect(checkXStart, currentY + 8, 12, 12);
+                             ctx.fillStyle = '#aaa'; ctx.fillText("x", checkXStart + 15, currentY + 18);
+                             ctx.fillStyle = (val.y < 0) ? '#0ff' : '#444'; ctx.fillRect(checkXStart + 30, currentY + 8, 12, 12);
+                             ctx.strokeStyle = '#888'; ctx.strokeRect(checkXStart + 30, currentY + 8, 12, 12);
+                             ctx.fillStyle = '#aaa'; ctx.fillText("y", checkXStart + 45, currentY + 18);
+                             const linkBtnX = EVENT_LEFT_PANEL_WIDTH - 113;
+                             ctx.fillStyle = track.linked ? '#666' : '#444'; ctx.fillRect(linkBtnX, currentY+8, 10, 12);
+                             ctx.strokeStyle = '#888'; ctx.strokeRect(linkBtnX, currentY+8, 10, 12);
+                             ctx.fillStyle = track.linked ? '#fff' : '#888'; ctx.fillText(track.linked ? "∞" : "-", linkBtnX + 1, currentY + 17);
                         }
-
-                        const valX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.VAL_VEC_X_RIGHT;
-                        ctx.fillStyle = '#3a2a2a';
-                        ctx.fillRect(valX, currentY + 4, UI_LAYOUT.VAL_VEC_WIDTH, EVENT_TRACK_HEIGHT - 8);
-                        ctx.fillStyle = '#f88';
-                        ctx.textAlign = 'right';
-                        ctx.fillText(Math.abs(val.x).toFixed(1), valX + UI_LAYOUT.VAL_VEC_WIDTH - 4, currentY + 19);
-
-                        const valY = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.VAL_VEC_Y_RIGHT;
-                        ctx.fillStyle = '#2a3a2a';
-                        ctx.fillRect(valY, currentY + 4, UI_LAYOUT.VAL_VEC_WIDTH, EVENT_TRACK_HEIGHT - 8);
-                        ctx.fillStyle = '#8f8';
-                        ctx.textAlign = 'right';
-                        ctx.fillText(Math.abs(val.y).toFixed(1), valY + UI_LAYOUT.VAL_VEC_WIDTH - 4, currentY + 19);
-                        ctx.textAlign = 'left';
                     } else {
-                        const valText = event_formatValue(val, track.type);
-                        const valX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.VAL_SINGLE_RIGHT;
-                        ctx.fillStyle = '#3a3a3a';
-                        ctx.fillRect(valX, currentY + 4, UI_LAYOUT.VAL_SINGLE_WIDTH, EVENT_TRACK_HEIGHT - 8);
-                        ctx.fillStyle = '#eee';
-                        ctx.textAlign = 'right';
-                        ctx.fillText(valText, valX + UI_LAYOUT.VAL_SINGLE_WIDTH - 4, currentY + 19);
-                        ctx.textAlign = 'left';
+                        const vx = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.VAL_SINGLE_RIGHT;
+                        ctx.fillStyle = '#3a3a3a'; ctx.fillRect(vx, currentY+4, UI_LAYOUT.VAL_SINGLE_WIDTH, 22);
+                        ctx.fillStyle = '#eee'; ctx.textAlign='right'; ctx.fillText(event_formatValue(val, track.type), vx+UI_LAYOUT.VAL_SINGLE_WIDTH-4, currentY+19);
+                        ctx.textAlign='left';
                     }
-
+                    
                     const btnX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.KEY_ADD_RIGHT;
-                    const btnY = currentY + EVENT_TRACK_HEIGHT / 2;
-                    ctx.strokeStyle = '#aaa'; ctx.beginPath(); ctx.moveTo(btnX, btnY - 5); ctx.lineTo(btnX + 5, btnY); ctx.lineTo(btnX, btnY + 5); ctx.lineTo(btnX - 5, btnY); ctx.closePath(); ctx.stroke();
-                    const hasKey = track.keys && track.keys.some(k => Math.abs(k.time - drawTime) < 0.001);
-                    if (hasKey) { ctx.fillStyle = '#48f'; ctx.fill(); }
+                    ctx.strokeStyle = '#aaa'; ctx.beginPath(); ctx.moveTo(btnX, currentY+15-5); ctx.lineTo(btnX+5, currentY+15); ctx.lineTo(btnX, currentY+15+5); ctx.lineTo(btnX-5, currentY+15); ctx.closePath(); ctx.stroke();
+                    if (track.keys && track.keys.some(k=>Math.abs(k.time-drawTime)<0.001)) { ctx.fillStyle='#48f'; ctx.fill(); }
 
-                    ctx.save();
-                    ctx.beginPath(); ctx.rect(EVENT_LEFT_PANEL_WIDTH, currentY, w - EVENT_LEFT_PANEL_WIDTH, EVENT_TRACK_HEIGHT); ctx.clip();
                     if (track.keys) {
-                        track.keys.forEach(key => {
-                            const kx = EVENT_LEFT_PANEL_WIDTH + (key.time - event_viewStartTime) * event_pixelsPerSec;
-                            const ky = currentY + EVENT_TRACK_HEIGHT / 2;
-                            const isSelected = (event_selectedKey && event_selectedKey.keyObj === key) || (event_selectedKeys && event_selectedKeys.some(sk => sk.keyObj === key));
-                            const isDragging = (event_dragTarget && event_dragTarget.type === 'keys' && event_dragTarget.keys.some(k => k.key === key));
-                            const isHold = (key.interpolation === 'Hold');
-                            const isEase = (key.easeIn || key.easeOut);
-
-                            if (isSelected || isDragging) { ctx.fillStyle = '#ff0'; ctx.strokeStyle = '#fff'; }
-                            else { ctx.fillStyle = isHold ? '#f88' : '#ddd'; ctx.strokeStyle = '#000'; }
-
-                            ctx.beginPath();
-                            if (isHold) ctx.rect(kx - 4, ky - 4, 8, 8);
-                            else if (isEase) ctx.arc(kx, ky, EVENT_KEYFRAME_SIZE, 0, Math.PI * 2);
-                            else {
-                                ctx.moveTo(kx, ky - EVENT_KEYFRAME_SIZE);
-                                ctx.lineTo(kx + EVENT_KEYFRAME_SIZE, ky);
-                                ctx.lineTo(kx, ky + EVENT_KEYFRAME_SIZE);
-                                ctx.lineTo(kx - EVENT_KEYFRAME_SIZE, ky);
-                                ctx.closePath();
+                        track.keys.forEach(k => {
+                            const kx = EVENT_LEFT_PANEL_WIDTH + (k.time - event_viewStartTime) * event_pixelsPerSec;
+                            if (kx >= EVENT_LEFT_PANEL_WIDTH && kx <= w) {
+                                const isSel = (event_selectedKey && event_selectedKey.keyObj === k) || event_selectedKeys.some(sk=>sk.keyObj===k);
+                                ctx.fillStyle = isSel ? '#ff0' : (k.interpolation==='Hold'?'#f88':(k.easeIn||k.easeOut?'#8f8':'#ddd'));
+                                ctx.beginPath();
+                                if(k.interpolation==='Hold') ctx.rect(kx-4, currentY+11, 8, 8);
+                                else if(k.easeIn||k.easeOut) ctx.arc(kx, currentY+15, 4, 0, Math.PI*2);
+                                else { ctx.moveTo(kx, currentY+10); ctx.lineTo(kx+5, currentY+15); ctx.lineTo(kx, currentY+20); ctx.lineTo(kx-5, currentY+15); }
+                                ctx.fill();
                             }
-                            ctx.fill(); ctx.stroke();
                         });
                     }
-                    ctx.restore();
                 }
                 currentY += EVENT_TRACK_HEIGHT;
             });
         }
     });
 
-    // --- 固定ヘッダーの描画 ---
-    ctx.save();
-    // 固定のためtranslateなし
-    
-    // ヘッダー背景
-    ctx.fillStyle = '#333';
-    ctx.fillRect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT);
-    ctx.fillStyle = '#444';
-    ctx.fillRect(0, 0, EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT);
-    ctx.strokeStyle = '#555';
-    ctx.beginPath(); ctx.moveTo(0, EVENT_HEADER_HEIGHT); ctx.lineTo(w, EVENT_HEADER_HEIGHT); ctx.stroke();
+    // --- 音声トラックエリア (結合モード時) ---
+    if (event_audioCompactMode) {
+        if (currentY > EVENT_HEADER_HEIGHT && currentY < h) {
+            ctx.strokeStyle = '#666'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, currentY); ctx.lineTo(w, currentY); ctx.stroke(); ctx.lineWidth = 1;
+        }
+        for (let t = 0; t < 4; t++) {
+            const trackY = currentY;
+            if (trackY + EVENT_TRACK_HEIGHT > EVENT_HEADER_HEIGHT && trackY < h) {
+                ctx.fillStyle = '#222'; ctx.fillRect(0, trackY, w, EVENT_TRACK_HEIGHT);
+                ctx.fillStyle = '#333'; ctx.fillRect(0, trackY, EVENT_LEFT_PANEL_WIDTH, EVENT_TRACK_HEIGHT);
+                ctx.strokeStyle = '#444'; ctx.strokeRect(0, trackY, w, EVENT_TRACK_HEIGHT);
+                ctx.fillStyle = '#aaa'; ctx.fillText(`Audio ${t+1}`, 10, trackY + 18);
+            }
+            
+            event_data.layers.forEach((layer, layerIdx) => {
+                if (layer.type !== 'audio') return;
+                const tr = (layer.trackIdx !== undefined) ? layer.trackIdx : 0;
+                if (tr !== t) return;
+                if (trackY + EVENT_TRACK_HEIGHT <= EVENT_HEADER_HEIGHT || trackY >= h) return;
 
-    // 時間目盛り
-    ctx.save();
-    ctx.beginPath(); ctx.rect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT); ctx.clip();
-    for (let t = Math.floor(event_viewStartTime); t <= viewEndTime; t += secStep) {
-        if (t < 0 || t > event_data.composition.duration) continue;
-        const x = EVENT_LEFT_PANEL_WIDTH + (t - event_viewStartTime) * event_pixelsPerSec;
-        ctx.strokeStyle = '#888'; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, EVENT_HEADER_HEIGHT); ctx.stroke();
-        if (Math.floor(t) === t) {
-            ctx.fillStyle = '#aaa'; ctx.font = '10px sans-serif';
-            ctx.fillText(t + 's', x + 3, 14);
+                const inX = EVENT_LEFT_PANEL_WIDTH + (layer.inPoint - event_viewStartTime) * event_pixelsPerSec;
+                const outX = EVENT_LEFT_PANEL_WIDTH + (layer.outPoint - event_viewStartTime) * event_pixelsPerSec;
+                const barX = Math.max(EVENT_LEFT_PANEL_WIDTH, inX);
+                const barW = Math.max(0, outX - barX);
+
+                if (barW > 0) {
+                    const isSel = (layerIdx === event_selectedLayerIndex);
+                    ctx.save(); ctx.beginPath(); ctx.rect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, h); ctx.clip();
+                    ctx.fillStyle = isSel ? 'rgba(100, 255, 100, 0.5)' : 'rgba(80, 200, 80, 0.4)';
+                    ctx.fillRect(barX, trackY + 4, barW, EVENT_TRACK_HEIGHT - 8);
+                    ctx.fillStyle = '#fff'; ctx.fillText(layer.name, barX + 5, trackY + 18);
+                    
+                    const asset = event_findAssetById(layer.assetId);
+                    if (asset && asset.waveform) {
+                        const startT = layer.startTime || 0;
+                        const wfX = EVENT_LEFT_PANEL_WIDTH + (layer.inPoint - startT - event_viewStartTime) * event_pixelsPerSec;
+                        ctx.globalAlpha = 0.5;
+                        ctx.save(); ctx.beginPath(); ctx.rect(barX, trackY+4, barW, EVENT_TRACK_HEIGHT-8); ctx.clip();
+                        
+                        // エラー対策
+                        if (event_isValidDrawable(asset.waveform)) {
+                            try {
+                                ctx.drawImage(asset.waveform, wfX, trackY+4, asset.duration*event_pixelsPerSec, EVENT_TRACK_HEIGHT-8);
+                            } catch(e) { console.warn("Waveform draw error (compact)", e); }
+                        }
+                        ctx.restore();
+                    }
+                    ctx.restore();
+                }
+            });
+            currentY += EVENT_TRACK_HEIGHT;
         }
     }
-    ctx.restore();
 
-    // ヘッダーラベルと現在時刻
-    ctx.fillStyle = '#aaa'; ctx.font = '10px sans-serif';
-    ctx.textAlign = 'left';
+    // --- 固定ヘッダー ---
+    ctx.save();
+    ctx.fillStyle = '#333'; ctx.fillRect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT);
+    ctx.fillStyle = '#444'; ctx.fillRect(0, 0, EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT);
+    ctx.strokeStyle = '#555'; ctx.beginPath(); ctx.moveTo(0, EVENT_HEADER_HEIGHT); ctx.lineTo(w, EVENT_HEADER_HEIGHT); ctx.stroke();
+    
+    ctx.save(); ctx.beginPath(); ctx.rect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT); ctx.clip();
+    for (let t = Math.floor(event_viewStartTime); t <= viewEndTime; t += secStep) {
+        const x = EVENT_LEFT_PANEL_WIDTH + (t - event_viewStartTime) * event_pixelsPerSec;
+        ctx.strokeStyle = '#888'; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, EVENT_HEADER_HEIGHT); ctx.stroke();
+        if (Math.floor(t) === t) { ctx.fillStyle = '#aaa'; ctx.fillText(t + 's', x + 3, 14); }
+    }
+    ctx.restore();
+    
+    ctx.fillStyle = '#aaa'; ctx.font = '10px sans-serif'; ctx.textAlign = 'left';
     ctx.fillText("親", EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PARENT_RIGHT + 5, 18);
     ctx.fillText("Link", EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PICK_RIGHT - 10, 18);
 
-    const fps = event_data.composition.fps || 30;
-    const sec = Math.floor(event_currentTime);
-    const frame = Math.floor(((event_currentTime + 0.0001) % 1) * fps);
-    ctx.fillStyle = '#0ff'; ctx.font = 'bold 14px monospace';
-    ctx.fillText(`${event_currentTime.toFixed(2)}s (${sec}s ${frame}f)`, 10, 20);
-
-    // 再生ヘッド (三角形) - ヘッダー上
+    ctx.fillStyle = '#0ff'; ctx.font = 'bold 14px monospace'; ctx.fillText(event_currentTime.toFixed(2)+"s", 10, 20);
     const headX = EVENT_LEFT_PANEL_WIDTH + (drawTime - event_viewStartTime) * event_pixelsPerSec;
     if (headX >= EVENT_LEFT_PANEL_WIDTH && headX <= w) {
-        ctx.fillStyle = '#f00';
-        ctx.beginPath();
-        ctx.moveTo(headX, EVENT_HEADER_HEIGHT);
-        ctx.lineTo(headX - 6, EVENT_HEADER_HEIGHT - 10);
-        ctx.lineTo(headX + 6, EVENT_HEADER_HEIGHT - 10);
-        ctx.fill();
+        ctx.fillStyle = '#f00'; ctx.beginPath(); ctx.moveTo(headX, EVENT_HEADER_HEIGHT); ctx.lineTo(headX-6, EVENT_HEADER_HEIGHT-10); ctx.lineTo(headX+6, EVENT_HEADER_HEIGHT-10); ctx.fill();
     }
     ctx.restore();
 
-    // 再生ヘッド (線) - トラック上 (スクロールに関係なく表示位置はCanvas相対)
     const lineX = EVENT_LEFT_PANEL_WIDTH + (drawTime - event_viewStartTime) * event_pixelsPerSec;
     if (lineX >= EVENT_LEFT_PANEL_WIDTH && lineX <= w) {
-        ctx.strokeStyle = '#f00'; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(lineX, EVENT_HEADER_HEIGHT); ctx.lineTo(lineX, h); ctx.stroke();
+        ctx.strokeStyle = '#f00'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(lineX, EVENT_HEADER_HEIGHT); ctx.lineTo(lineX, h); ctx.stroke();
     }
 
-    // --- 矩形選択範囲の描画 (スクロール補正済み) ---
     if (event_state === 'rect-select') {
         const x1 = Math.min(event_rectStartPos.x, event_rectEndPos.x);
         const x2 = Math.max(event_rectStartPos.x, event_rectEndPos.x);
         const y1 = Math.min(event_rectStartPos.y, event_rectEndPos.y);
         const y2 = Math.max(event_rectStartPos.y, event_rectEndPos.y);
-
-        ctx.strokeStyle = '#0ff';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 4]);
-        ctx.strokeRect(x1, y1 - scrollY, x2 - x1, y2 - y1);
-        ctx.fillStyle = 'rgba(0, 255, 255, 0.1)';
-        ctx.fillRect(x1, y1 - scrollY, x2 - x1, y2 - y1);
+        ctx.strokeStyle = '#0ff'; ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]); ctx.strokeRect(x1, y1 - scrollY, x2 - x1, y2 - y1);
+        ctx.fillStyle = 'rgba(0, 255, 255, 0.1)'; ctx.fillRect(x1, y1 - scrollY, x2 - x1, y2 - y1);
         ctx.setLineDash([]);
     }
 
