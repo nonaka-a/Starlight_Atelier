@@ -18,7 +18,7 @@
           "startTime": 0.6166666666666666,
           "inPoint": 0.6166666666666666,
           "outPoint": 0.7721315192743763,
-          "expanded": true,
+          "expanded": false,
           "tracks": {
             "volume": {
               "label": "Volume (dB)",
@@ -709,9 +709,18 @@
           "audioBuffer": {},
           "duration": 128.05224489795918,
           "waveform": {}
+        },
+        {
+          "type": "audio",
+          "name": "jump.mp3",
+          "id": "audio_17707274773710.4861996141200261",
+          "src": "../sounds/jump.mp3",
+          "audioBuffer": {},
+          "duration": 0.15546485260770976,
+          "waveform": {}
         }
       ],
-      "_collapsed": false
+      "_collapsed": true
     },
     {
       "type": "folder",
@@ -891,15 +900,6 @@
       "id": "img_17707021603200.585046707172355",
       "src": "../image/craft_image3/star_raw.png",
       "imgObj": {}
-    },
-    {
-      "type": "audio",
-      "name": "jump.mp3",
-      "id": "audio_17707274773710.4861996141200261",
-      "src": "../sounds/jump.mp3",
-      "audioBuffer": {},
-      "duration": 0.15546485260770976,
-      "waveform": {}
     }
   ]
 }
