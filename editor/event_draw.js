@@ -1,6 +1,6 @@
 /**
  * イベントエディタ: 描画関連
- * Step 24 (Fix): レイヤータイプ別のバー色分け対応
+ * Step 25 (Fix): 固定ヘッダー描画位置修正、波形表示位置修正
  */
 
 // UI定数のオーバーライド
@@ -113,7 +113,6 @@ window.event_draw = function () {
         event_offscreenCtx = event_offscreenCanvas.getContext('2d');
     }
 
-    // --- Timeline スクロール・ズーム処理 ---
     const zoomInput = document.getElementById('event-zoom');
     if (zoomInput) {
         event_pixelsPerSec = parseInt(zoomInput.value);
@@ -125,11 +124,9 @@ window.event_draw = function () {
     
     const drawTime = event_snapTime(event_currentTime);
 
-    // --- Timeline Canvas リサイズとスクロールダミー制御 (仮想スクロール) ---
     const containerW = event_timelineContainer.clientWidth;
     const containerH = event_timelineContainer.clientHeight;
 
-    // スクロール用ダミー要素
     let scrollDummy = document.getElementById('event-timeline-scroll-dummy');
     if (!scrollDummy) {
         scrollDummy = document.createElement('div');
@@ -212,7 +209,6 @@ window.event_draw = function () {
         let drawW = 0, drawH = 0;
         let drawAnchorX = 0, drawAnchorY = 0;
 
-        // --- テキストレイヤー描画 ---
         if (layer.type === 'text') {
             const text = layer.text || "";
             const fontSize = layer.fontSize || 40;
@@ -257,7 +253,6 @@ window.event_draw = function () {
                         const drawX = currentX + cw / 2;
                         const drawY = startY + lineIdx * lineHeight;
 
-                        // 1. シャドウ設定
                         if (shadowOpacity > 0) {
                             osCtx.shadowColor = `rgba(0, 0, 0, ${shadowOpacity / 100})`;
                             osCtx.shadowBlur = fontSize * 0.15;
@@ -268,18 +263,15 @@ window.event_draw = function () {
                             osCtx.shadowBlur = 0;
                         }
 
-                        // 2. 輪郭線の描画 (面の下)
                         if (strokeWidth > 0) {
                             osCtx.lineWidth = strokeWidth;
                             osCtx.strokeStyle = strokeColor;
                             osCtx.lineJoin = 'round';
                             osCtx.strokeText(char, drawX, drawY);
-                            // 影のリセット
                             osCtx.shadowColor = 'transparent';
                             osCtx.shadowBlur = 0;
                         }
 
-                        // 3. 塗りつぶし
                         osCtx.fillStyle = color;
                         osCtx.fillText(char, drawX, drawY);
                         
@@ -289,7 +281,6 @@ window.event_draw = function () {
                 });
             });
 
-            // シャドウ設定のリセット
             osCtx.shadowColor = 'transparent';
             osCtx.shadowBlur = 0;
 
@@ -511,17 +502,12 @@ window.event_draw = function () {
             ctx.beginPath(); ctx.rect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, h); ctx.clip();
 
             if (barW > 0) {
-                // --- バーの背景色決定ロジック ---
-                let r = 100, g = 150, b = 255; // Default (Image): Blue
-                if (layer.type === 'animated_layer') {
-                    r = 230; g = 200; b = 20; // Animation: Yellow
-                } else if (layer.type === 'text') {
-                    r = 255; g = 80; b = 80; // Text: Red
-                } else if (layer.type === 'audio') {
-                    r = 80; g = 200; b = 80; // Audio: Green
-                }
+                // 背景色分岐
+                let r = 100, g = 150, b = 255;
+                if (layer.type === 'animated_layer') { r = 230; g = 200; b = 20; }
+                else if (layer.type === 'text') { r = 255; g = 80; b = 80; }
+                else if (layer.type === 'audio') { r = 80; g = 200; b = 80; }
 
-                // 背景
                 ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.2)`;
                 ctx.fillRect(barX, currentY + 4, barW, EVENT_TRACK_HEIGHT - 8);
 
@@ -529,7 +515,7 @@ window.event_draw = function () {
                 if (layer.type === 'audio') {
                     const asset = event_findAssetById(layer.assetId);
                     if (asset && asset.waveform) {
-                        const startT = layer.startTime;
+                        const startT = layer.startTime || 0;
                         const wfCanvas = asset.waveform;
                         const waveformW = asset.duration * event_pixelsPerSec;
                         const waveformX = EVENT_LEFT_PANEL_WIDTH + (startT - event_viewStartTime) * event_pixelsPerSec;
@@ -646,7 +632,6 @@ window.event_draw = function () {
                             const kx = EVENT_LEFT_PANEL_WIDTH + (key.time - event_viewStartTime) * event_pixelsPerSec;
                             const ky = currentY + EVENT_TRACK_HEIGHT / 2;
                             const isSelected = (event_selectedKey && event_selectedKey.keyObj === key) || (event_selectedKeys && event_selectedKeys.some(sk => sk.keyObj === key));
-                            // ドラッグ中のハイライト
                             const isDragging = (event_dragTarget && event_dragTarget.type === 'keys' && event_dragTarget.keys.some(k => k.key === key));
                             const isHold = (key.interpolation === 'Hold');
                             const isEase = (key.easeIn || key.easeOut);
@@ -676,8 +661,8 @@ window.event_draw = function () {
 
     // --- 固定ヘッダーの描画 ---
     ctx.save();
-    ctx.translate(0, scrollY);
-
+    // 固定のためtranslateなし
+    
     // ヘッダー背景
     ctx.fillStyle = '#333';
     ctx.fillRect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT);
@@ -741,7 +726,6 @@ window.event_draw = function () {
         ctx.strokeStyle = '#0ff';
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]);
-        // y は絶対座標(scrollY込み)なので、Canvas上の描画位置に変換するには -scrollY
         ctx.strokeRect(x1, y1 - scrollY, x2 - x1, y2 - y1);
         ctx.fillStyle = 'rgba(0, 255, 255, 0.1)';
         ctx.fillRect(x1, y1 - scrollY, x2 - x1, y2 - y1);

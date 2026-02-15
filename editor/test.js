@@ -1,7 +1,5 @@
 /**
- * イベント再生テスト (更新版)
- * エディタの補間ロジック(EaseIn/Out, Hold, Vector2)とデータ構造に対応
- * 2026-02-10: 音声再生・音量キーフレーム対応
+ * イベント再生テスト (Fix: 音声読み込み強化版)
  */
 
 const canvas = document.getElementById('view');
@@ -19,7 +17,6 @@ let animationId = null;
 let audioCtx = null;
 let audioLayers = {}; // layerId -> { sourceNode, gainNode, lastPlayedTime }
 
-// ユーザー操作によるAudioContext初期化
 function initAudio() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -31,7 +28,6 @@ function initAudio() {
 window.addEventListener('mousedown', initAudio, { once: true });
 window.addEventListener('keydown', initAudio, { once: true });
 
-// ファイル読み込みイベント
 fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -51,7 +47,7 @@ fileInput.addEventListener('change', (e) => {
 
 async function loadProject(json) {
     if (animationId) cancelAnimationFrame(animationId);
-    stopAllAudio(); // 既存の音を止める
+    stopAllAudio();
 
     projectData = json;
 
@@ -73,6 +69,9 @@ async function loadProject(json) {
 
     info.textContent = "Loading assets...";
     await restoreAssetsRecursive(projectData.assets);
+    
+    // フォント読み込み待ち
+    await document.fonts.ready;
 
     info.textContent = `Playing: ${activeComp.name}`;
     isLoaded = true;
@@ -102,9 +101,6 @@ function findCompRecursive(items) {
     return null;
 }
 
-/**
- * アセットの復元
- */
 async function restoreAssetsRecursive(items) {
     async function loadImg(url) {
         return new Promise((resolve) => {
@@ -115,9 +111,13 @@ async function restoreAssetsRecursive(items) {
                     const fallback = url.substring(3);
                     const img2 = new Image();
                     img2.onload = () => resolve(img2);
-                    img2.onerror = () => resolve(null);
+                    img2.onerror = () => {
+                        console.warn("Failed to load image:", url);
+                        resolve(null);
+                    };
                     img2.src = fallback;
                 } else {
+                    console.warn("Failed to load image:", url);
                     resolve(null);
                 }
             };
@@ -127,20 +127,26 @@ async function restoreAssetsRecursive(items) {
 
     async function loadAudio(url) {
         if (!audioCtx) return null;
-        try {
-            const response = await fetch(url);
+        
+        const fetchAudio = async (path) => {
+            const response = await fetch(path);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const arrayBuffer = await response.arrayBuffer();
             return await audioCtx.decodeAudioData(arrayBuffer);
+        };
+
+        try {
+            return await fetchAudio(url);
         } catch (e) {
             if (url.startsWith('../')) {
                 try {
-                    const response = await fetch(url.substring(3));
-                    const arrayBuffer = await response.arrayBuffer();
-                    return await audioCtx.decodeAudioData(arrayBuffer);
+                    return await fetchAudio(url.substring(3));
                 } catch (e2) {
+                    console.warn("Failed to load audio:", url);
                     return null;
                 }
             }
+            console.warn("Failed to load audio:", url);
             return null;
         }
     }
@@ -179,6 +185,8 @@ function getInterpolatedValue(layer, propName, time) {
         if (propName === 'opacity') return 100;
         if (propName === 'volume') return 0;
         if (propName === 'motion') return layer.animId || "idle";
+        if (propName === 'typewriter') return 100;
+        if (propName === 'letterSpacing') return 0;
         return 0;
     }
 
@@ -217,9 +225,6 @@ function getInterpolatedValue(layer, propName, time) {
     return keys[keys.length - 1].value;
 }
 
-/**
- * オーディオ同期
- */
 function syncAudio(activeComp, time) {
     if (!audioCtx) return;
 
@@ -229,7 +234,6 @@ function syncAudio(activeComp, time) {
         const inPoint = layer.inPoint || 0;
         const outPoint = layer.outPoint || (activeComp.duration || 10);
 
-        // アセット取得
         const assetId = layer.assetId || layer.audioAssetId;
         const asset = findAssetById(assetId, projectData.assets);
         if (!asset || !asset.audioBuffer) return;
@@ -243,7 +247,6 @@ function syncAudio(activeComp, time) {
             const gain = Math.pow(10, volumeDb / 20);
 
             if (!audioState) {
-                // 新しく再生開始
                 const source = audioCtx.createBufferSource();
                 source.buffer = asset.audioBuffer;
                 source.loop = layer.loop;
@@ -254,22 +257,21 @@ function syncAudio(activeComp, time) {
                 source.connect(gainNode);
                 gainNode.connect(audioCtx.destination);
 
-                source.start(0, offset % asset.audioBuffer.duration);
-                audioLayers[layer.id] = { source, gainNode, lastPlayedTime: time };
+                let startOffset = offset;
+                if (layer.loop) startOffset = offset % asset.audioBuffer.duration;
+                
+                if (startOffset < asset.audioBuffer.duration) {
+                    source.start(0, startOffset);
+                    audioLayers[layer.id] = { source, gainNode, lastPlayedTime: time };
+                }
             } else {
-                // 音量更新
                 audioState.gainNode.gain.setTargetAtTime(gain, audioCtx.currentTime, 0.02);
-
-                // ループなしで再生終了している場合（簡易チェック）
                 if (!layer.loop && offset > asset.audioBuffer.duration) {
                     stopLayerAudio(layer.id);
                 }
             }
         } else {
-            // 範囲外なら止める
-            if (audioState) {
-                stopLayerAudio(layer.id);
-            }
+            if (audioState) stopLayerAudio(layer.id);
         }
     });
 }
@@ -295,6 +297,7 @@ function applyTransform(ctx, layer, layers, time) {
     const pos = getInterpolatedValue(layer, "position", time);
     const lScale = getInterpolatedValue(layer, "scale", time);
     const rot = getInterpolatedValue(layer, "rotation", time);
+    
     ctx.translate(pos.x, pos.y);
     ctx.rotate(rot * Math.PI / 180);
     ctx.scale((lScale.x || 100) / 100, (lScale.y || 100) / 100);
@@ -304,11 +307,11 @@ let lastTime = 0;
 
 function update(now) {
     if (!isLoaded || !activeComp) return;
+    
     const elapsed = (now - startTime) / 1000;
     const duration = activeComp.duration || 10;
     const time = elapsed % duration;
 
-    // 時間が巻き戻った（ループした）場合はオーディオをリセット
     if (time < lastTime) stopAllAudio();
     lastTime = time;
 
@@ -323,13 +326,19 @@ function update(now) {
         return;
     }
 
+    // 描画順 (奥 -> 手前)
     for (let i = layers.length - 1; i >= 0; i--) {
         const layer = layers[i];
         if (layer.type === 'audio') continue;
-        if (time < (layer.inPoint || 0) || time > (layer.outPoint || duration)) continue;
+        
+        const inP = layer.inPoint || 0;
+        const outP = layer.outPoint || duration;
+        if (time < inP || time > outP) continue;
 
         ctx.save();
-        ctx.globalAlpha = getInterpolatedValue(layer, "opacity", time) / 100;
+        
+        const opacity = getInterpolatedValue(layer, "opacity", time);
+        ctx.globalAlpha = opacity / 100;
 
         if (layer.effects) {
             let filterStr = "";
@@ -345,7 +354,79 @@ function update(now) {
 
         applyTransform(ctx, layer, layers, time);
 
-        if (layer.type === 'animated_layer') {
+        if (layer.type === 'text') {
+            const text = layer.text || "";
+            const fontSize = layer.fontSize || 40;
+            const fontFamily = layer.fontFamily || 'sans-serif';
+            const color = layer.color || '#ffffff';
+            const strokeColor = layer.strokeColor || '#000000';
+            const strokeWidth = layer.strokeWidth || 0;
+            const shadowOpacity = layer.shadowOpacity || 0;
+            
+            const typewriter = getInterpolatedValue(layer, "typewriter", time);
+            const letterSpacing = getInterpolatedValue(layer, "letterSpacing", time);
+
+            ctx.font = `bold ${fontSize}px ${fontFamily}`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            
+            const lines = text.split('\n');
+            const lineHeight = fontSize * 1.2;
+            const totalHeight = lines.length * lineHeight;
+            let startY = -(totalHeight / 2) + (lineHeight / 2);
+
+            const totalChars = text.replace(/\n/g, '').length;
+            const visibleCharCount = Math.floor(totalChars * (Math.max(0, Math.min(100, typewriter)) / 100));
+            
+            let charCounter = 0;
+
+            lines.forEach((line, lineIdx) => {
+                let lineWidth = 0;
+                const chars = line.split('');
+                const charWidths = chars.map(c => {
+                    const w = ctx.measureText(c).width;
+                    lineWidth += w + letterSpacing;
+                    return w;
+                });
+                if (chars.length > 0) lineWidth -= letterSpacing;
+
+                let currentX = -lineWidth / 2;
+                
+                chars.forEach((char, charIdx) => {
+                    if (charCounter < visibleCharCount) {
+                        const cw = charWidths[charIdx];
+                        const drawX = currentX + cw / 2;
+                        const drawY = startY + lineIdx * lineHeight;
+
+                        if (shadowOpacity > 0) {
+                            ctx.shadowColor = `rgba(0, 0, 0, ${shadowOpacity / 100})`;
+                            ctx.shadowBlur = fontSize * 0.15;
+                            ctx.shadowOffsetX = 0;
+                            ctx.shadowOffsetY = 0;
+                        } else {
+                            ctx.shadowColor = 'transparent';
+                            ctx.shadowBlur = 0;
+                        }
+
+                        if (strokeWidth > 0) {
+                            ctx.lineWidth = strokeWidth;
+                            ctx.strokeStyle = strokeColor;
+                            ctx.lineJoin = 'round';
+                            ctx.strokeText(char, drawX, drawY);
+                            ctx.shadowColor = 'transparent';
+                            ctx.shadowBlur = 0;
+                        }
+
+                        ctx.fillStyle = color;
+                        ctx.fillText(char, drawX, drawY);
+                        
+                        currentX += cw + letterSpacing;
+                        charCounter++;
+                    }
+                });
+            });
+
+        } else if (layer.type === 'animated_layer') {
             const asset = findAssetById(layer.animAssetId, projectData.assets);
             const animId = getInterpolatedValue(layer, "motion", time);
             if (asset && asset.data && asset.data[animId]) {
@@ -356,7 +437,9 @@ function update(now) {
                     const idx = layer.loop ? (frameIdx % anim.frames.length) : Math.min(frameIdx, anim.frames.length - 1);
                     const frame = anim.frames[idx];
                     const img = layer.imgObj || asset.imgObj;
-                    if (frame && img) ctx.drawImage(img, frame.x, frame.y, frame.w, frame.h, -frame.w / 2, -frame.h / 2, frame.w, frame.h);
+                    if (frame && img) {
+                        ctx.drawImage(img, frame.x, frame.y, frame.w, frame.h, -frame.w / 2, -frame.h / 2, frame.w, frame.h);
+                    }
                 }
             }
         } else if (layer.imgObj) {

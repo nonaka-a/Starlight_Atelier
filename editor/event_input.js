@@ -1,6 +1,6 @@
 /**
  * イベントエディタ: 入力処理
- * Step 23 (Fix): UI位置調整とインプットボックスのY座標補正
+ * Step 25 (Fix): レイヤー移動時のstartTime更新復活、スクロール挙動修正
  */
 
 // Pick Whip用ステート変数
@@ -147,9 +147,8 @@ window.event_onTimelineDblClick = function (e) {
             const nameStart = 50;
             const nameEnd = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PARENT_RIGHT - 10;
             if (x >= nameStart && x <= nameEnd) {
-                // インライン入力位置をトラックの上端に合わせて補正
-                // clickYをそのまま渡すとマウス位置になるため、currentYベースで計算したView座標を渡す
-                const inputY = currentY - scrollY + 4; // +4はパディング調整
+                // インプット表示位置はスクロールを考慮して渡す
+                const inputY = currentY - scrollY + 4; 
                 event_showInlineInput(x, inputY, layer.name, 'string', (newName) => {
                     if (newName && newName.trim() !== "") {
                         event_pushHistory();
@@ -177,11 +176,11 @@ window.event_updateSeekFromMouse = function (x) {
 window.event_onTimelineMouseDown = function (e) {
     const rect = event_canvasTimeline.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top; // Absolute Y (in viewport context)
+    const clickY = e.clientY - rect.top; // Absolute Y
     const scrollY = event_timelineContainer.scrollTop;
 
-    // ヘッダー判定
-    if ((clickY - scrollY) < EVENT_HEADER_HEIGHT) {
+    // ヘッダー判定 (見た目Y座標)
+    if (clickY < EVENT_HEADER_HEIGHT) {
         if (e.button === 0 && x > EVENT_LEFT_PANEL_WIDTH) {
             event_state = 'scrub-time';
             event_updateSeekFromMouse(x);
@@ -189,12 +188,7 @@ window.event_onTimelineMouseDown = function (e) {
         return;
     }
 
-    const y = clickY; // これは absoluteY ではない。event_onTimelineMouseDownのclickYは clientY - rect.top なので View座標。
-    // しかし他のロジックでは y = clickY + scrollY としている箇所と混同があるかもしれない。
-    // *重要* event_canvasTimeline は sticky配置されているが、イベントのoffsetX/Yの挙動はブラウザによる。
-    // ここでは getBoundingClientRect を基準にしているため、clickY は「見えているCanvas上の座標」。
-    // したがって、トラック判定には scrollY を足す必要がある。
-    
+    // コンテンツの絶対座標
     const absoluteY = clickY + scrollY;
 
     // 右クリック判定
@@ -272,6 +266,7 @@ window.event_onTimelineMouseDown = function (e) {
                 if (!e.shiftKey) event_selectedKeys = [];
                 event_draw();
             } else {
+                // 右パネル
                 const inX = EVENT_LEFT_PANEL_WIDTH + (layer.inPoint - event_viewStartTime) * event_pixelsPerSec;
                 const outX = EVENT_LEFT_PANEL_WIDTH + (layer.outPoint - event_viewStartTime) * event_pixelsPerSec;
                 
@@ -323,8 +318,8 @@ window.event_onTimelineMouseDown = function (e) {
                             return;
                         }
 
-                        // 入力ボックス表示位置（View座標）の計算
-                        const inputY = currentY - scrollY + 4; // 行の上端 + パディング
+                        // 数値入力位置 (View Y)
+                        const inputY = currentY - scrollY + 4;
 
                         if (track.type === 'vector2') {
                             if (prop === 'scale') {
@@ -363,7 +358,6 @@ window.event_onTimelineMouseDown = function (e) {
                                 const kx = EVENT_LEFT_PANEL_WIDTH + (key.time - event_viewStartTime) * event_pixelsPerSec;
                                 if (Math.abs(x - kx) <= EVENT_KEYFRAME_HIT_RADIUS) {
                                     hitSomething = true;
-                                    
                                     const isSelected = event_selectedKeys.some(sk => sk.keyObj === key);
                                     if (e.shiftKey) {
                                         if (isSelected) {
@@ -561,7 +555,10 @@ window.event_onGlobalMouseMove = function (e) {
         else {
             layer.inPoint += dt; 
             layer.outPoint += dt;
-            if (layer.startTime !== undefined) layer.startTime += dt;
+            // ★重要: 移動時は startTime もずらす（音/アニメの再生開始位置を維持するため）
+            if (layer.startTime !== undefined) {
+                layer.startTime += dt;
+            }
             Object.values(layer.tracks).forEach(tr => tr.keys && tr.keys.forEach(k => k.time += dt));
         }
         event_dragStartPos = { x: e.clientX, y: e.clientY };
@@ -623,7 +620,6 @@ window.event_onGlobalMouseUp = function (e) {
         const t = event_dragTarget;
         if (t.prop === 'motion') {
             const options = event_getLayerAnimationNames(t.layerIdx);
-            // motionプルダウンは originY (計算済みView座標) に表示
             event_showEnumSelect(t.originX - 40, t.originY, t.startVal, options, (val) => {
                 event_pushHistory();
                 event_updateKeyframe(t.layerIdx, t.prop, event_currentTime, val);
@@ -631,7 +627,6 @@ window.event_onGlobalMouseUp = function (e) {
             });
         } else {
             const initVal = (t.trackType === 'vector2') ? Math.abs(t.startVal).toFixed(1) : t.startVal.toString();
-            // インライン入力も originY (計算済みView座標) に表示
             event_showInlineInput(t.originX - 40, t.originY, initVal, t.trackType, (val) => {
                 event_pushHistory();
                 if (t.trackType === 'vector2') {
@@ -659,7 +654,6 @@ window.event_onPreviewMouseDown = function (e) {
     const mx = (e.clientX - rect.left) / event_previewScale;
     const my = (e.clientY - rect.top) / event_previewScale;
 
-    // 前面（インデックスが小さい方）から判定
     for (let i = 0; i < event_data.layers.length; i++) {
         const layer = event_data.layers[i];
         if (event_currentTime < layer.inPoint || event_currentTime > layer.outPoint || layer.type === 'audio') continue;
@@ -669,8 +663,6 @@ window.event_onPreviewMouseDown = function (e) {
             const asset = event_findAssetById(layer.animAssetId);
             if (!img && asset) img = asset.imgObj;
         }
-        
-        // 画像がなく、かつテキストでもない場合はスキップ
         if (!img && layer.type !== 'text') continue;
 
         const world = event_getLayerWorldTransform(i, event_currentTime);
@@ -678,12 +670,11 @@ window.event_onPreviewMouseDown = function (e) {
         let hitW = 64, hitH = 64;
         
         if (layer.type === 'text') {
-            // テキストのヒット判定：実際の描画サイズを計測
+            // テキストのヒット判定 (簡易計測 + プレビューコンテキスト利用)
             const fontSize = layer.fontSize || 40;
             const text = layer.text || "";
             const fontFamily = layer.fontFamily || 'sans-serif';
             
-            // プレビューコンテキストを使って正確に計測
             if (event_ctxPreview) {
                 event_ctxPreview.save();
                 event_ctxPreview.font = `bold ${fontSize}px ${fontFamily}`;
@@ -693,29 +684,23 @@ window.event_onPreviewMouseDown = function (e) {
                     const w = event_ctxPreview.measureText(line).width;
                     if (w > maxW) maxW = w;
                 });
-                
-                // 字間設定(letterSpacing)の考慮
+                // 字間
                 const letterSpacing = event_getInterpolatedValue(i, "letterSpacing", event_currentTime) || 0;
                 if (letterSpacing !== 0) {
                     let maxLen = 0;
                     lines.forEach(l => maxLen = Math.max(maxLen, l.length));
                     if (maxLen > 1) maxW += (maxLen - 1) * letterSpacing;
                 }
-
                 hitW = maxW;
-                hitH = lines.length * fontSize * 1.2; // 行間係数 1.2
+                hitH = lines.length * fontSize * 1.2;
                 event_ctxPreview.restore();
             } else {
-                hitW = 200; hitH = 50; // フォールバック
+                hitW = 200; hitH = 50; 
             }
-            
-            // 輪郭線の分だけ少し広げる
             const strokeW = layer.strokeWidth || 0;
-            hitW += strokeW;
-            hitH += strokeW;
+            hitW += strokeW; hitH += strokeW;
 
         } else {
-            // 画像レイヤー
             const iw = img.naturalWidth || 64;
             const ih = img.naturalHeight || 64;
             hitW = iw; hitH = ih;
@@ -732,18 +717,15 @@ window.event_onPreviewMouseDown = function (e) {
             }
         }
 
-        // マウス座標をレイヤーのローカル空間に変換
         const dx = mx - world.position.x;
         const dy = my - world.position.y;
         const rad = -world.rotation * Math.PI / 180;
         const cos = Math.cos(rad);
         const sin = Math.sin(rad);
 
-        // 親のスケールも考慮して逆算
         const lx = (dx * cos - dy * sin) / (world.scale.x || 1);
         const ly = (dx * sin + dy * cos) / (world.scale.y || 1);
 
-        // 中心基準の矩形判定
         if (lx >= -hitW / 2 && lx <= hitW / 2 && ly >= -hitH / 2 && ly <= hitH / 2) {
             const pos = event_getInterpolatedValue(i, "position", event_currentTime);
             event_pushHistory();
@@ -752,18 +734,13 @@ window.event_onPreviewMouseDown = function (e) {
             event_dragStartPos = { x: e.clientX, y: e.clientY };
             event_dragTarget = { layerIdx: i, startX: pos.x, startY: pos.y };
             event_draw();
-            // UI更新（テキストプロパティパネル等）
             if (window.event_updateTextPropertyUI) window.event_updateTextPropertyUI();
             return;
         }
     }
-    
-    // 何も掴まなかった場合
-    if (event_selectedLayerIndex !== -1) {
-        event_selectedLayerIndex = -1;
-        event_draw();
-        if (window.event_updateTextPropertyUI) window.event_updateTextPropertyUI();
-    }
+    event_selectedLayerIndex = -1;
+    event_draw();
+    if (window.event_updateTextPropertyUI) window.event_updateTextPropertyUI();
 };
 
 window.event_onKeyDown = function (e) {
@@ -798,7 +775,6 @@ window.event_showInlineInput = function (x, y, initialValue, trackType, callback
     input.style.position = 'absolute';
     const rect = event_canvasTimeline.getBoundingClientRect();
     input.style.left = (rect.left + x) + 'px';
-    // y は absoluteY ではなく View座標 (currentY - scrollY) を受け取るようになった
     input.style.top = (rect.top + y) + 'px';
     input.style.width = '80px'; input.style.zIndex = '3000';
     const commit = () => {
