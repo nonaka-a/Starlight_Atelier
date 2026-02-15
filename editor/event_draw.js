@@ -220,6 +220,7 @@ window.event_draw = function () {
             const color = layer.color || '#ffffff';
             const strokeColor = layer.strokeColor || '#000000';
             const strokeWidth = layer.strokeWidth || 0;
+            const shadowOpacity = layer.shadowOpacity || 0;
             
             const typewriter = event_getInterpolatedValue(idx, "typewriter", drawTime);
             const letterSpacing = event_getInterpolatedValue(idx, "letterSpacing", drawTime);
@@ -256,21 +257,44 @@ window.event_draw = function () {
                         const drawX = currentX + cw / 2;
                         const drawY = startY + lineIdx * lineHeight;
 
-                        osCtx.fillStyle = color;
-                        osCtx.fillText(char, drawX, drawY);
-                        
+                        // 1. 共通: シャドウの設定
+                        // 周囲を暗くするタイプなので、オフセット0でぼかしを入れる
+                        if (shadowOpacity > 0) {
+                            osCtx.shadowColor = `rgba(0, 0, 0, ${shadowOpacity / 100})`;
+                            osCtx.shadowBlur = fontSize * 0.15; // フォントサイズに応じたぼかし量
+                            osCtx.shadowOffsetX = 0;
+                            osCtx.shadowOffsetY = 0;
+                        } else {
+                            osCtx.shadowColor = 'transparent';
+                            osCtx.shadowBlur = 0;
+                        }
+
+                        // 2. 輪郭線の描画 (面の下にするため先に描画)
                         if (strokeWidth > 0) {
                             osCtx.lineWidth = strokeWidth;
                             osCtx.strokeStyle = strokeColor;
                             osCtx.lineJoin = 'round';
                             osCtx.strokeText(char, drawX, drawY);
+                            
+                            // 輪郭線を描画したら、その上の塗りつぶしには影をつけない
+                            // (そうしないと影が二重にかかったり、文字の上に影が乗ったりする)
+                            osCtx.shadowColor = 'transparent';
+                            osCtx.shadowBlur = 0;
                         }
+
+                        // 3. 塗りつぶしの描画 (輪郭線の上に乗せる)
+                        osCtx.fillStyle = color;
+                        osCtx.fillText(char, drawX, drawY);
                         
                         currentX += cw + letterSpacing;
                         charCounter++;
                     }
                 });
             });
+
+            // シャドウ設定のリセット
+            osCtx.shadowColor = 'transparent';
+            osCtx.shadowBlur = 0;
 
             let maxW = 0;
             lines.forEach(l => {

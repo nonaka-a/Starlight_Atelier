@@ -659,6 +659,7 @@ window.event_onPreviewMouseDown = function (e) {
     const mx = (e.clientX - rect.left) / event_previewScale;
     const my = (e.clientY - rect.top) / event_previewScale;
 
+    // 前面（インデックスが小さい方）から判定
     for (let i = 0; i < event_data.layers.length; i++) {
         const layer = event_data.layers[i];
         if (event_currentTime < layer.inPoint || event_currentTime > layer.outPoint || layer.type === 'audio') continue;
@@ -668,6 +669,8 @@ window.event_onPreviewMouseDown = function (e) {
             const asset = event_findAssetById(layer.animAssetId);
             if (!img && asset) img = asset.imgObj;
         }
+        
+        // 画像がなく、かつテキストでもない場合はスキップ
         if (!img && layer.type !== 'text') continue;
 
         const world = event_getLayerWorldTransform(i, event_currentTime);
@@ -675,11 +678,44 @@ window.event_onPreviewMouseDown = function (e) {
         let hitW = 64, hitH = 64;
         
         if (layer.type === 'text') {
-            // テキストのヒット判定は簡易的に
-            hitW = 200; // 仮
-            hitH = 50;  // 仮
-            // 厳密なサイズ取得は描画コンテキストが必要なためここでは簡易実装
+            // テキストのヒット判定：実際の描画サイズを計測
+            const fontSize = layer.fontSize || 40;
+            const text = layer.text || "";
+            const fontFamily = layer.fontFamily || 'sans-serif';
+            
+            // プレビューコンテキストを使って正確に計測
+            if (event_ctxPreview) {
+                event_ctxPreview.save();
+                event_ctxPreview.font = `bold ${fontSize}px ${fontFamily}`;
+                const lines = text.split('\n');
+                let maxW = 0;
+                lines.forEach(line => {
+                    const w = event_ctxPreview.measureText(line).width;
+                    if (w > maxW) maxW = w;
+                });
+                
+                // 字間設定(letterSpacing)の考慮
+                const letterSpacing = event_getInterpolatedValue(i, "letterSpacing", event_currentTime) || 0;
+                if (letterSpacing !== 0) {
+                    let maxLen = 0;
+                    lines.forEach(l => maxLen = Math.max(maxLen, l.length));
+                    if (maxLen > 1) maxW += (maxLen - 1) * letterSpacing;
+                }
+
+                hitW = maxW;
+                hitH = lines.length * fontSize * 1.2; // 行間係数 1.2
+                event_ctxPreview.restore();
+            } else {
+                hitW = 200; hitH = 50; // フォールバック
+            }
+            
+            // 輪郭線の分だけ少し広げる
+            const strokeW = layer.strokeWidth || 0;
+            hitW += strokeW;
+            hitH += strokeW;
+
         } else {
+            // 画像レイヤー
             const iw = img.naturalWidth || 64;
             const ih = img.naturalHeight || 64;
             hitW = iw; hitH = ih;
@@ -696,15 +732,18 @@ window.event_onPreviewMouseDown = function (e) {
             }
         }
 
+        // マウス座標をレイヤーのローカル空間に変換
         const dx = mx - world.position.x;
         const dy = my - world.position.y;
         const rad = -world.rotation * Math.PI / 180;
         const cos = Math.cos(rad);
         const sin = Math.sin(rad);
 
+        // 親のスケールも考慮して逆算
         const lx = (dx * cos - dy * sin) / (world.scale.x || 1);
         const ly = (dx * sin + dy * cos) / (world.scale.y || 1);
 
+        // 中心基準の矩形判定
         if (lx >= -hitW / 2 && lx <= hitW / 2 && ly >= -hitH / 2 && ly <= hitH / 2) {
             const pos = event_getInterpolatedValue(i, "position", event_currentTime);
             event_pushHistory();
@@ -713,11 +752,18 @@ window.event_onPreviewMouseDown = function (e) {
             event_dragStartPos = { x: e.clientX, y: e.clientY };
             event_dragTarget = { layerIdx: i, startX: pos.x, startY: pos.y };
             event_draw();
+            // UI更新（テキストプロパティパネル等）
+            if (window.event_updateTextPropertyUI) window.event_updateTextPropertyUI();
             return;
         }
     }
-    event_selectedLayerIndex = -1;
-    event_draw();
+    
+    // 何も掴まなかった場合
+    if (event_selectedLayerIndex !== -1) {
+        event_selectedLayerIndex = -1;
+        event_draw();
+        if (window.event_updateTextPropertyUI) window.event_updateTextPropertyUI();
+    }
 };
 
 window.event_onKeyDown = function (e) {

@@ -783,7 +783,7 @@ window.event_addTextLayer = function () {
     const cx = event_data.composition.width / 2;
     const cy = event_data.composition.height / 2;
 
-    const newLayer = {
+     const newLayer = {
         id: 'layer_text_' + Date.now(),
         type: 'text',
         name: 'Text Layer',
@@ -794,6 +794,7 @@ window.event_addTextLayer = function () {
         color: '#ffffff',
         strokeColor: '#000000',
         strokeWidth: 0,
+        shadowOpacity: 0, // ★追加: ドロップシャドウの不透明度 (0-100)
         
         parent: null,
         expanded: true,
@@ -824,11 +825,15 @@ window.event_onTextPropertyChange = function (prop) {
     if (layer.type !== 'text') return;
 
     let val;
-    if (prop === 'text') val = document.getElementById('inp-text-content').value;
+    if (prop === 'text') {
+        // 入力された "\n" (文字列) を 改行コード に変換
+        val = document.getElementById('inp-text-content').value.replace(/\\n/g, '\n');
+    }
     else if (prop === 'fontSize') val = parseInt(document.getElementById('inp-text-size').value);
     else if (prop === 'color') val = document.getElementById('inp-text-color').value;
     else if (prop === 'strokeColor') val = document.getElementById('inp-text-stroke-color').value;
     else if (prop === 'strokeWidth') val = parseInt(document.getElementById('inp-text-stroke-w').value);
+    else if (prop === 'shadowOpacity') val = parseInt(document.getElementById('inp-text-shadow').value);
 
     layer[prop] = val;
     event_draw();
@@ -849,11 +854,14 @@ window.event_updateTextPropertyUI = function () {
         const layer = event_data.layers[event_selectedLayerIndex];
         if (layer && layer.type === 'text') {
             ui.style.display = 'flex';
-            document.getElementById('inp-text-content').value = layer.text;
+            // 改行コードを "\n" (文字列) に変換して表示
+            document.getElementById('inp-text-content').value = layer.text.replace(/\n/g, '\\n');
+            
             document.getElementById('inp-text-size').value = layer.fontSize;
             document.getElementById('inp-text-color').value = layer.color;
             document.getElementById('inp-text-stroke-color').value = layer.strokeColor;
             document.getElementById('inp-text-stroke-w').value = layer.strokeWidth;
+            document.getElementById('inp-text-shadow').value = layer.shadowOpacity || 0;
             return;
         }
     }

@@ -714,7 +714,6 @@
         <!-- 元のテキスト追加ボタンがあった tool-group は削除または空なら削除 -->
         
         <div id="event-text-props" class="tool-group" style="display:none; align-items: center; gap: 5px; background: #444; padding: 2px 8px; border-radius: 4px;">
-            <!-- (中身は変更なし) -->
             <span style="font-size:0.8rem; color:#aaa;">Text:</span>
             <input type="text" id="inp-text-content" style="width: 120px;" oninput="event_onTextPropertyChange('text')">
             <input type="number" id="inp-text-size" value="40" style="width: 40px;" onchange="event_onTextPropertyChange('fontSize')">
@@ -723,6 +722,9 @@
             <span style="font-size:0.8rem; color:#aaa;">Str:</span>
             <input type="color" id="inp-text-stroke-color" value="#000000" onchange="event_onTextPropertyChange('strokeColor')" style="width:24px; height:24px; padding:0; border:none;">
             <input type="number" id="inp-text-stroke-w" value="0" style="width: 30px;" onchange="event_onTextPropertyChange('strokeWidth')">
+            <!-- 以下を追加: ドロップシャドウ用 -->
+            <span style="font-size:0.8rem; color:#aaa;">Shd:</span>
+            <input type="number" id="inp-text-shadow" value="0" min="0" max="100" style="width: 35px;" onchange="event_onTextPropertyChange('shadowOpacity')" title="影の不透明度(%)">
         </div>
         <div class="tool-group">
             <button id="btn-event-play" onclick="event_togglePlay()">▶ 再生</button>
