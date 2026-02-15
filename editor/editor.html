@@ -804,9 +804,16 @@
                     <button onclick="event_setInPointToCurrent()" title="現在位置をイン点に設定" style="font-size: 0.8rem; padding: 2px 6px;">《</button>
                     <button onclick="event_setOutPointToCurrent()" title="現在位置をアウト点に設定" style="font-size: 0.8rem; padding: 2px 6px;">》</button>
                 </div>
+                <div style="display: flex; gap: 2px;">
+                    <button onclick="event_moveLayerStartToCurrent()" title="先頭を現在位置へ移動" style="font-size: 0.8rem; padding: 2px 6px;">［</button>
+                    <button onclick="event_moveLayerEndToCurrent()" title="お尻を現在位置へ移動" style="font-size: 0.8rem; padding: 2px 6px;">］</button>
+                </div>
+
                 <button onclick="event_toggleAudioMode()" style="font-size: 0.8rem; padding: 2px 8px;" title="音声トラックの結合/展開">🎵 切替</button>
+
                 <span style="font-size: 0.8rem; color: #666; margin-left: auto;">Key: Delete to remove
                     keyframe</span>
+            </div>
             </div>
         </div>
     </div>

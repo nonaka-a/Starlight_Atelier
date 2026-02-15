@@ -1,13 +1,13 @@
 /**
  * イベントエディタ: 描画関連
- * Step 29: 親レイヤー名の表示対応
+ * Step 30 (Fix): フレーム数表示の復活
  */
 
 // UI定数のオーバーライド
 Object.assign(UI_LAYOUT, {
     VAL_VEC_X_RIGHT: 175,
     VAL_VEC_Y_RIGHT: 100,
-    AUDIO_TRACK_SEL_RIGHT: 180, // 右へ移動
+    AUDIO_TRACK_SEL_RIGHT: 180,
     AUDIO_TRACK_SEL_WIDTH: 50
 });
 
@@ -353,7 +353,7 @@ window.event_draw = function () {
             const parentW = UI_LAYOUT.PARENT_RIGHT - UI_LAYOUT.PICK_RIGHT - 5;
             ctx.fillStyle = '#222'; ctx.fillRect(parentX, currentY+4, parentW, EVENT_TRACK_HEIGHT-8);
             
-            // ★親レイヤー名の表示
+            // 親レイヤー名の表示
             let parentLabel = "なし";
             if (layer.parent) {
                 const p = event_data.layers.find(l => l.id === layer.parent);
@@ -552,7 +552,13 @@ window.event_draw = function () {
     ctx.fillText("親", EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PARENT_RIGHT + 5, 18);
     ctx.fillText("Link", EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PICK_RIGHT - 10, 18);
 
-    ctx.fillStyle = '#0ff'; ctx.font = 'bold 14px monospace'; ctx.fillText(event_currentTime.toFixed(2)+"s", 10, 20);
+    // ★修正: フレーム数表示を復活
+    const fps = event_data.composition.fps || 30;
+    const sec = Math.floor(event_currentTime);
+    const frame = Math.floor(((event_currentTime + 0.0001) % 1) * fps);
+    ctx.fillStyle = '#0ff'; ctx.font = 'bold 14px monospace';
+    ctx.fillText(`${event_currentTime.toFixed(2)}s (${sec}s ${frame}f)`, 10, 20);
+
     const headX = EVENT_LEFT_PANEL_WIDTH + (drawTime - event_viewStartTime) * event_pixelsPerSec;
     if (headX >= EVENT_LEFT_PANEL_WIDTH && headX <= w) {
         ctx.fillStyle = '#f00'; ctx.beginPath(); ctx.moveTo(headX, EVENT_HEADER_HEIGHT); ctx.lineTo(headX-6, EVENT_HEADER_HEIGHT-10); ctx.lineTo(headX+6, EVENT_HEADER_HEIGHT-10); ctx.fill();

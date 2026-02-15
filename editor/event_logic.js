@@ -968,3 +968,77 @@ window.event_setOutPointToCurrent = function() {
     layer.outPoint = time;
     event_draw();
 };
+
+/**
+ * 選択レイヤーの先頭(inPoint)を現在のインジケータ位置まで移動させる
+ * (キーフレームや再生タイミングも追従)
+ */
+window.event_moveLayerStartToCurrent = function() {
+    if (event_selectedLayerIndex === -1) {
+        alert("レイヤーを選択してください");
+        return;
+    }
+    
+    event_pushHistory();
+    const layer = event_data.layers[event_selectedLayerIndex];
+    const targetTime = event_snapTime(event_currentTime);
+    
+    // 移動量 (差分) を計算
+    const dt = targetTime - layer.inPoint;
+    
+    // 各種プロパティに差分を加算
+    layer.inPoint += dt;
+    layer.outPoint += dt;
+    
+    if (layer.startTime !== undefined) {
+        layer.startTime += dt;
+    }
+    
+    // キーフレームも全て移動
+    Object.values(layer.tracks).forEach(track => {
+        if (track.keys) {
+            track.keys.forEach(k => {
+                k.time += dt;
+            });
+        }
+    });
+    
+    event_draw();
+};
+
+/**
+ * 選択レイヤーの末尾(outPoint)を現在のインジケータ位置まで移動させる
+ * (キーフレームや再生タイミングも追従)
+ */
+window.event_moveLayerEndToCurrent = function() {
+    if (event_selectedLayerIndex === -1) {
+        alert("レイヤーを選択してください");
+        return;
+    }
+    
+    event_pushHistory();
+    const layer = event_data.layers[event_selectedLayerIndex];
+    const targetTime = event_snapTime(event_currentTime);
+    
+    // 移動量 (差分) を計算 (ターゲット - 現在の終了点)
+    const dt = targetTime - layer.outPoint;
+    
+    // 各種プロパティに差分を加算
+    layer.inPoint += dt;
+    layer.outPoint += dt;
+    
+    if (layer.startTime !== undefined) {
+        layer.startTime += dt;
+    }
+    
+    // キーフレームも全て移動
+    Object.values(layer.tracks).forEach(track => {
+        if (track.keys) {
+            track.keys.forEach(k => {
+                k.time += dt;
+            });
+        }
+    });
+    
+    event_draw();
+};
