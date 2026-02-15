@@ -867,3 +867,76 @@ window.event_updateTextPropertyUI = function () {
     }
     ui.style.display = 'none';
 };
+
+// --- event_logic.js の末尾に追加してください ---
+
+/**
+ * 1フレーム単位でインジケータを移動
+ * @param {number} dir -1: 戻る, 1: 進む
+ */
+window.event_stepFrame = function(dir) {
+    const fps = event_data.composition.fps || 30;
+    const frameTime = 1 / fps;
+    
+    // 現在時刻にフレーム時間を加算・減算し、フレームグリッドに吸着させる
+    let newTime = event_currentTime + (dir * frameTime);
+    
+    // 浮動小数点誤差対策（一度フレーム番号にしてから戻す）
+    const frame = Math.round(newTime * fps);
+    newTime = frame / fps;
+    
+    if (newTime < 0) newTime = 0;
+    if (newTime > event_data.composition.duration) newTime = event_data.composition.duration;
+    
+    event_seekTo(newTime);
+};
+
+/**
+ * 現在のインジケータ位置を選択レイヤーのイン点（開始）に設定
+ */
+window.event_setInPointToCurrent = function() {
+    if (event_selectedLayerIndex === -1) {
+        alert("レイヤーを選択してください");
+        return;
+    }
+    event_pushHistory();
+    const layer = event_data.layers[event_selectedLayerIndex];
+    const time = event_snapTime(event_currentTime);
+    
+    // イン点がアウト点を超えないように調整
+    if (time >= layer.outPoint) {
+        // アウト点を少し後ろにずらす（最小1フレーム幅確保）
+        const fps = event_data.composition.fps || 30;
+        layer.outPoint = time + (1 / fps);
+    }
+    
+    layer.inPoint = time;
+    
+    // 音声やアニメーションの場合、開始タイミングの調整が必要であれば行う
+    // (ここでは表示区間のみ変更し、メディアの再生開始位置自体はずらさない仕様とします)
+    
+    event_draw();
+};
+
+/**
+ * 現在のインジケータ位置を選択レイヤーのアウト点（終了）に設定
+ */
+window.event_setOutPointToCurrent = function() {
+    if (event_selectedLayerIndex === -1) {
+        alert("レイヤーを選択してください");
+        return;
+    }
+    event_pushHistory();
+    const layer = event_data.layers[event_selectedLayerIndex];
+    const time = event_snapTime(event_currentTime);
+    
+    // アウト点がイン点より前にならないように調整
+    if (time <= layer.inPoint) {
+        // イン点を少し前にずらす（最小1フレーム幅確保）
+        const fps = event_data.composition.fps || 30;
+        layer.inPoint = Math.max(0, time - (1 / fps));
+    }
+    
+    layer.outPoint = time;
+    event_draw();
+};

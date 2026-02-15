@@ -796,6 +796,14 @@
                     oninput="event_draw()">
                 <button onclick="event_openKeyframeMenuFromButton(event)"
                     style="font-size: 0.8rem; padding: 2px 8px; margin-left: 5px;">KF制御</button>
+                    <div style="display: flex; gap: 2px;">
+                    <button onclick="event_stepFrame(-1)" title="1フレーム戻る" style="font-size: 0.8rem; padding: 2px 6px;">◀︎</button>
+                    <button onclick="event_stepFrame(1)" title="1フレーム進む" style="font-size: 0.8rem; padding: 2px 6px;">▶︎</button>
+                </div>
+                <div style="display: flex; gap: 2px;">
+                    <button onclick="event_setInPointToCurrent()" title="現在位置をイン点に設定" style="font-size: 0.8rem; padding: 2px 6px;">《</button>
+                    <button onclick="event_setOutPointToCurrent()" title="現在位置をアウト点に設定" style="font-size: 0.8rem; padding: 2px 6px;">》</button>
+                </div>
                 <span style="font-size: 0.8rem; color: #666; margin-left: auto;">Key: Delete to remove
                     keyframe</span>
             </div>
