@@ -1,6 +1,6 @@
 /**
  * イベントエディタ: 描画関連
- * 仮想スクロール、テキストレイヤー描画、矩形選択描画
+ * Step 24 (Fix): レイヤータイプ別のバー色分け対応
  */
 
 // UI定数のオーバーライド
@@ -257,11 +257,10 @@ window.event_draw = function () {
                         const drawX = currentX + cw / 2;
                         const drawY = startY + lineIdx * lineHeight;
 
-                        // 1. 共通: シャドウの設定
-                        // 周囲を暗くするタイプなので、オフセット0でぼかしを入れる
+                        // 1. シャドウ設定
                         if (shadowOpacity > 0) {
                             osCtx.shadowColor = `rgba(0, 0, 0, ${shadowOpacity / 100})`;
-                            osCtx.shadowBlur = fontSize * 0.15; // フォントサイズに応じたぼかし量
+                            osCtx.shadowBlur = fontSize * 0.15;
                             osCtx.shadowOffsetX = 0;
                             osCtx.shadowOffsetY = 0;
                         } else {
@@ -269,20 +268,18 @@ window.event_draw = function () {
                             osCtx.shadowBlur = 0;
                         }
 
-                        // 2. 輪郭線の描画 (面の下にするため先に描画)
+                        // 2. 輪郭線の描画 (面の下)
                         if (strokeWidth > 0) {
                             osCtx.lineWidth = strokeWidth;
                             osCtx.strokeStyle = strokeColor;
                             osCtx.lineJoin = 'round';
                             osCtx.strokeText(char, drawX, drawY);
-                            
-                            // 輪郭線を描画したら、その上の塗りつぶしには影をつけない
-                            // (そうしないと影が二重にかかったり、文字の上に影が乗ったりする)
+                            // 影のリセット
                             osCtx.shadowColor = 'transparent';
                             osCtx.shadowBlur = 0;
                         }
 
-                        // 3. 塗りつぶしの描画 (輪郭線の上に乗せる)
+                        // 3. 塗りつぶし
                         osCtx.fillStyle = color;
                         osCtx.fillText(char, drawX, drawY);
                         
@@ -415,11 +412,11 @@ window.event_draw = function () {
     }
     ctx.restore();
 
-    // トラック描画
+    // トラック描画ループ
     let currentY = EVENT_HEADER_HEIGHT - scrollY; // 縦スクロール位置を適用
     
     event_data.layers.forEach((layer, layerIdx) => {
-        // カリング（画面外は描画スキップ）
+        // カリング
         const isVisible = (currentY + EVENT_TRACK_HEIGHT > EVENT_HEADER_HEIGHT && currentY < h);
         
         if (isVisible) {
@@ -514,8 +511,18 @@ window.event_draw = function () {
             ctx.beginPath(); ctx.rect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, h); ctx.clip();
 
             if (barW > 0) {
+                // --- バーの背景色決定ロジック ---
+                let r = 100, g = 150, b = 255; // Default (Image): Blue
+                if (layer.type === 'animated_layer') {
+                    r = 230; g = 200; b = 20; // Animation: Yellow
+                } else if (layer.type === 'text') {
+                    r = 255; g = 80; b = 80; // Text: Red
+                } else if (layer.type === 'audio') {
+                    r = 80; g = 200; b = 80; // Audio: Green
+                }
+
                 // 背景
-                ctx.fillStyle = 'rgba(100, 150, 255, 0.1)';
+                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.2)`;
                 ctx.fillRect(barX, currentY + 4, barW, EVENT_TRACK_HEIGHT - 8);
 
                 // 波形描画
@@ -544,7 +551,7 @@ window.event_draw = function () {
                 }
 
                 // ハンドルと枠
-                ctx.fillStyle = 'rgba(100, 150, 255, 0.8)';
+                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.8)`;
                 if (inX >= EVENT_LEFT_PANEL_WIDTH) ctx.fillRect(inX, currentY + 4, EVENT_LAYER_HANDLE_WIDTH, EVENT_TRACK_HEIGHT - 8);
                 if (outX >= EVENT_LEFT_PANEL_WIDTH) ctx.fillRect(outX - EVENT_LAYER_HANDLE_WIDTH, currentY + 4, EVENT_LAYER_HANDLE_WIDTH, EVENT_TRACK_HEIGHT - 8);
             }
@@ -669,11 +676,8 @@ window.event_draw = function () {
 
     // --- 固定ヘッダーの描画 ---
     ctx.save();
-    // 固定ヘッダーはスクロールの影響を受けないように、絶対位置（Canvas上部）に描画
-    // ただし、トラック描画で translate してないので、ヘッダー描画はそのまま
-    // *重要* scrollYはトラック描画には影響するが、ヘッダーは常に上部に張り付く必要がある
-    // ここで一旦クリップを解除して上書き描画
-    
+    ctx.translate(0, scrollY);
+
     // ヘッダー背景
     ctx.fillStyle = '#333';
     ctx.fillRect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT);
