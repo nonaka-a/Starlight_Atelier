@@ -134,7 +134,7 @@ window.event_draw = function () {
     const scrollY = event_timelineContainer.scrollTop;
     const scrollX = event_timelineContainer.scrollLeft;
     event_viewStartTime = scrollX / event_pixelsPerSec;
-    
+
     const drawTime = event_snapTime(event_currentTime);
 
     // --- コンテンツ高さ計算 (仮想スクロール用) ---
@@ -145,7 +145,7 @@ window.event_draw = function () {
         if (l.expanded) totalTracksHeight += Object.keys(l.tracks).length * EVENT_TRACK_HEIGHT;
     });
     const audioAreaHeight = event_audioCompactMode ? (4 * EVENT_TRACK_HEIGHT + 20) : 0;
-    
+
     const containerH = event_timelineContainer.clientHeight;
     const containerW = event_timelineContainer.clientWidth;
     const totalContentHeight = Math.max(containerH, EVENT_HEADER_HEIGHT + totalTracksHeight + audioAreaHeight + 100);
@@ -215,7 +215,7 @@ window.event_draw = function () {
             const strokeColor = layer.strokeColor || '#000000';
             const strokeWidth = layer.strokeWidth || 0;
             const shadowOpacity = layer.shadowOpacity || 0;
-            
+
             const typewriter = event_getInterpolatedValue(idx, "typewriter", drawTime);
             const letterSpacing = event_getInterpolatedValue(idx, "letterSpacing", drawTime);
 
@@ -260,6 +260,20 @@ window.event_draw = function () {
             let maxW = 0; lines.forEach(l => { const w = osCtx.measureText(l).width + (l.length - 1) * letterSpacing; if (w > maxW) maxW = w; });
             drawW = maxW + strokeWidth; drawH = totalHeight + strokeWidth; drawAnchorX = -drawW / 2; drawAnchorY = -drawH / 2;
 
+        } else if (layer.type === 'solid') {
+            const color = layer.color || '#ffffff';
+            osCtx.fillStyle = color;
+            if (layer.shape === 'circle') {
+                const r = Math.min(cw, ch) / 2;
+                osCtx.beginPath();
+                osCtx.arc(0, 0, r, 0, Math.PI * 2);
+                osCtx.fill();
+                drawW = r * 2; drawH = r * 2; drawAnchorX = -r; drawAnchorY = -r;
+            } else {
+                // rect (default screen fill)
+                osCtx.fillRect(-cw / 2, -ch / 2, cw, ch);
+                drawW = cw; drawH = ch; drawAnchorX = -cw / 2; drawAnchorY = -ch / 2;
+            }
         } else if (layer.type === 'animated_layer') {
             const asset = event_findAssetById(layer.animAssetId);
             const currentAnimId = event_getInterpolatedValue(idx, "motion", drawTime);
@@ -296,14 +310,14 @@ window.event_draw = function () {
         let filterStr = "";
         if (layer.effects) layer.effects.forEach(fx => { if (fx.type === 'blur') filterStr += ` blur(${event_getInterpolatedValue(idx, fx.trackName, drawTime)}px)`; });
         event_ctxPreview.filter = filterStr.trim() || 'none';
-        
+
         if (event_isValidDrawable(event_offscreenCanvas)) {
             try {
                 event_ctxPreview.drawImage(event_offscreenCanvas, 0, 0);
-            } catch(e) {}
+            } catch (e) { }
         }
         event_ctxPreview.filter = 'none';
-        
+
         if (idx === event_selectedLayerIndex) {
             event_applyLayerTransform(event_ctxPreview, idx, drawTime);
             const currentTransform = event_ctxPreview.getTransform();
@@ -340,19 +354,19 @@ window.event_draw = function () {
         if (isVisible) {
             ctx.fillStyle = (layerIdx === event_selectedLayerIndex) ? '#556' : '#3a3a3a';
             ctx.fillRect(0, currentY, w, EVENT_TRACK_HEIGHT);
-            if (layerIdx === event_selectedLayerIndex) { ctx.strokeStyle = '#88a'; ctx.lineWidth = 2; ctx.strokeRect(1, currentY+1, EVENT_LEFT_PANEL_WIDTH-2, EVENT_TRACK_HEIGHT-2); ctx.lineWidth = 1; }
+            if (layerIdx === event_selectedLayerIndex) { ctx.strokeStyle = '#88a'; ctx.lineWidth = 2; ctx.strokeRect(1, currentY + 1, EVENT_LEFT_PANEL_WIDTH - 2, EVENT_TRACK_HEIGHT - 2); ctx.lineWidth = 1; }
             else { ctx.strokeStyle = '#222'; ctx.strokeRect(0, currentY, w, EVENT_TRACK_HEIGHT); }
 
-            ctx.fillStyle = '#aaa'; ctx.font = '10px sans-serif'; ctx.fillText(layer.expanded?"▼":"▶", 5, currentY+18);
-            ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.fillText(layer.name, 50, currentY+20);
-            
+            ctx.fillStyle = '#aaa'; ctx.font = '10px sans-serif'; ctx.fillText(layer.expanded ? "▼" : "▶", 5, currentY + 18);
+            ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.fillText(layer.name, 50, currentY + 20);
+
             const pickX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PICK_RIGHT;
-            ctx.strokeStyle = '#aaa'; ctx.beginPath(); ctx.arc(pickX+8, currentY+15, 6, 0, Math.PI*2); ctx.stroke();
-            
+            ctx.strokeStyle = '#aaa'; ctx.beginPath(); ctx.arc(pickX + 8, currentY + 15, 6, 0, Math.PI * 2); ctx.stroke();
+
             const parentX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PARENT_RIGHT;
             const parentW = UI_LAYOUT.PARENT_RIGHT - UI_LAYOUT.PICK_RIGHT - 5;
-            ctx.fillStyle = '#222'; ctx.fillRect(parentX, currentY+4, parentW, EVENT_TRACK_HEIGHT-8);
-            
+            ctx.fillStyle = '#222'; ctx.fillRect(parentX, currentY + 4, parentW, EVENT_TRACK_HEIGHT - 8);
+
             // 親レイヤー名の表示
             let parentLabel = "なし";
             if (layer.parent) {
@@ -360,17 +374,17 @@ window.event_draw = function () {
                 if (p) parentLabel = p.name;
                 else parentLabel = "?";
             }
-            ctx.fillStyle = '#ccc'; 
+            ctx.fillStyle = '#ccc';
             let dispParent = parentLabel;
             const maxPW = parentW - 10;
             if (ctx.measureText(dispParent).width > maxPW) {
                 while (ctx.measureText(dispParent + '..').width > maxPW && dispParent.length > 0) dispParent = dispParent.slice(0, -1);
                 dispParent += '..';
             }
-            ctx.fillText(dispParent, parentX+4, currentY+18);
+            ctx.fillText(dispParent, parentX + 4, currentY + 18);
 
             const trashX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.TRASH_RIGHT;
-            ctx.fillStyle = '#d44'; ctx.fillRect(trashX, currentY+5, 20, 20); ctx.fillStyle = '#fff'; ctx.fillText("×", trashX+6, currentY+19);
+            ctx.fillStyle = '#d44'; ctx.fillRect(trashX, currentY + 5, 20, 20); ctx.fillStyle = '#fff'; ctx.fillText("×", trashX + 6, currentY + 19);
 
             const inX = EVENT_LEFT_PANEL_WIDTH + (layer.inPoint - event_viewStartTime) * event_pixelsPerSec;
             const outX = EVENT_LEFT_PANEL_WIDTH + (layer.outPoint - event_viewStartTime) * event_pixelsPerSec;
@@ -378,29 +392,29 @@ window.event_draw = function () {
             const barW = Math.max(0, outX - barX);
 
             if (barW > 0) {
-                let r=100, g=150, b=255;
-                if (layer.type==='animated_layer'){r=230;g=200;b=20;} else if(layer.type==='text'){r=255;g=80;b=80;} else if(layer.type==='audio'){r=80;g=200;b=80;}
+                let r = 100, g = 150, b = 255;
+                if (layer.type === 'animated_layer') { r = 230; g = 200; b = 20; } else if (layer.type === 'text') { r = 255; g = 80; b = 80; } else if (layer.type === 'audio') { r = 80; g = 200; b = 80; } else if (layer.type === 'solid') { r = 80; g = 120; b = 255; }
                 ctx.fillStyle = `rgba(${r},${g},${b},0.2)`;
-                ctx.fillRect(barX, currentY+4, barW, EVENT_TRACK_HEIGHT-8);
+                ctx.fillRect(barX, currentY + 4, barW, EVENT_TRACK_HEIGHT - 8);
 
                 if (layer.type === 'audio') {
                     const asset = event_findAssetById(layer.assetId);
                     if (asset && asset.waveform) {
                         const startT = layer.startTime || 0;
                         const wfX = EVENT_LEFT_PANEL_WIDTH + (layer.inPoint - startT - event_viewStartTime) * event_pixelsPerSec;
-                        ctx.save(); ctx.beginPath(); ctx.rect(barX, currentY+4, barW, EVENT_TRACK_HEIGHT-8); ctx.clip();
-                        ctx.globalAlpha=0.8; 
+                        ctx.save(); ctx.beginPath(); ctx.rect(barX, currentY + 4, barW, EVENT_TRACK_HEIGHT - 8); ctx.clip();
+                        ctx.globalAlpha = 0.8;
                         if (event_isValidDrawable(asset.waveform)) {
                             try {
-                                ctx.drawImage(asset.waveform, wfX, currentY+4, asset.duration*event_pixelsPerSec, EVENT_TRACK_HEIGHT-8);
-                            } catch(e) { console.warn("Waveform draw error", e); }
+                                ctx.drawImage(asset.waveform, wfX, currentY + 4, asset.duration * event_pixelsPerSec, EVENT_TRACK_HEIGHT - 8);
+                            } catch (e) { console.warn("Waveform draw error", e); }
                         }
                         ctx.restore();
                     }
                 }
                 ctx.fillStyle = `rgba(${r},${g},${b},0.8)`;
-                if(inX >= EVENT_LEFT_PANEL_WIDTH) ctx.fillRect(inX, currentY+4, 6, EVENT_TRACK_HEIGHT-8);
-                if(outX >= EVENT_LEFT_PANEL_WIDTH) ctx.fillRect(outX-6, currentY+4, 6, EVENT_TRACK_HEIGHT-8);
+                if (inX >= EVENT_LEFT_PANEL_WIDTH) ctx.fillRect(inX, currentY + 4, 6, EVENT_TRACK_HEIGHT - 8);
+                if (outX >= EVENT_LEFT_PANEL_WIDTH) ctx.fillRect(outX - 6, currentY + 4, 6, EVENT_TRACK_HEIGHT - 8);
             }
         }
         currentY += EVENT_TRACK_HEIGHT;
@@ -411,7 +425,7 @@ window.event_draw = function () {
                 if (currentY + EVENT_TRACK_HEIGHT > EVENT_HEADER_HEIGHT && currentY < h) {
                     ctx.fillStyle = '#2d2d2d'; ctx.fillRect(0, currentY, w, EVENT_TRACK_HEIGHT);
                     ctx.strokeStyle = '#222'; ctx.strokeRect(0, currentY, w, EVENT_TRACK_HEIGHT);
-                    ctx.fillStyle = '#ddd'; ctx.fillText(track.label, 30, currentY+19);
+                    ctx.fillStyle = '#ddd'; ctx.fillText(track.label, 30, currentY + 19);
 
                     if (propName.startsWith('fx_')) {
                         const delBtnX = 15; const delBtnY = currentY + 10;
@@ -428,50 +442,50 @@ window.event_draw = function () {
                         ctx.fillText("Tr: " + currentTrack + " ▼", trX + UI_LAYOUT.AUDIO_TRACK_SEL_WIDTH / 2, currentY + 19);
                         ctx.textAlign = 'left';
                     }
-                    
+
                     const val = event_getInterpolatedValue(layerIdx, propName, drawTime);
                     if (track.type === 'vector2') {
                         const vx = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.VAL_VEC_X_RIGHT;
-                        ctx.fillStyle = '#3a2a2a'; ctx.fillRect(vx, currentY+4, UI_LAYOUT.VAL_VEC_WIDTH, 22);
-                        ctx.fillStyle = '#f88'; ctx.textAlign='right'; ctx.fillText(Math.abs(val.x).toFixed(1), vx+UI_LAYOUT.VAL_VEC_WIDTH-4, currentY+19);
+                        ctx.fillStyle = '#3a2a2a'; ctx.fillRect(vx, currentY + 4, UI_LAYOUT.VAL_VEC_WIDTH, 22);
+                        ctx.fillStyle = '#f88'; ctx.textAlign = 'right'; ctx.fillText(Math.abs(val.x).toFixed(1), vx + UI_LAYOUT.VAL_VEC_WIDTH - 4, currentY + 19);
                         const vy = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.VAL_VEC_Y_RIGHT;
-                        ctx.fillStyle = '#2a3a2a'; ctx.fillRect(vy, currentY+4, UI_LAYOUT.VAL_VEC_WIDTH, 22);
-                        ctx.fillStyle = '#8f8'; ctx.fillText(Math.abs(val.y).toFixed(1), vy+UI_LAYOUT.VAL_VEC_WIDTH-4, currentY+19);
-                        ctx.textAlign='left';
+                        ctx.fillStyle = '#2a3a2a'; ctx.fillRect(vy, currentY + 4, UI_LAYOUT.VAL_VEC_WIDTH, 22);
+                        ctx.fillStyle = '#8f8'; ctx.fillText(Math.abs(val.y).toFixed(1), vy + UI_LAYOUT.VAL_VEC_WIDTH - 4, currentY + 19);
+                        ctx.textAlign = 'left';
                         if (propName === 'scale') {
-                             const checkXStart = EVENT_LEFT_PANEL_WIDTH - 220;
-                             ctx.fillStyle = (val.x < 0) ? '#0ff' : '#444'; ctx.fillRect(checkXStart, currentY + 8, 12, 12);
-                             ctx.strokeStyle = '#888'; ctx.strokeRect(checkXStart, currentY + 8, 12, 12);
-                             ctx.fillStyle = '#aaa'; ctx.fillText("x", checkXStart + 15, currentY + 18);
-                             ctx.fillStyle = (val.y < 0) ? '#0ff' : '#444'; ctx.fillRect(checkXStart + 30, currentY + 8, 12, 12);
-                             ctx.strokeStyle = '#888'; ctx.strokeRect(checkXStart + 30, currentY + 8, 12, 12);
-                             ctx.fillStyle = '#aaa'; ctx.fillText("y", checkXStart + 45, currentY + 18);
-                             const linkBtnX = EVENT_LEFT_PANEL_WIDTH - 113;
-                             ctx.fillStyle = track.linked ? '#666' : '#444'; ctx.fillRect(linkBtnX, currentY+8, 10, 12);
-                             ctx.strokeStyle = '#888'; ctx.strokeRect(linkBtnX, currentY+8, 10, 12);
-                             ctx.fillStyle = track.linked ? '#fff' : '#888'; ctx.fillText(track.linked ? "∞" : "-", linkBtnX + 1, currentY + 17);
+                            const checkXStart = EVENT_LEFT_PANEL_WIDTH - 220;
+                            ctx.fillStyle = (val.x < 0) ? '#0ff' : '#444'; ctx.fillRect(checkXStart, currentY + 8, 12, 12);
+                            ctx.strokeStyle = '#888'; ctx.strokeRect(checkXStart, currentY + 8, 12, 12);
+                            ctx.fillStyle = '#aaa'; ctx.fillText("x", checkXStart + 15, currentY + 18);
+                            ctx.fillStyle = (val.y < 0) ? '#0ff' : '#444'; ctx.fillRect(checkXStart + 30, currentY + 8, 12, 12);
+                            ctx.strokeStyle = '#888'; ctx.strokeRect(checkXStart + 30, currentY + 8, 12, 12);
+                            ctx.fillStyle = '#aaa'; ctx.fillText("y", checkXStart + 45, currentY + 18);
+                            const linkBtnX = EVENT_LEFT_PANEL_WIDTH - 113;
+                            ctx.fillStyle = track.linked ? '#666' : '#444'; ctx.fillRect(linkBtnX, currentY + 8, 10, 12);
+                            ctx.strokeStyle = '#888'; ctx.strokeRect(linkBtnX, currentY + 8, 10, 12);
+                            ctx.fillStyle = track.linked ? '#fff' : '#888'; ctx.fillText(track.linked ? "∞" : "-", linkBtnX + 1, currentY + 17);
                         }
                     } else {
                         const vx = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.VAL_SINGLE_RIGHT;
-                        ctx.fillStyle = '#3a3a3a'; ctx.fillRect(vx, currentY+4, UI_LAYOUT.VAL_SINGLE_WIDTH, 22);
-                        ctx.fillStyle = '#eee'; ctx.textAlign='right'; ctx.fillText(event_formatValue(val, track.type), vx+UI_LAYOUT.VAL_SINGLE_WIDTH-4, currentY+19);
-                        ctx.textAlign='left';
+                        ctx.fillStyle = '#3a3a3a'; ctx.fillRect(vx, currentY + 4, UI_LAYOUT.VAL_SINGLE_WIDTH, 22);
+                        ctx.fillStyle = '#eee'; ctx.textAlign = 'right'; ctx.fillText(event_formatValue(val, track.type), vx + UI_LAYOUT.VAL_SINGLE_WIDTH - 4, currentY + 19);
+                        ctx.textAlign = 'left';
                     }
-                    
+
                     const btnX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.KEY_ADD_RIGHT;
-                    ctx.strokeStyle = '#aaa'; ctx.beginPath(); ctx.moveTo(btnX, currentY+15-5); ctx.lineTo(btnX+5, currentY+15); ctx.lineTo(btnX, currentY+15+5); ctx.lineTo(btnX-5, currentY+15); ctx.closePath(); ctx.stroke();
-                    if (track.keys && track.keys.some(k=>Math.abs(k.time-drawTime)<0.001)) { ctx.fillStyle='#48f'; ctx.fill(); }
+                    ctx.strokeStyle = '#aaa'; ctx.beginPath(); ctx.moveTo(btnX, currentY + 15 - 5); ctx.lineTo(btnX + 5, currentY + 15); ctx.lineTo(btnX, currentY + 15 + 5); ctx.lineTo(btnX - 5, currentY + 15); ctx.closePath(); ctx.stroke();
+                    if (track.keys && track.keys.some(k => Math.abs(k.time - drawTime) < 0.001)) { ctx.fillStyle = '#48f'; ctx.fill(); }
 
                     if (track.keys) {
                         track.keys.forEach(k => {
                             const kx = EVENT_LEFT_PANEL_WIDTH + (k.time - event_viewStartTime) * event_pixelsPerSec;
                             if (kx >= EVENT_LEFT_PANEL_WIDTH && kx <= w) {
-                                const isSel = (event_selectedKey && event_selectedKey.keyObj === k) || event_selectedKeys.some(sk=>sk.keyObj===k);
-                                ctx.fillStyle = isSel ? '#ff0' : (k.interpolation==='Hold'?'#f88':(k.easeIn||k.easeOut?'#8f8':'#ddd'));
+                                const isSel = (event_selectedKey && event_selectedKey.keyObj === k) || event_selectedKeys.some(sk => sk.keyObj === k);
+                                ctx.fillStyle = isSel ? '#ff0' : (k.interpolation === 'Hold' ? '#f88' : (k.easeIn || k.easeOut ? '#8f8' : '#ddd'));
                                 ctx.beginPath();
-                                if(k.interpolation==='Hold') ctx.rect(kx-4, currentY+11, 8, 8);
-                                else if(k.easeIn||k.easeOut) ctx.arc(kx, currentY+15, 4, 0, Math.PI*2);
-                                else { ctx.moveTo(kx, currentY+10); ctx.lineTo(kx+5, currentY+15); ctx.lineTo(kx, currentY+20); ctx.lineTo(kx-5, currentY+15); }
+                                if (k.interpolation === 'Hold') ctx.rect(kx - 4, currentY + 11, 8, 8);
+                                else if (k.easeIn || k.easeOut) ctx.arc(kx, currentY + 15, 4, 0, Math.PI * 2);
+                                else { ctx.moveTo(kx, currentY + 10); ctx.lineTo(kx + 5, currentY + 15); ctx.lineTo(kx, currentY + 20); ctx.lineTo(kx - 5, currentY + 15); }
                                 ctx.fill();
                             }
                         });
@@ -493,9 +507,9 @@ window.event_draw = function () {
                 ctx.fillStyle = '#222'; ctx.fillRect(0, trackY, w, EVENT_TRACK_HEIGHT);
                 ctx.fillStyle = '#333'; ctx.fillRect(0, trackY, EVENT_LEFT_PANEL_WIDTH, EVENT_TRACK_HEIGHT);
                 ctx.strokeStyle = '#444'; ctx.strokeRect(0, trackY, w, EVENT_TRACK_HEIGHT);
-                ctx.fillStyle = '#aaa'; ctx.fillText(`Audio ${t+1}`, 10, trackY + 18);
+                ctx.fillStyle = '#aaa'; ctx.fillText(`Audio ${t + 1}`, 10, trackY + 18);
             }
-            
+
             event_data.layers.forEach((layer, layerIdx) => {
                 if (layer.type !== 'audio') return;
                 const tr = (layer.trackIdx !== undefined) ? layer.trackIdx : 0;
@@ -513,17 +527,17 @@ window.event_draw = function () {
                     ctx.fillStyle = isSel ? 'rgba(100, 255, 100, 0.5)' : 'rgba(80, 200, 80, 0.4)';
                     ctx.fillRect(barX, trackY + 4, barW, EVENT_TRACK_HEIGHT - 8);
                     ctx.fillStyle = '#fff'; ctx.fillText(layer.name, barX + 5, trackY + 18);
-                    
+
                     const asset = event_findAssetById(layer.assetId);
                     if (asset && asset.waveform) {
                         const startT = layer.startTime || 0;
                         const wfX = EVENT_LEFT_PANEL_WIDTH + (layer.inPoint - startT - event_viewStartTime) * event_pixelsPerSec;
                         ctx.globalAlpha = 0.5;
-                        ctx.save(); ctx.beginPath(); ctx.rect(barX, trackY+4, barW, EVENT_TRACK_HEIGHT-8); ctx.clip();
+                        ctx.save(); ctx.beginPath(); ctx.rect(barX, trackY + 4, barW, EVENT_TRACK_HEIGHT - 8); ctx.clip();
                         if (event_isValidDrawable(asset.waveform)) {
                             try {
-                                ctx.drawImage(asset.waveform, wfX, trackY+4, asset.duration*event_pixelsPerSec, EVENT_TRACK_HEIGHT-8);
-                            } catch(e) { console.warn("Waveform draw error (compact)", e); }
+                                ctx.drawImage(asset.waveform, wfX, trackY + 4, asset.duration * event_pixelsPerSec, EVENT_TRACK_HEIGHT - 8);
+                            } catch (e) { console.warn("Waveform draw error (compact)", e); }
                         }
                         ctx.restore();
                     }
@@ -539,7 +553,7 @@ window.event_draw = function () {
     ctx.fillStyle = '#333'; ctx.fillRect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT);
     ctx.fillStyle = '#444'; ctx.fillRect(0, 0, EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT);
     ctx.strokeStyle = '#555'; ctx.beginPath(); ctx.moveTo(0, EVENT_HEADER_HEIGHT); ctx.lineTo(w, EVENT_HEADER_HEIGHT); ctx.stroke();
-    
+
     ctx.save(); ctx.beginPath(); ctx.rect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT); ctx.clip();
     for (let t = Math.floor(event_viewStartTime); t <= viewEndTime; t += secStep) {
         const x = EVENT_LEFT_PANEL_WIDTH + (t - event_viewStartTime) * event_pixelsPerSec;
@@ -547,7 +561,7 @@ window.event_draw = function () {
         if (Math.floor(t) === t) { ctx.fillStyle = '#aaa'; ctx.fillText(t + 's', x + 3, 14); }
     }
     ctx.restore();
-    
+
     ctx.fillStyle = '#aaa'; ctx.font = '10px sans-serif'; ctx.textAlign = 'left';
     ctx.fillText("親", EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PARENT_RIGHT + 5, 18);
     ctx.fillText("Link", EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PICK_RIGHT - 10, 18);
@@ -561,7 +575,7 @@ window.event_draw = function () {
 
     const headX = EVENT_LEFT_PANEL_WIDTH + (drawTime - event_viewStartTime) * event_pixelsPerSec;
     if (headX >= EVENT_LEFT_PANEL_WIDTH && headX <= w) {
-        ctx.fillStyle = '#f00'; ctx.beginPath(); ctx.moveTo(headX, EVENT_HEADER_HEIGHT); ctx.lineTo(headX-6, EVENT_HEADER_HEIGHT-10); ctx.lineTo(headX+6, EVENT_HEADER_HEIGHT-10); ctx.fill();
+        ctx.fillStyle = '#f00'; ctx.beginPath(); ctx.moveTo(headX, EVENT_HEADER_HEIGHT); ctx.lineTo(headX - 6, EVENT_HEADER_HEIGHT - 10); ctx.lineTo(headX + 6, EVENT_HEADER_HEIGHT - 10); ctx.fill();
     }
     ctx.restore();
 

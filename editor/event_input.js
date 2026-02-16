@@ -131,7 +131,7 @@ window.event_openKeyframeMenuFromButton = function (e) {
 window.event_onTimelineDblClick = function (e) {
     const rect = event_canvasTimeline.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top; 
+    const clickY = e.clientY - rect.top;
     const scrollY = event_timelineContainer.scrollTop;
 
     // ヘッダー判定 (見た目Y座標)
@@ -142,7 +142,7 @@ window.event_onTimelineDblClick = function (e) {
 
     for (let i = 0; i < event_data.layers.length; i++) {
         const layer = event_data.layers[i];
-        
+
         // 結合モード時は音声レイヤーをスキップ
         if (event_audioCompactMode && layer.type === 'audio') continue;
 
@@ -203,7 +203,7 @@ window.event_onTimelineMouseDown = function (e) {
     if (e.button === 2) {
         for (let i = 0; i < event_data.layers.length; i++) {
             const layer = event_data.layers[i];
-            
+
             // 結合モード時は音声レイヤーをスキップ
             if (event_audioCompactMode && layer.type === 'audio') continue;
 
@@ -286,7 +286,7 @@ window.event_onTimelineMouseDown = function (e) {
                 // 右パネル
                 const inX = EVENT_LEFT_PANEL_WIDTH + (layer.inPoint - event_viewStartTime) * event_pixelsPerSec;
                 const outX = EVENT_LEFT_PANEL_WIDTH + (layer.outPoint - event_viewStartTime) * event_pixelsPerSec;
-                
+
                 if (Math.abs(x - inX) <= EVENT_LAYER_HANDLE_WIDTH) {
                     hitSomething = true;
                     event_pushHistory(); event_state = 'drag-layer-in'; event_dragTarget = { layerIdx: i };
@@ -298,7 +298,7 @@ window.event_onTimelineMouseDown = function (e) {
                     event_pushHistory(); event_state = 'drag-layer-move'; event_dragTarget = { layerIdx: i, startIn: layer.inPoint, startOut: layer.outPoint };
                 } else {
                     hitSomething = true;
-                    event_selectedLayerIndex = i; 
+                    event_selectedLayerIndex = i;
                     if (!e.shiftKey) {
                         event_selectedKey = null;
                         event_selectedKeys = [];
@@ -379,7 +379,7 @@ window.event_onTimelineMouseDown = function (e) {
                         if (fromRight >= UI_LAYOUT.KEY_ADD_RIGHT - 10 && fromRight <= UI_LAYOUT.KEY_ADD_RIGHT + 10) {
                             event_pushHistory(); const v = event_getInterpolatedValue(i, prop, event_currentTime);
                             const nk = event_updateKeyframe(i, prop, event_currentTime, v);
-                            event_selectedKey = { layerIdx: i, prop, keyObj: nk }; 
+                            event_selectedKey = { layerIdx: i, prop, keyObj: nk };
                             event_selectedKeys = [event_selectedKey];
                             event_draw(); return;
                         }
@@ -411,8 +411,8 @@ window.event_onTimelineMouseDown = function (e) {
                                     event_pushHistory();
                                     event_state = 'drag-key';
                                     event_dragStartPos = { x: e.clientX, y: e.clientY };
-                                    event_dragTarget = { 
-                                        type: 'keys', 
+                                    event_dragTarget = {
+                                        type: 'keys',
                                         keys: event_selectedKeys.map(sk => ({
                                             key: sk.keyObj,
                                             startTime: sk.keyObj.time,
@@ -420,7 +420,7 @@ window.event_onTimelineMouseDown = function (e) {
                                             prop: sk.prop
                                         }))
                                     };
-                                    event_draw(); 
+                                    event_draw();
                                     return;
                                 }
                             }
@@ -445,7 +445,7 @@ window.event_onTimelineMouseDown = function (e) {
 
                     const inX = EVENT_LEFT_PANEL_WIDTH + (layer.inPoint - event_viewStartTime) * event_pixelsPerSec;
                     const outX = EVENT_LEFT_PANEL_WIDTH + (layer.outPoint - event_viewStartTime) * event_pixelsPerSec;
-                    
+
                     if (x >= inX && x <= outX && x > EVENT_LEFT_PANEL_WIDTH) {
                         hitSomething = true;
                         // 端か中か
@@ -454,8 +454,8 @@ window.event_onTimelineMouseDown = function (e) {
                         } else if (Math.abs(x - outX) <= EVENT_LAYER_HANDLE_WIDTH) {
                             event_pushHistory(); event_state = 'drag-layer-out'; event_dragTarget = { layerIdx: i };
                         } else {
-                            event_pushHistory(); 
-                            event_state = 'drag-layer-move'; 
+                            event_pushHistory();
+                            event_state = 'drag-layer-move';
                             // ★ドラッグ開始時のView座標(currentScreenY)を基準点として保存
                             event_dragTarget = { layerIdx: i, startIn: layer.inPoint, startOut: layer.outPoint, startTrack: t, originScreenY: currentScreenY };
                         }
@@ -518,16 +518,16 @@ window.event_onGlobalMouseMove = function (e) {
                 }
                 currentScreenY += EVENT_TRACK_HEIGHT + (layer.expanded ? Object.keys(layer.tracks).length * EVENT_TRACK_HEIGHT : 0);
             }
-            
+
             // Audio Compact Mode判定
             if (event_audioCompactMode) {
                 // 線
                 if (currentScreenY > EVENT_HEADER_HEIGHT) { /* Divider */ }
                 for (let t = 0; t < 4; t++) {
-                     if (clickY >= currentScreenY && clickY < currentScreenY + EVENT_TRACK_HEIGHT) {
-                         // クリップ上なら move/resize (簡易判定: トラック内全クリップをループするのは重いので省略か、必要なら実装)
-                     }
-                     currentScreenY += EVENT_TRACK_HEIGHT;
+                    if (clickY >= currentScreenY && clickY < currentScreenY + EVENT_TRACK_HEIGHT) {
+                        // クリップ上なら move/resize (簡易判定: トラック内全クリップをループするのは重いので省略か、必要なら実装)
+                    }
+                    currentScreenY += EVENT_TRACK_HEIGHT;
                 }
             }
         }
@@ -540,7 +540,7 @@ window.event_onGlobalMouseMove = function (e) {
     } else if (event_state === 'scrub-value') {
         const delta = e.clientX - event_dragStartPos.x;
         const t = event_dragTarget;
-        if (t.prop === 'motion') return; 
+        if (t.prop === 'motion') return;
         const layer = event_data.layers[t.layerIdx];
         const track = layer.tracks[t.prop];
         let newVal;
@@ -582,18 +582,18 @@ window.event_onGlobalMouseMove = function (e) {
     } else if (event_state === 'drag-layer-order') {
         let currentScreenY = EVENT_HEADER_HEIGHT - scrollY;
         let targetIdx = -1;
-        
+
         // clickY (View Y) で比較
         for (let i = 0; i < event_data.layers.length; i++) {
-             // Compact Mode スキップは本来ここにも必要だが、並べ替え中は全レイヤー計算対象にするのが自然か？
-             // いや、見えているものだけで判定すべき。
-             if (event_audioCompactMode && event_data.layers[i].type === 'audio') continue;
-             
-             const h = EVENT_TRACK_HEIGHT + (event_data.layers[i].expanded ? Object.keys(event_data.layers[i].tracks).length * EVENT_TRACK_HEIGHT : 0);
-             if (clickY >= currentScreenY && clickY < currentScreenY + h) { targetIdx = i; break; }
-             currentScreenY += h;
+            // Compact Mode スキップは本来ここにも必要だが、並べ替え中は全レイヤー計算対象にするのが自然か？
+            // いや、見えているものだけで判定すべき。
+            if (event_audioCompactMode && event_data.layers[i].type === 'audio') continue;
+
+            const h = EVENT_TRACK_HEIGHT + (event_data.layers[i].expanded ? Object.keys(event_data.layers[i].tracks).length * EVENT_TRACK_HEIGHT : 0);
+            if (clickY >= currentScreenY && clickY < currentScreenY + h) { targetIdx = i; break; }
+            currentScreenY += h;
         }
-        
+
         if (targetIdx !== -1 && targetIdx !== event_dragTarget.layerIdx) {
             const item = event_data.layers.splice(event_dragTarget.layerIdx, 1)[0];
             event_data.layers.splice(targetIdx, 0, item);
@@ -642,14 +642,14 @@ window.event_onGlobalMouseMove = function (e) {
     } else if (event_state === 'drag-layer-in' || event_state === 'drag-layer-out' || event_state === 'drag-layer-move') {
         const dt = (e.clientX - event_dragStartPos.x) / event_pixelsPerSec;
         const layer = event_data.layers[event_dragTarget.layerIdx];
-        
+
         if (event_state === 'drag-layer-in') {
             layer.inPoint = Math.min(event_snapTime(layer.inPoint + dt), layer.outPoint);
         } else if (event_state === 'drag-layer-out') {
             layer.outPoint = Math.max(event_snapTime(layer.outPoint + dt), layer.inPoint);
         } else {
             // move
-            layer.inPoint += dt; 
+            layer.inPoint += dt;
             layer.outPoint += dt;
             if (layer.startTime !== undefined) {
                 layer.startTime += dt;
@@ -660,7 +660,7 @@ window.event_onGlobalMouseMove = function (e) {
             if (event_audioCompactMode && layer.type === 'audio' && event_dragTarget.startTrack !== undefined) {
                 // View座標同士の差分 (clickY - originScreenY) を使う
                 // ※ absoluteY - originY だと、スクロールしたときにずれる可能性があるため、View座標で統一
-                const dy = clickY - event_dragTarget.originScreenY; 
+                const dy = clickY - event_dragTarget.originScreenY;
                 const trackDiff = Math.round(dy / EVENT_TRACK_HEIGHT);
                 const newTrack = event_dragTarget.startTrack + trackDiff;
                 if (newTrack >= 0 && newTrack < 4) {
@@ -669,7 +669,7 @@ window.event_onGlobalMouseMove = function (e) {
             }
         }
         event_dragStartPos = { x: e.clientX, y: e.clientY };
-        
+
         event_draw();
     }
 };
@@ -678,7 +678,7 @@ window.event_onGlobalMouseUp = function (e) {
     if (event_state === 'drag-pickwhip') {
         const rect = event_canvasTimeline.getBoundingClientRect();
         const x = e.clientX - rect.left;
-        const clickY = e.clientY - rect.top; 
+        const clickY = e.clientY - rect.top;
         const scrollY = event_timelineContainer.scrollTop;
         const absoluteY = clickY + scrollY;
 
@@ -776,17 +776,17 @@ window.event_onPreviewMouseDown = function (e) {
             const asset = event_findAssetById(layer.animAssetId);
             if (!img && asset) img = asset.imgObj;
         }
-        if (!img && layer.type !== 'text') continue;
+        if (!img && layer.type !== 'text' && layer.type !== 'solid') continue;
 
         const world = event_getLayerWorldTransform(i, event_currentTime);
-        
+
         let hitW = 64, hitH = 64;
-        
+
         if (layer.type === 'text') {
             const fontSize = layer.fontSize || 40;
             const text = layer.text || "";
             const fontFamily = layer.fontFamily || 'sans-serif';
-            
+
             if (event_ctxPreview) {
                 event_ctxPreview.save();
                 event_ctxPreview.font = `bold ${fontSize}px ${fontFamily}`;
@@ -806,11 +806,20 @@ window.event_onPreviewMouseDown = function (e) {
                 hitH = lines.length * fontSize * 1.2;
                 event_ctxPreview.restore();
             } else {
-                hitW = 200; hitH = 50; 
+                hitW = 200; hitH = 50;
             }
             const strokeW = layer.strokeWidth || 0;
             hitW += strokeW; hitH += strokeW;
 
+        } else if (layer.type === 'solid') {
+            const cw = event_data.composition.width;
+            const ch = event_data.composition.height;
+            if (layer.shape === 'circle') {
+                const r = Math.min(cw, ch) / 2;
+                hitW = r * 2; hitH = r * 2;
+            } else {
+                hitW = cw; hitH = ch;
+            }
         } else {
             const iw = img.naturalWidth || 64;
             const ih = img.naturalHeight || 64;
@@ -819,11 +828,11 @@ window.event_onPreviewMouseDown = function (e) {
                 const asset = event_findAssetById(layer.animAssetId);
                 const currentAnimId = event_getInterpolatedValue(i, "motion", event_currentTime);
                 if (asset && asset.data && asset.data[currentAnimId]) {
-                     const frames = asset.data[currentAnimId].frames;
-                     if (frames.length > 0) {
-                         hitW = frames[0].w;
-                         hitH = frames[0].h;
-                     }
+                    const frames = asset.data[currentAnimId].frames;
+                    if (frames.length > 0) {
+                        hitW = frames[0].w;
+                        hitH = frames[0].h;
+                    }
                 }
             }
         }
@@ -865,7 +874,7 @@ window.event_onKeyDown = function (e) {
     }
 
     if (e.code === 'F9' && event_selectedKey) {
-        event_pushHistory(); 
+        event_pushHistory();
         const keys = event_selectedKeys.length > 0 ? event_selectedKeys : [event_selectedKey];
         const s = !(keys[0].keyObj.easeIn && keys[0].keyObj.easeOut);
         keys.forEach(k => { k.keyObj.easeIn = s; k.keyObj.easeOut = s; });
@@ -896,8 +905,8 @@ window.event_showInlineInput = function (x, y, initialValue, trackType, callback
         if (!isNaN(val) || trackType === 'string') callback(val);
         if (input.parentNode) input.parentNode.removeChild(input);
     };
-    input.onkeydown = (e) => { 
-        if (e.key === 'Enter') commit(); 
+    input.onkeydown = (e) => {
+        if (e.key === 'Enter') commit();
         else if (e.key === 'Escape') if (input.parentNode) input.parentNode.removeChild(input);
     };
     input.onblur = commit;
@@ -956,7 +965,7 @@ window.event_showParentSelect = function (x, y, childIdx) {
     document.body.appendChild(menu);
 };
 
-window.event_showTrackSelectMenu = function(x, y, currentTrack, callback) {
+window.event_showTrackSelectMenu = function (x, y, currentTrack, callback) {
     const oldMenu = document.getElementById('event-track-select-menu');
     if (oldMenu) oldMenu.remove();
 
@@ -970,7 +979,7 @@ window.event_showTrackSelectMenu = function(x, y, currentTrack, callback) {
     menu.style.padding = '5px 0';
     menu.style.zIndex = '3000';
     menu.style.boxShadow = '0 4px 12px rgba(0,0,0,0.5)';
-    
+
     [1, 2, 3, 4].forEach(tNum => {
         const item = document.createElement('div');
         item.style.padding = '6px 15px';
@@ -978,7 +987,7 @@ window.event_showTrackSelectMenu = function(x, y, currentTrack, callback) {
         item.style.fontSize = '12px';
         item.style.color = (tNum === currentTrack) ? '#66aa44' : '#fff';
         item.textContent = `Track ${tNum}` + (tNum === currentTrack ? ' ✓' : '');
-        
+
         item.onmouseover = () => item.style.backgroundColor = '#444';
         item.onmouseout = () => item.style.backgroundColor = '';
         item.onclick = (e) => {
@@ -988,7 +997,7 @@ window.event_showTrackSelectMenu = function(x, y, currentTrack, callback) {
         };
         menu.appendChild(item);
     });
-    
+
     const closeMenu = (e) => {
         if (!menu.contains(e.target)) {
             if (menu.parentNode) menu.remove();
@@ -1002,8 +1011,8 @@ window.event_showTrackSelectMenu = function(x, y, currentTrack, callback) {
 window.event_showEnumSelect = function (x, y, initialValue, options, callback) {
     const select = document.createElement('select');
     const rect = event_canvasTimeline.getBoundingClientRect();
-    select.style.position = 'absolute'; 
-    select.style.left = (rect.left + x) + 'px'; 
+    select.style.position = 'absolute';
+    select.style.left = (rect.left + x) + 'px';
     select.style.top = (rect.top + y) + 'px';
     select.style.zIndex = '3000';
     options.forEach(o => {

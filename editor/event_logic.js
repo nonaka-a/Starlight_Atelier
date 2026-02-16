@@ -29,7 +29,7 @@ window.event_copySelectedKeyframe = function () {
 
     // 選択されたキーの中で最小の時間を基準とする
     const minTime = Math.min(...event_selectedKeys.map(k => k.keyObj.time));
-    
+
     // コピー元の代表レイヤーインデックスを保存（ペースト時のフォールバック用）
     const sourceLayerIdx = event_selectedKeys[0].layerIdx;
 
@@ -57,13 +57,13 @@ window.event_pasteKeyframe = function () {
     // 1. 現在選択されているレイヤー (event_selectedLayerIndex)
     // 2. 現在キーフレームが選択されているレイヤー
     // 3. コピー元のレイヤー (event_clipboard.sourceLayerIdx)
-    
+
     let targetLayerIdx = event_selectedLayerIndex;
-    
+
     if (targetLayerIdx === -1 && event_selectedKeys.length > 0) {
         targetLayerIdx = event_selectedKeys[0].layerIdx;
     }
-    
+
     if (targetLayerIdx === -1 && event_clipboard.sourceLayerIdx !== undefined) {
         targetLayerIdx = event_clipboard.sourceLayerIdx;
     }
@@ -87,11 +87,11 @@ window.event_pasteKeyframe = function () {
 
         const track = layer.tracks[item.prop];
         const pasteTime = event_snapTime(baseTime + item.offset);
-        
+
         // 既存キーを検索して更新、なければ追加
         let existingKey = track.keys.find(k => Math.abs(k.time - pasteTime) < 0.001);
         const valCopy = JSON.parse(JSON.stringify(item.value));
-        
+
         if (existingKey) {
             existingKey.value = valCopy;
             existingKey.interpolation = item.interpolation;
@@ -358,12 +358,12 @@ window.event_setLayerParent = function (childLayerIdx, parentLayerId) {
 
     // 4. 新しいローカル値を逆算
     const newLocalRot = world.rotation - parentWorld.rotation;
-    
+
     const newLocalScale = {
         x: (parentWorld.scale.x !== 0) ? (world.scale.x / parentWorld.scale.x) * 100 : world.scale.x * 100,
         y: (parentWorld.scale.y !== 0) ? (world.scale.y / parentWorld.scale.y) * 100 : world.scale.y * 100
     };
-    
+
     const dx = world.position.x - parentWorld.position.x;
     const dy = world.position.y - parentWorld.position.y;
     const pRad = -parentWorld.rotation * Math.PI / 180;
@@ -539,7 +539,7 @@ window.event_addAudioLayer = function (name, assetId) {
 /**
  * 音声トラックの表示モード切り替え
  */
-window.event_toggleAudioMode = function() {
+window.event_toggleAudioMode = function () {
     event_audioCompactMode = !event_audioCompactMode;
     event_draw();
 };
@@ -684,6 +684,41 @@ window.event_applyCompSettings = function (isInit = false) {
     event_draw();
 };
 
+window.event_toggleSolidMenu = function () {
+    const m = document.getElementById('event-solid-menu');
+    if (m) m.style.display = (m.style.display === 'none') ? 'block' : 'none';
+};
+
+window.event_addSolidLayer = function (shape) {
+    event_pushHistory();
+    document.getElementById('event-solid-menu').style.display = 'none';
+
+    const cx = event_data.composition.width / 2;
+    const cy = event_data.composition.height / 2;
+
+    const newLayer = {
+        id: 'layer_solid_' + Date.now(),
+        type: 'solid',
+        name: (shape === 'rect' ? 'Square' : 'Circle'),
+        shape: shape,
+        color: '#ffffff',
+        parent: null,
+        expanded: true,
+        inPoint: 0,
+        outPoint: event_data.composition.duration,
+        tracks: {
+            "position": { label: "Position", type: "vector2", keys: [], step: 1, initialValue: { x: cx, y: cy } },
+            "scale": { label: "Scale", type: "vector2", linked: true, keys: [], step: 1, initialValue: { x: 100, y: 100 } },
+            "rotation": { label: "Rotation", type: "rotation", keys: [], min: -3600, max: 3600, step: 1, initialValue: 0 },
+            "opacity": { label: "Opacity", type: "number", keys: [], min: 0, max: 100, step: 1, initialValue: 100 }
+        }
+    };
+
+    event_data.layers.unshift(newLayer);
+    event_selectedLayerIndex = 0;
+    event_draw();
+};
+
 window.event_createComp = function () {
     const name = prompt("コンポジション名", "Comp " + (event_data.assets.filter(a => a.type === 'comp').length + 1));
     if (name) {
@@ -811,7 +846,7 @@ window.event_addTextLayer = function () {
     const cx = event_data.composition.width / 2;
     const cy = event_data.composition.height / 2;
 
-     const newLayer = {
+    const newLayer = {
         id: 'layer_text_' + Date.now(),
         type: 'text',
         name: 'Text Layer',
@@ -823,7 +858,7 @@ window.event_addTextLayer = function () {
         strokeColor: '#000000',
         strokeWidth: 0,
         shadowOpacity: 0, // ★追加: ドロップシャドウの不透明度 (0-100)
-        
+
         parent: null,
         expanded: true,
         inPoint: 0,
@@ -850,11 +885,10 @@ window.event_addTextLayer = function () {
 window.event_onTextPropertyChange = function (prop) {
     if (event_selectedLayerIndex === -1) return;
     const layer = event_data.layers[event_selectedLayerIndex];
-    if (layer.type !== 'text') return;
+    if (layer.type !== 'text' && layer.type !== 'solid') return;
 
     let val;
     if (prop === 'text') {
-        // 入力された "\n" (文字列) を 改行コード に変換
         val = document.getElementById('inp-text-content').value.replace(/\\n/g, '\n');
     }
     else if (prop === 'fontSize') val = parseInt(document.getElementById('inp-text-size').value);
@@ -880,16 +914,27 @@ window.event_updateTextPropertyUI = function () {
 
     if (event_selectedLayerIndex !== -1) {
         const layer = event_data.layers[event_selectedLayerIndex];
-        if (layer && layer.type === 'text') {
+        if (layer && (layer.type === 'text' || layer.type === 'solid')) {
             ui.style.display = 'flex';
-            // 改行コードを "\n" (文字列) に変換して表示
-            document.getElementById('inp-text-content').value = layer.text.replace(/\n/g, '\\n');
-            
-            document.getElementById('inp-text-size').value = layer.fontSize;
-            document.getElementById('inp-text-color').value = layer.color;
-            document.getElementById('inp-text-stroke-color').value = layer.strokeColor;
-            document.getElementById('inp-text-stroke-w').value = layer.strokeWidth;
-            document.getElementById('inp-text-shadow').value = layer.shadowOpacity || 0;
+
+            const isText = (layer.type === 'text');
+
+            // UI項目の表示・非表示を切り替え
+            const textFields = ['event-prop-label-text', 'inp-text-content', 'inp-text-size', 'event-prop-label-px', 'event-prop-label-str', 'inp-text-stroke-color', 'inp-text-stroke-w', 'event-prop-label-shd', 'inp-text-shadow'];
+            textFields.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = isText ? '' : 'none';
+            });
+
+            if (isText) {
+                document.getElementById('inp-text-content').value = layer.text.replace(/\n/g, '\\n');
+                document.getElementById('inp-text-size').value = layer.fontSize;
+                document.getElementById('inp-text-stroke-color').value = layer.strokeColor;
+                document.getElementById('inp-text-stroke-w').value = layer.strokeWidth;
+                document.getElementById('inp-text-shadow').value = layer.shadowOpacity || 0;
+            }
+
+            document.getElementById('inp-text-color').value = layer.color || '#ffffff';
             return;
         }
     }
@@ -902,27 +947,27 @@ window.event_updateTextPropertyUI = function () {
  * 1フレーム単位でインジケータを移動
  * @param {number} dir -1: 戻る, 1: 進む
  */
-window.event_stepFrame = function(dir) {
+window.event_stepFrame = function (dir) {
     const fps = event_data.composition.fps || 30;
     const frameTime = 1 / fps;
-    
+
     // 現在時刻にフレーム時間を加算・減算し、フレームグリッドに吸着させる
     let newTime = event_currentTime + (dir * frameTime);
-    
+
     // 浮動小数点誤差対策（一度フレーム番号にしてから戻す）
     const frame = Math.round(newTime * fps);
     newTime = frame / fps;
-    
+
     if (newTime < 0) newTime = 0;
     if (newTime > event_data.composition.duration) newTime = event_data.composition.duration;
-    
+
     event_seekTo(newTime);
 };
 
 /**
  * 現在のインジケータ位置を選択レイヤーのイン点（開始）に設定
  */
-window.event_setInPointToCurrent = function() {
+window.event_setInPointToCurrent = function () {
     if (event_selectedLayerIndex === -1) {
         alert("レイヤーを選択してください");
         return;
@@ -930,26 +975,26 @@ window.event_setInPointToCurrent = function() {
     event_pushHistory();
     const layer = event_data.layers[event_selectedLayerIndex];
     const time = event_snapTime(event_currentTime);
-    
+
     // イン点がアウト点を超えないように調整
     if (time >= layer.outPoint) {
         // アウト点を少し後ろにずらす（最小1フレーム幅確保）
         const fps = event_data.composition.fps || 30;
         layer.outPoint = time + (1 / fps);
     }
-    
+
     layer.inPoint = time;
-    
+
     // 音声やアニメーションの場合、開始タイミングの調整が必要であれば行う
     // (ここでは表示区間のみ変更し、メディアの再生開始位置自体はずらさない仕様とします)
-    
+
     event_draw();
 };
 
 /**
  * 現在のインジケータ位置を選択レイヤーのアウト点（終了）に設定
  */
-window.event_setOutPointToCurrent = function() {
+window.event_setOutPointToCurrent = function () {
     if (event_selectedLayerIndex === -1) {
         alert("レイヤーを選択してください");
         return;
@@ -957,14 +1002,14 @@ window.event_setOutPointToCurrent = function() {
     event_pushHistory();
     const layer = event_data.layers[event_selectedLayerIndex];
     const time = event_snapTime(event_currentTime);
-    
+
     // アウト点がイン点より前にならないように調整
     if (time <= layer.inPoint) {
         // イン点を少し前にずらす（最小1フレーム幅確保）
         const fps = event_data.composition.fps || 30;
         layer.inPoint = Math.max(0, time - (1 / fps));
     }
-    
+
     layer.outPoint = time;
     event_draw();
 };
@@ -973,27 +1018,27 @@ window.event_setOutPointToCurrent = function() {
  * 選択レイヤーの先頭(inPoint)を現在のインジケータ位置まで移動させる
  * (キーフレームや再生タイミングも追従)
  */
-window.event_moveLayerStartToCurrent = function() {
+window.event_moveLayerStartToCurrent = function () {
     if (event_selectedLayerIndex === -1) {
         alert("レイヤーを選択してください");
         return;
     }
-    
+
     event_pushHistory();
     const layer = event_data.layers[event_selectedLayerIndex];
     const targetTime = event_snapTime(event_currentTime);
-    
+
     // 移動量 (差分) を計算
     const dt = targetTime - layer.inPoint;
-    
+
     // 各種プロパティに差分を加算
     layer.inPoint += dt;
     layer.outPoint += dt;
-    
+
     if (layer.startTime !== undefined) {
         layer.startTime += dt;
     }
-    
+
     // キーフレームも全て移動
     Object.values(layer.tracks).forEach(track => {
         if (track.keys) {
@@ -1002,7 +1047,7 @@ window.event_moveLayerStartToCurrent = function() {
             });
         }
     });
-    
+
     event_draw();
 };
 
@@ -1010,27 +1055,27 @@ window.event_moveLayerStartToCurrent = function() {
  * 選択レイヤーの末尾(outPoint)を現在のインジケータ位置まで移動させる
  * (キーフレームや再生タイミングも追従)
  */
-window.event_moveLayerEndToCurrent = function() {
+window.event_moveLayerEndToCurrent = function () {
     if (event_selectedLayerIndex === -1) {
         alert("レイヤーを選択してください");
         return;
     }
-    
+
     event_pushHistory();
     const layer = event_data.layers[event_selectedLayerIndex];
     const targetTime = event_snapTime(event_currentTime);
-    
+
     // 移動量 (差分) を計算 (ターゲット - 現在の終了点)
     const dt = targetTime - layer.outPoint;
-    
+
     // 各種プロパティに差分を加算
     layer.inPoint += dt;
     layer.outPoint += dt;
-    
+
     if (layer.startTime !== undefined) {
         layer.startTime += dt;
     }
-    
+
     // キーフレームも全て移動
     Object.values(layer.tracks).forEach(track => {
         if (track.keys) {
@@ -1039,6 +1084,6 @@ window.event_moveLayerEndToCurrent = function() {
             });
         }
     });
-    
+
     event_draw();
 };

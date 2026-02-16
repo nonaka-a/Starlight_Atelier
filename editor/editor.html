@@ -705,26 +705,45 @@
             </div>
             <!-- テキスト追加ボタンをここに移動し、ラベルを短縮 -->
             <button onclick="event_addTextLayer()" style="background:#d84; width:30px; padding:5px 0;">T</button>
+            <div style="position: relative; display: inline-block;">
+                <button onclick="event_toggleSolidMenu()"
+                    style="background:#48f; width:30px; padding:5px 0; margin-left: 2px;">◻️</button>
+                <div id="event-solid-menu"
+                    style="display: none; position: absolute; top: 100%; left: 0; background: #444; border: 1px solid #666; z-index: 1000; min-width: 120px; box-shadow: 0 4px 8px rgba(0,0,0,0.5);">
+                    <div class="anim-item" onclick="event_addSolidLayer('rect')"
+                        style="padding: 5px 10px; font-size: 0.9rem;">四角 (Square)</div>
+                    <div class="anim-item" onclick="event_addSolidLayer('circle')"
+                        style="padding: 5px 10px; font-size: 0.9rem;">丸 (Circle)</div>
+                </div>
+            </div>
         </div>
         <div class="tool-group">
             <button onclick="event_exportJSON()" style="background:#6a4;">💾 JSON書出</button>
             <button onclick="event_importJSON()" style="background:#559;">📂 JSON読込</button>
         </div>
-        
+
         <!-- 元のテキスト追加ボタンがあった tool-group は削除または空なら削除 -->
-        
-        <div id="event-text-props" class="tool-group" style="display:none; align-items: center; gap: 5px; background: #444; padding: 2px 8px; border-radius: 4px;">
-            <span style="font-size:0.8rem; color:#aaa;">Text:</span>
+
+        <div id="event-text-props" class="tool-group"
+            style="display:none; align-items: center; gap: 5px; background: #444; padding: 2px 8px; border-radius: 4px;">
+            <span id="event-prop-label-text" style="font-size:0.8rem; color:#aaa;">Text:</span>
             <input type="text" id="inp-text-content" style="width: 120px;" oninput="event_onTextPropertyChange('text')">
-            <input type="number" id="inp-text-size" value="40" style="width: 40px;" onchange="event_onTextPropertyChange('fontSize')">
-            <span style="font-size:0.8rem; color:#aaa;">px</span>
-            <input type="color" id="inp-text-color" value="#ffffff" onchange="event_onTextPropertyChange('color')" style="width:24px; height:24px; padding:0; border:none;">
-            <span style="font-size:0.8rem; color:#aaa;">Str:</span>
-            <input type="color" id="inp-text-stroke-color" value="#000000" onchange="event_onTextPropertyChange('strokeColor')" style="width:24px; height:24px; padding:0; border:none;">
-            <input type="number" id="inp-text-stroke-w" value="0" style="width: 30px;" onchange="event_onTextPropertyChange('strokeWidth')">
+            <input type="number" id="inp-text-size" value="40" style="width: 40px;"
+                onchange="event_onTextPropertyChange('fontSize')">
+            <span id="event-prop-label-px" style="font-size:0.8rem; color:#aaa;">px</span>
+            <span id="event-prop-label-color" style="font-size:0.8rem; color:#aaa;">Col:</span>
+            <input type="color" id="inp-text-color" value="#ffffff" onchange="event_onTextPropertyChange('color')"
+                style="width:24px; height:24px; padding:0; border:none;">
+            <span id="event-prop-label-str" style="font-size:0.8rem; color:#aaa;">Str:</span>
+            <input type="color" id="inp-text-stroke-color" value="#000000"
+                onchange="event_onTextPropertyChange('strokeColor')"
+                style="width:24px; height:24px; padding:0; border:none;">
+            <input type="number" id="inp-text-stroke-w" value="0" style="width: 30px;"
+                onchange="event_onTextPropertyChange('strokeWidth')">
             <!-- 以下を追加: ドロップシャドウ用 -->
-            <span style="font-size:0.8rem; color:#aaa;">Shd:</span>
-            <input type="number" id="inp-text-shadow" value="0" min="0" max="100" style="width: 35px;" onchange="event_onTextPropertyChange('shadowOpacity')" title="影の不透明度(%)">
+            <span id="event-prop-label-shd" style="font-size:0.8rem; color:#aaa;">Shd:</span>
+            <input type="number" id="inp-text-shadow" value="0" min="0" max="100" style="width: 35px;"
+                onchange="event_onTextPropertyChange('shadowOpacity')" title="影の不透明度(%)">
         </div>
         <div class="tool-group">
             <button id="btn-event-play" onclick="event_togglePlay()">▶ 再生</button>
@@ -796,97 +815,104 @@
                     oninput="event_draw()">
                 <button onclick="event_openKeyframeMenuFromButton(event)"
                     style="font-size: 0.8rem; padding: 2px 8px; margin-left: 5px;">KF制御</button>
-                    <div style="display: flex; gap: 2px;">
-                    <button onclick="event_stepFrame(-1)" title="1フレーム戻る" style="font-size: 0.8rem; padding: 2px 6px;">◀︎</button>
-                    <button onclick="event_stepFrame(1)" title="1フレーム進む" style="font-size: 0.8rem; padding: 2px 6px;">▶︎</button>
+                <div style="display: flex; gap: 2px;">
+                    <button onclick="event_stepFrame(-1)" title="1フレーム戻る"
+                        style="font-size: 0.8rem; padding: 2px 6px;">◀︎</button>
+                    <button onclick="event_stepFrame(1)" title="1フレーム進む"
+                        style="font-size: 0.8rem; padding: 2px 6px;">▶︎</button>
                 </div>
                 <div style="display: flex; gap: 2px;">
-                    <button onclick="event_setInPointToCurrent()" title="現在位置をイン点に設定" style="font-size: 0.8rem; padding: 2px 6px;">《</button>
-                    <button onclick="event_setOutPointToCurrent()" title="現在位置をアウト点に設定" style="font-size: 0.8rem; padding: 2px 6px;">》</button>
+                    <button onclick="event_setInPointToCurrent()" title="現在位置をイン点に設定"
+                        style="font-size: 0.8rem; padding: 2px 6px;">《</button>
+                    <button onclick="event_setOutPointToCurrent()" title="現在位置をアウト点に設定"
+                        style="font-size: 0.8rem; padding: 2px 6px;">》</button>
                 </div>
                 <div style="display: flex; gap: 2px;">
-                    <button onclick="event_moveLayerStartToCurrent()" title="先頭を現在位置へ移動" style="font-size: 0.8rem; padding: 2px 6px;">［</button>
-                    <button onclick="event_moveLayerEndToCurrent()" title="お尻を現在位置へ移動" style="font-size: 0.8rem; padding: 2px 6px;">］</button>
+                    <button onclick="event_moveLayerStartToCurrent()" title="先頭を現在位置へ移動"
+                        style="font-size: 0.8rem; padding: 2px 6px;">［</button>
+                    <button onclick="event_moveLayerEndToCurrent()" title="お尻を現在位置へ移動"
+                        style="font-size: 0.8rem; padding: 2px 6px;">］</button>
                 </div>
 
-                <button onclick="event_toggleAudioMode()" style="font-size: 0.8rem; padding: 2px 8px;" title="音声トラックの結合/展開">🎵 切替</button>
+                <button onclick="event_toggleAudioMode()" style="font-size: 0.8rem; padding: 2px 8px;"
+                    title="音声トラックの結合/展開">🎵 切替</button>
 
                 <span style="font-size: 0.8rem; color: #666; margin-left: auto;">Key: Delete to remove
                     keyframe</span>
             </div>
-            </div>
         </div>
     </div>
+</div>
 
-    <div id="event-comp-modal" class="overlay" style="display: none;">
-        <div class="modal" style="width: 300px;">
-            <h2>コンポジション設定</h2>
-            <div style="display: flex; flex-direction: column; gap: 10px; text-align: left;">
-                <div><label style="font-size: 0.8rem;">名前</label><input type="text" id="inp-comp-name"
-                        style="width: 100%;"></div>
-                <div style="display: flex; gap: 10px;">
-                    <div style="flex: 1;"><label style="font-size: 0.8rem;">幅 (px)</label><input type="number"
-                            id="inp-comp-w" style="width: 100%;"></div>
-                    <div style="flex: 1;"><label style="font-size: 0.8rem;">高さ (px)</label><input type="number"
-                            id="inp-comp-h" style="width: 100%;"></div>
-                </div>
-                <div style="display: flex; gap: 10px;">
-                    <div style="flex: 1;"><label style="font-size: 0.8rem;">尺 (秒)</label><input type="number"
-                            id="inp-comp-duration" style="width: 100%;"></div>
-                    <div style="flex: 1;"><label style="font-size: 0.8rem;">フレームレート</label><input type="number"
-                            id="inp-comp-fps" style="width: 100%;"></div>
-                </div>
+<div id="event-comp-modal" class="overlay" style="display: none;">
+    <div class="modal" style="width: 300px;">
+        <h2>コンポジション設定</h2>
+        <div style="display: flex; flex-direction: column; gap: 10px; text-align: left;">
+            <div><label style="font-size: 0.8rem;">名前</label><input type="text" id="inp-comp-name" style="width: 100%;">
             </div>
-            <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
-                <button class="danger"
-                    onclick="document.getElementById('event-comp-modal').style.display='none'">キャンセル</button>
-                <button class="active" onclick="event_applyCompSettings()">OK</button>
+            <div style="display: flex; gap: 10px;">
+                <div style="flex: 1;"><label style="font-size: 0.8rem;">幅 (px)</label><input type="number"
+                        id="inp-comp-w" style="width: 100%;"></div>
+                <div style="flex: 1;"><label style="font-size: 0.8rem;">高さ (px)</label><input type="number"
+                        id="inp-comp-h" style="width: 100%;"></div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <div style="flex: 1;"><label style="font-size: 0.8rem;">尺 (秒)</label><input type="number"
+                        id="inp-comp-duration" style="width: 100%;"></div>
+                <div style="flex: 1;"><label style="font-size: 0.8rem;">フレームレート</label><input type="number"
+                        id="inp-comp-fps" style="width: 100%;"></div>
             </div>
         </div>
-    </div>
-
-    <div id="event-prompt-modal" class="overlay" style="display: none;">
-        <div class="modal" style="width: 300px;">
-            <h2 id="event-prompt-title">入力してください</h2>
-            <div style="display: flex; flex-direction: column; gap: 10px; text-align: left;">
-                <input type="text" id="event-prompt-input" style="width: 100%;">
-            </div>
-            <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
-                <button class="danger" onclick="window.event_onPromptCancel()">キャンセル</button>
-                <button class="active" onclick="window.event_onPromptOK()">OK</button>
-            </div>
+        <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+            <button class="danger"
+                onclick="document.getElementById('event-comp-modal').style.display='none'">キャンセル</button>
+            <button class="active" onclick="event_applyCompSettings()">OK</button>
         </div>
     </div>
+</div>
 
-    <script src="editor_map.js"></script>
-    <script src="editor_anim.js"></script>
-    <script src="editor_chart.js"></script>
-    <script src="event_core.js"></script>
-    <script src="event_logic.js"></script>
-    <script src="event_draw.js"></script>
-    <script src="event_input.js"></script>
-    <script src="event_project.js"></script>
+<div id="event-prompt-modal" class="overlay" style="display: none;">
+    <div class="modal" style="width: 300px;">
+        <h2 id="event-prompt-title">入力してください</h2>
+        <div style="display: flex; flex-direction: column; gap: 10px; text-align: left;">
+            <input type="text" id="event-prompt-input" style="width: 100%;">
+        </div>
+        <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+            <button class="danger" onclick="window.event_onPromptCancel()">キャンセル</button>
+            <button class="active" onclick="window.event_onPromptOK()">OK</button>
+        </div>
+    </div>
+</div>
 
-    <script>
-        window.switchMode = function (mode) {
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            const tabBtn = document.getElementById(`tab-${mode}`);
-            if (tabBtn) tabBtn.classList.add('active');
+<script src="editor_map.js"></script>
+<script src="editor_anim.js"></script>
+<script src="editor_chart.js"></script>
+<script src="event_core.js"></script>
+<script src="event_logic.js"></script>
+<script src="event_draw.js"></script>
+<script src="event_input.js"></script>
+<script src="event_project.js"></script>
 
-            document.querySelectorAll('.mode-area').forEach(area => area.classList.remove('active'));
-            const modeArea = document.getElementById(`mode-${mode}`);
-            if (modeArea) modeArea.classList.add('active');
+<script>
+    window.switchMode = function (mode) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        const tabBtn = document.getElementById(`tab-${mode}`);
+        if (tabBtn) tabBtn.classList.add('active');
 
-            if (mode === 'map' && window.initMapEditor) window.initMapEditor();
-            if (mode === 'anim' && window.initAnimEditor) window.initAnimEditor();
-            if (mode === 'chart' && window.initChartEditor) window.initChartEditor();
-            if (mode === 'event' && window.initEventEditor) window.initEventEditor();
-        };
+        document.querySelectorAll('.mode-area').forEach(area => area.classList.remove('active'));
+        const modeArea = document.getElementById(`mode-${mode}`);
+        if (modeArea) modeArea.classList.add('active');
 
-        window.onload = () => {
-            if (window.initMapEditor) window.initMapEditor();
-        };
-    </script>
-    </body>
+        if (mode === 'map' && window.initMapEditor) window.initMapEditor();
+        if (mode === 'anim' && window.initAnimEditor) window.initAnimEditor();
+        if (mode === 'chart' && window.initChartEditor) window.initChartEditor();
+        if (mode === 'event' && window.initEventEditor) window.initEventEditor();
+    };
+
+    window.onload = () => {
+        if (window.initMapEditor) window.initMapEditor();
+    };
+</script>
+</body>
 
 </html>
