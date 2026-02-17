@@ -93,6 +93,7 @@ function event_applyLayerTransform(ctx, layerIdx, time) {
     const sx = lScale.x / 100;
     const sy = lScale.y / 100;
     ctx.scale(sx, sy);
+
 }
 
 let event_offscreenCanvas = null;
@@ -312,6 +313,8 @@ window.event_draw = function () {
         event_ctxPreview.filter = filterStr.trim() || 'none';
 
         if (event_isValidDrawable(event_offscreenCanvas)) {
+            // ブレンドモード適用 (OffscreenCanvasをMainCanvasに描画するタイミングで行う)
+            event_ctxPreview.globalCompositeOperation = layer.blendMode || 'source-over';
             try {
                 event_ctxPreview.drawImage(event_offscreenCanvas, 0, 0);
             } catch (e) { }
@@ -320,13 +323,16 @@ window.event_draw = function () {
 
         if (idx === event_selectedLayerIndex) {
             event_applyLayerTransform(event_ctxPreview, idx, drawTime);
-            const currentTransform = event_ctxPreview.getTransform();
-            const pixelRatio = 1 / Math.sqrt(currentTransform.a * currentTransform.a + currentTransform.b * currentTransform.b);
-            event_ctxPreview.strokeStyle = '#0ff'; event_ctxPreview.lineWidth = 2 * pixelRatio;
+            event_ctxPreview.strokeStyle = '#0ff';
+            event_ctxPreview.lineWidth = 2; // シンプルに固定線幅で描画（スケーリングの影響を受けるが、簡易化のため）
+            // event_applyLayerTransformで既にtransformされているので、
+            // アンカー位置とサイズを使って枠線を描画する
             event_ctxPreview.strokeRect(drawAnchorX, drawAnchorY, drawW, drawH);
         }
         event_ctxPreview.restore();
     }
+    // ループ終了後に合成モードを初期値に戻す
+    event_ctxPreview.globalCompositeOperation = 'source-over';
     event_ctxPreview.restore();
 
     // --- タイムライン描画 ---
@@ -382,6 +388,22 @@ window.event_draw = function () {
                 dispParent += '..';
             }
             ctx.fillText(dispParent, parentX + 4, currentY + 18);
+
+            // ブレンドモードUI
+            const blendX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.BLEND_RIGHT;
+            ctx.fillStyle = '#222'; ctx.fillRect(blendX, currentY + 4, 18, 22);
+            ctx.strokeStyle = '#555'; ctx.strokeRect(blendX, currentY + 4, 18, 22);
+
+            let blendChar = 'N'; // Normal
+            if (layer.blendMode === 'multiply') blendChar = 'M';
+            else if (layer.blendMode === 'screen') blendChar = 'S';
+            else if (layer.blendMode === 'overlay') blendChar = 'O';
+
+            ctx.fillStyle = (blendChar === 'N') ? '#888' : '#fff';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(blendChar, blendX + 9, currentY + 19);
+            ctx.textAlign = 'left';
 
             const trashX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.TRASH_RIGHT;
             ctx.fillStyle = '#d44'; ctx.fillRect(trashX, currentY + 5, 20, 20); ctx.fillStyle = '#fff'; ctx.fillText("×", trashX + 6, currentY + 19);
@@ -563,6 +585,7 @@ window.event_draw = function () {
     ctx.restore();
 
     ctx.fillStyle = '#aaa'; ctx.font = '10px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText("Md", EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.BLEND_RIGHT + 2, 18);
     ctx.fillText("親", EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PARENT_RIGHT + 5, 18);
     ctx.fillText("Link", EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PICK_RIGHT - 10, 18);
 

@@ -215,6 +215,7 @@ window.event_addLayer = function (name, source) {
         name: name,
         source: source,
         imgObj: img,
+        blendMode: 'source-over',
         parent: null, // 親レイヤーID
         expanded: true,
         inPoint: 0,
@@ -702,6 +703,7 @@ window.event_addSolidLayer = function (shape) {
         name: (shape === 'rect' ? 'Square' : 'Circle'),
         shape: shape,
         color: '#ffffff',
+        blendMode: 'source-over',
         parent: null,
         expanded: true,
         inPoint: 0,
@@ -811,6 +813,7 @@ window.event_addAnimatedLayer = function (name, animAssetId, animId) {
         loop: true,
         imgObj: img,
         source: asset.source,
+        blendMode: 'source-over',
         parent: null,
         expanded: true,
         inPoint: 0,
@@ -850,6 +853,7 @@ window.event_addTextLayer = function () {
         id: 'layer_text_' + Date.now(),
         type: 'text',
         name: 'Text Layer',
+        blendMode: 'source-over',
         // テキスト固有プロパティ (非アニメーション)
         text: "テキストを入力\n改行も可能",
         fontSize: 60,

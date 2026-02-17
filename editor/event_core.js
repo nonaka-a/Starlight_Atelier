@@ -182,7 +182,8 @@ const UI_LAYOUT = {
     VAL_SINGLE_WIDTH: 80,
     VAL_VEC_Y_RIGHT: 100,
     VAL_VEC_X_RIGHT: 175,
-    VAL_VEC_WIDTH: 60
+    VAL_VEC_WIDTH: 60,
+    BLEND_RIGHT: 170
 };
 
 // UI定数 (パネル幅拡張)
@@ -208,7 +209,7 @@ window.initEventEditor = function () {
     // フォント読み込み待ち
     document.fonts.ready.then(() => {
         console.log("Fonts loaded.");
-        if (event_initialized) event_draw(); 
+        if (event_initialized) event_draw();
     });
 
     event_canvasPreview = document.getElementById('event-preview-canvas');

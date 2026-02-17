@@ -269,6 +269,15 @@ window.event_onTimelineMouseDown = function (e) {
                     event_showParentSelect(e.clientX, e.clientY, i);
                     return;
                 }
+                if (fromRight >= UI_LAYOUT.BLEND_RIGHT - 18 && fromRight <= UI_LAYOUT.BLEND_RIGHT) {
+                    const options = { 'source-over': '通常(N)', 'multiply': '乗算(M)', 'screen': 'スクリーン(S)', 'overlay': 'オーバーレイ(O)' };
+                    event_showKeyValSelect(e.clientX, e.clientY, layer.blendMode || 'source-over', options, (val) => {
+                        event_pushHistory();
+                        layer.blendMode = val;
+                        event_draw();
+                    });
+                    return;
+                }
                 if (x < 25) {
                     layer.expanded = !layer.expanded;
                 } else {
@@ -1024,6 +1033,48 @@ window.event_showEnumSelect = function (x, y, initialValue, options, callback) {
     select.onchange = () => { callback(select.value); removeSelect(); };
     select.onblur = () => setTimeout(removeSelect, 150);
     document.body.appendChild(select); select.focus();
+};
+
+window.event_showKeyValSelect = function (x, y, initialKey, optionsObj, callback) {
+    const old = document.getElementById('event-enum-menu');
+    if (old) old.remove();
+
+    const menu = document.createElement('div');
+    menu.id = 'event-enum-menu';
+    menu.style.position = 'fixed';
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+    menu.style.backgroundColor = '#333';
+    menu.style.border = '1px solid #666';
+    menu.style.zIndex = '3000';
+    menu.style.boxShadow = '0 4px 12px rgba(0,0,0,0.5)';
+    menu.style.minWidth = '120px';
+
+    Object.keys(optionsObj).forEach(key => {
+        const item = document.createElement('div');
+        item.style.padding = '6px 15px';
+        item.style.cursor = 'pointer';
+        item.style.fontSize = '12px';
+        item.style.color = (key === initialKey) ? '#66aa44' : '#fff';
+        item.textContent = (key === initialKey ? '✓ ' : '') + optionsObj[key];
+        item.onmouseover = () => item.style.backgroundColor = '#444';
+        item.onmouseout = () => item.style.backgroundColor = '';
+        item.onclick = (e) => {
+            e.stopPropagation();
+            callback(key);
+            menu.remove();
+        };
+        menu.appendChild(item);
+    });
+
+    const closeMenu = (e) => {
+        if (!menu.contains(e.target)) {
+            if (menu.parentNode) menu.remove();
+            window.removeEventListener('mousedown', closeMenu);
+        }
+    };
+    setTimeout(() => window.addEventListener('mousedown', closeMenu), 10);
+    document.body.appendChild(menu);
 };
 
 window.addEventListener('DOMContentLoaded', () => {

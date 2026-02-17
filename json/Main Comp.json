@@ -23,15 +23,15 @@
           "shadowOpacity": 0,
           "parent": null,
           "expanded": false,
-          "inPoint": 0.9351351351351329,
-          "outPoint": 7.93513513513514,
+          "inPoint": 2.433333333333333,
+          "outPoint": 8.255135135135124,
           "tracks": {
             "position": {
               "label": "Position",
               "type": "vector2",
               "keys": [
                 {
-                  "time": 1.168468468468467,
+                  "time": 3.3666666666666667,
                   "value": {
                     "x": 495.1807228915663,
                     "y": 66.26506024096383
@@ -70,7 +70,22 @@
             "opacity": {
               "label": "Opacity",
               "type": "number",
-              "keys": [],
+              "keys": [
+                {
+                  "time": 2.433333333333333,
+                  "value": 0,
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Linear"
+                },
+                {
+                  "time": 3.3666666666666667,
+                  "value": 100,
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Linear"
+                }
+              ],
               "min": 0,
               "max": 100,
               "step": 1,
@@ -309,6 +324,118 @@
               "initialValue": 100
             }
           }
+        },
+        {
+          "id": "layer_solid_1771286224777",
+          "type": "solid",
+          "name": "Circle",
+          "shape": "circle",
+          "color": "#ffa914",
+          "blendMode": "screen",
+          "parent": "layer_1770702162767_268",
+          "expanded": false,
+          "inPoint": 0,
+          "outPoint": 10,
+          "tracks": {
+            "position": {
+              "label": "Position",
+              "type": "vector2",
+              "keys": [
+                {
+                  "time": 4.4,
+                  "value": {
+                    "x": 1.865379223869752,
+                    "y": 1.1308171685529942
+                  },
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Linear"
+                }
+              ],
+              "step": 1,
+              "initialValue": {
+                "x": -2.0307246722341574,
+                "y": 11.52042755816342
+              }
+            },
+            "scale": {
+              "label": "Scale",
+              "type": "vector2",
+              "linked": true,
+              "keys": [
+                {
+                  "time": 4.4,
+                  "value": {
+                    "x": 33.78378378378378,
+                    "y": 33.78378378378378
+                  },
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Linear"
+                }
+              ],
+              "step": 1,
+              "initialValue": {
+                "x": 135.13513513513513,
+                "y": 135.13513513513513
+              }
+            },
+            "rotation": {
+              "label": "Rotation",
+              "type": "rotation",
+              "keys": [],
+              "min": -3600,
+              "max": 3600,
+              "step": 1,
+              "initialValue": 0
+            },
+            "opacity": {
+              "label": "Opacity",
+              "type": "number",
+              "keys": [
+                {
+                  "time": 0.8666666666666667,
+                  "value": 0,
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Linear"
+                },
+                {
+                  "time": 1.2666666666666666,
+                  "value": 58,
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Linear"
+                }
+              ],
+              "min": 0,
+              "max": 100,
+              "step": 1,
+              "initialValue": 100
+            },
+            "fx_blur_1771286255842": {
+              "type": "number",
+              "label": "FX: Blur",
+              "min": 0,
+              "max": 100,
+              "step": 0.1,
+              "keys": [
+                {
+                  "time": 4.4,
+                  "value": 18.6,
+                  "interpolation": "Linear"
+                }
+              ]
+            }
+          },
+          "effects": [
+            {
+              "id": "1771286255842",
+              "type": "blur",
+              "trackName": "fx_blur_1771286255842",
+              "enabled": true
+            }
+          ]
         },
         {
           "id": "layer_1770702162767_268",
@@ -641,9 +768,9 @@
           "type": "audio",
           "name": "atelier_bgm1.mp3",
           "assetId": "audio_17707012588850.11471787634632713",
-          "startTime": 0,
-          "inPoint": 0,
-          "outPoint": 10,
+          "startTime": -0.04,
+          "inPoint": -0.04,
+          "outPoint": 9.96,
           "expanded": false,
           "tracks": {
             "volume": {
@@ -651,7 +778,7 @@
               "type": "number",
               "keys": [
                 {
-                  "time": 0.5333333333333333,
+                  "time": 0.4933333333333333,
                   "value": -12.799999999999999,
                   "easeIn": false,
                   "easeOut": false,
