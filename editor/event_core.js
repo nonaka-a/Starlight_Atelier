@@ -183,7 +183,9 @@ const UI_LAYOUT = {
     VAL_VEC_Y_RIGHT: 100,
     VAL_VEC_X_RIGHT: 175,
     VAL_VEC_WIDTH: 60,
-    BLEND_RIGHT: 170
+    BLEND_RIGHT: 170,
+    EYE_RIGHT: 195,
+    LOCK_RIGHT: 215
 };
 
 // UI定数 (パネル幅拡張)

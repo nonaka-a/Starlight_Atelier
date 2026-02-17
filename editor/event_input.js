@@ -244,11 +244,51 @@ window.event_onTimelineMouseDown = function (e) {
         // 結合モード時は音声レイヤーをスキップ
         if (event_audioCompactMode && layer.type === 'audio') continue;
 
+        // ロックされているレイヤーの判定
+        if (layer.locked) {
+            if (clickY >= currentScreenY && clickY < currentScreenY + EVENT_TRACK_HEIGHT) {
+                // ロックボタン自体は押せるようにする (上記クリック判定の前に持ってくるべきだが、
+                // 構造上ループ内でクリック位置判定しているため、ここで特定エリア(ロックボタン)以外をブロックする)
+                // ただし、左パネルのボタン類は押せるようにしたいので、
+                // 「右パネル（タイムラインバー）」の操作のみブロックするのがシンプル。
+                if (x > EVENT_LEFT_PANEL_WIDTH) {
+                    // タイムラインバー操作無効
+                }
+            }
+            // しかし、layer.locked時は「プレビュー上の選択」も無効化したい
+            // ここではタイムライン上の操作スキップ処理
+        }
+
         // レイヤー行
         if (clickY >= currentScreenY && clickY < currentScreenY + EVENT_TRACK_HEIGHT) {
             if (x < EVENT_LEFT_PANEL_WIDTH) {
                 hitSomething = true;
                 const fromRight = EVENT_LEFT_PANEL_WIDTH - x;
+
+                // --- 左端基準のボタン判定 ---
+                // 1. 展開矢印 (0-18px)
+                if (x < 18) {
+                    layer.expanded = !layer.expanded;
+                    event_draw();
+                    return;
+                }
+                // 2. 👀ボタン (18-38px)
+                if (x >= 18 && x < 38) {
+                    layer.visible = (layer.visible === undefined) ? false : !layer.visible;
+                    event_draw();
+                    return;
+                }
+                // 3. 🔐ボタン (38-58px)
+                if (x >= 38 && x < 58) {
+                    layer.locked = !layer.locked;
+                    event_draw();
+                    return;
+                }
+
+                // ロック中のガード (ロック解除以外の操作をここから下でブロック)
+                if (layer.locked) return;
+
+                // --- 右端基準のボタン判定 (ゴミ箱、ピックウィップ、親選択、ブレンド) ---
                 if (fromRight >= UI_LAYOUT.TRASH_RIGHT - 20 && fromRight <= UI_LAYOUT.TRASH_RIGHT) {
                     if (confirm("レイヤーを削除しますか？")) {
                         event_pushHistory();
@@ -265,7 +305,6 @@ window.event_onTimelineMouseDown = function (e) {
                     return;
                 }
                 if (fromRight >= UI_LAYOUT.PICK_RIGHT + 5 && fromRight <= UI_LAYOUT.PARENT_RIGHT) {
-                    // 親選択メニューはView座標でOK（メニュー表示関数内でfixed配置するならclientX/Yを使う）
                     event_showParentSelect(e.clientX, e.clientY, i);
                     return;
                 }
@@ -278,19 +317,18 @@ window.event_onTimelineMouseDown = function (e) {
                     });
                     return;
                 }
-                if (x < 25) {
-                    layer.expanded = !layer.expanded;
-                } else {
+
+                // --- それ以外のレイヤー名部分などをクリック (順序入れ替え・選択) ---
+                if (x >= 58 || fromRight > UI_LAYOUT.PARENT_RIGHT) {
                     event_pushHistory();
                     event_state = 'drag-layer-order';
                     event_selectedLayerIndex = i;
-                    event_dragTarget = { layerIdx: i, originScreenY: currentScreenY }; // View座標を保存
+                    event_dragTarget = { layerIdx: i, originScreenY: currentScreenY };
                     event_dragStartPos = { x: e.clientX, y: e.clientY };
+                    event_selectedKey = null;
+                    if (!e.shiftKey) event_selectedKeys = [];
+                    event_draw();
                 }
-                event_selectedLayerIndex = i;
-                event_selectedKey = null;
-                if (!e.shiftKey) event_selectedKeys = [];
-                event_draw();
             } else {
                 // 右パネル
                 const inX = EVENT_LEFT_PANEL_WIDTH + (layer.inPoint - event_viewStartTime) * event_pixelsPerSec;
@@ -779,6 +817,9 @@ window.event_onPreviewMouseDown = function (e) {
     for (let i = 0; i < event_data.layers.length; i++) {
         const layer = event_data.layers[i];
         if (event_currentTime < layer.inPoint || event_currentTime > layer.outPoint || layer.type === 'audio') continue;
+
+        // ロックされているレイヤー、または非表示のレイヤーはプレビューで選択できない
+        if (layer.locked || layer.visible === false) continue;
 
         let img = layer.imgObj;
         if (layer.type === 'animated_layer') {

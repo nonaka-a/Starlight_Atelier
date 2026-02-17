@@ -201,7 +201,7 @@ window.event_draw = function () {
     for (let i = event_data.layers.length - 1; i >= 0; i--) {
         const idx = i;
         const layer = event_data.layers[idx];
-        if (drawTime < layer.inPoint || drawTime > layer.outPoint || layer.type === 'audio') continue;
+        if (drawTime < layer.inPoint || drawTime > layer.outPoint || layer.type === 'audio' || layer.visible === false) continue;
 
         osCtx.clearRect(0, 0, cw, ch); osCtx.save();
         event_applyLayerTransform(osCtx, idx, drawTime);
@@ -364,7 +364,23 @@ window.event_draw = function () {
             else { ctx.strokeStyle = '#222'; ctx.strokeRect(0, currentY, w, EVENT_TRACK_HEIGHT); }
 
             ctx.fillStyle = '#aaa'; ctx.font = '10px sans-serif'; ctx.fillText(layer.expanded ? "▼" : "▶", 5, currentY + 18);
-            ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.fillText(layer.name, 50, currentY + 20);
+
+            // 👀ボタン (左側)
+            const eyeX = 20;
+            if (layer.visible !== false) {
+                ctx.fillStyle = '#fff'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center';
+                ctx.fillText("👀", eyeX + 8, currentY + 20);
+            }
+
+            // 🔐ボタン (左側)
+            const lockX = 40;
+            if (layer.locked) {
+                ctx.fillStyle = '#f84'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center';
+                ctx.fillText("🔒", lockX + 8, currentY + 20);
+            }
+            ctx.textAlign = 'left';
+
+            ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.fillText(layer.name, 65, currentY + 20);
 
             const pickX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PICK_RIGHT;
             ctx.strokeStyle = '#aaa'; ctx.beginPath(); ctx.arc(pickX + 8, currentY + 15, 6, 0, Math.PI * 2); ctx.stroke();
