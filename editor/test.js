@@ -13,6 +13,9 @@ let startTime = 0;
 let isLoaded = false;
 let animationId = null;
 
+let offscreenCanvas = document.createElement('canvas');
+let offscreenCtx = offscreenCanvas.getContext('2d');
+
 // オーディオ管理
 let audioCtx = null;
 let audioLayers = {}; // layerId -> { sourceNode, gainNode, lastPlayedTime }
@@ -69,6 +72,9 @@ async function loadProject(json) {
 
     info.textContent = "Loading assets...";
     await restoreAssetsRecursive(projectData.assets);
+
+    offscreenCanvas.width = activeComp.width || 1000;
+    offscreenCanvas.height = activeComp.height || 600;
 
     // フォント読み込み待ち
     await document.fonts.ready;
@@ -261,7 +267,7 @@ function syncAudio(activeComp, time) {
                 if (layer.loop) startOffset = offset % asset.audioBuffer.duration;
 
                 if (startOffset < asset.audioBuffer.duration) {
-                    source.start(0, startOffset);
+                    source.start(0, Math.max(0, startOffset));
                     audioLayers[layer.id] = { source, gainNode, lastPlayedTime: time };
                 }
             } else {
@@ -333,26 +339,14 @@ function update(now) {
 
         const inP = layer.inPoint || 0;
         const outP = layer.outPoint || duration;
-        if (time < inP || time > outP) continue;
+        if (time < inP || time > outP || layer.visible === false) continue;
 
-        ctx.save();
+        const cw = activeComp.width;
+        const ch = activeComp.height;
 
-        const opacity = getInterpolatedValue(layer, "opacity", time);
-        ctx.globalAlpha = opacity / 100;
-
-        if (layer.effects) {
-            let filterStr = "";
-            layer.effects.forEach(fx => {
-                if (fx.type === 'blur') {
-                    let val = fx.blur || 0;
-                    if (fx.trackName) val = getInterpolatedValue(layer, fx.trackName, time);
-                    filterStr += ` blur(${val}px)`;
-                }
-            });
-            if (filterStr && ctx.filter !== undefined) ctx.filter = filterStr.trim();
-        }
-
-        applyTransform(ctx, layer, layers, time);
+        offscreenCtx.clearRect(0, 0, cw, ch);
+        offscreenCtx.save();
+        applyTransform(offscreenCtx, layer, layers, time);
 
         if (layer.type === 'text') {
             const text = layer.text || "";
@@ -366,9 +360,9 @@ function update(now) {
             const typewriter = getInterpolatedValue(layer, "typewriter", time);
             const letterSpacing = getInterpolatedValue(layer, "letterSpacing", time);
 
-            ctx.font = `bold ${fontSize}px ${fontFamily}`;
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
+            offscreenCtx.font = `bold ${fontSize}px ${fontFamily}`;
+            offscreenCtx.textAlign = "center";
+            offscreenCtx.textBaseline = "middle";
 
             const lines = text.split('\n');
             const lineHeight = fontSize * 1.2;
@@ -384,7 +378,7 @@ function update(now) {
                 let lineWidth = 0;
                 const chars = line.split('');
                 const charWidths = chars.map(c => {
-                    const w = ctx.measureText(c).width;
+                    const w = offscreenCtx.measureText(c).width;
                     lineWidth += w + letterSpacing;
                     return w;
                 });
@@ -394,38 +388,49 @@ function update(now) {
 
                 chars.forEach((char, charIdx) => {
                     if (charCounter < visibleCharCount) {
-                        const cw = charWidths[charIdx];
-                        const drawX = currentX + cw / 2;
+                        const cwChar = charWidths[charIdx];
+                        const drawX = currentX + cwChar / 2;
                         const drawY = startY + lineIdx * lineHeight;
 
                         if (shadowOpacity > 0) {
-                            ctx.shadowColor = `rgba(0, 0, 0, ${shadowOpacity / 100})`;
-                            ctx.shadowBlur = fontSize * 0.15;
-                            ctx.shadowOffsetX = 0;
-                            ctx.shadowOffsetY = 0;
+                            offscreenCtx.shadowColor = `rgba(0, 0, 0, ${shadowOpacity / 100})`;
+                            offscreenCtx.shadowBlur = fontSize * 0.15;
+                            offscreenCtx.shadowOffsetX = 0;
+                            offscreenCtx.shadowOffsetY = 0;
                         } else {
-                            ctx.shadowColor = 'transparent';
-                            ctx.shadowBlur = 0;
+                            offscreenCtx.shadowColor = 'transparent';
+                            offscreenCtx.shadowBlur = 0;
                         }
 
                         if (strokeWidth > 0) {
-                            ctx.lineWidth = strokeWidth;
-                            ctx.strokeStyle = strokeColor;
-                            ctx.lineJoin = 'round';
-                            ctx.strokeText(char, drawX, drawY);
-                            ctx.shadowColor = 'transparent';
-                            ctx.shadowBlur = 0;
+                            offscreenCtx.lineWidth = strokeWidth;
+                            offscreenCtx.strokeStyle = strokeColor;
+                            offscreenCtx.lineJoin = 'round';
+                            offscreenCtx.strokeText(char, drawX, drawY);
+                            offscreenCtx.shadowColor = 'transparent';
+                            offscreenCtx.shadowBlur = 0;
                         }
 
-                        ctx.fillStyle = color;
-                        ctx.fillText(char, drawX, drawY);
+                        offscreenCtx.fillStyle = color;
+                        offscreenCtx.fillText(char, drawX, drawY);
 
-                        currentX += cw + letterSpacing;
+                        currentX += cwChar + letterSpacing;
                         charCounter++;
                     }
                 });
             });
 
+        } else if (layer.type === 'solid') {
+            const color = layer.color || '#ffffff';
+            offscreenCtx.fillStyle = color;
+            if (layer.shape === 'circle') {
+                const r = Math.min(cw, ch) / 2;
+                offscreenCtx.beginPath();
+                offscreenCtx.arc(0, 0, r, 0, Math.PI * 2);
+                offscreenCtx.fill();
+            } else {
+                offscreenCtx.fillRect(-cw / 2, -ch / 2, cw, ch);
+            }
         } else if (layer.type === 'animated_layer') {
             const asset = findAssetById(layer.animAssetId, projectData.assets);
             const animId = getInterpolatedValue(layer, "motion", time);
@@ -434,18 +439,41 @@ function update(now) {
                 const localTime = time - (layer.startTime || 0);
                 if (localTime >= 0 && anim.frames.length > 0) {
                     const frameIdx = Math.floor(localTime * anim.fps);
-                    const idx = layer.loop ? (frameIdx % anim.frames.length) : Math.min(frameIdx, anim.frames.length - 1);
-                    const frame = anim.frames[idx];
+                    const fIdx = layer.loop ? (frameIdx % anim.frames.length) : Math.min(frameIdx, anim.frames.length - 1);
+                    const frame = anim.frames[fIdx];
                     const img = layer.imgObj || asset.imgObj;
                     if (frame && img) {
-                        ctx.drawImage(img, frame.x, frame.y, frame.w, frame.h, -frame.w / 2, -frame.h / 2, frame.w, frame.h);
+                        offscreenCtx.drawImage(img, frame.x, frame.y, frame.w, frame.h, -frame.w / 2, -frame.h / 2, frame.w, frame.h);
                     }
                 }
             }
         } else if (layer.imgObj) {
-            ctx.drawImage(layer.imgObj, -layer.imgObj.width / 2, -layer.imgObj.height / 2);
+            offscreenCtx.drawImage(layer.imgObj, -layer.imgObj.width / 2, -layer.imgObj.height / 2);
         }
+        offscreenCtx.restore();
+
+        // メインキャンバスへの転写
+        ctx.save();
+        const opacity = getInterpolatedValue(layer, "opacity", time);
+        ctx.globalAlpha = opacity / 100;
+        ctx.globalCompositeOperation = layer.blendMode || 'source-over';
+
+        if (layer.effects) {
+            let filterStr = "";
+            layer.effects.forEach(fx => {
+                if (fx.type === 'blur') {
+                    let val = fx.blur || 0;
+                    if (fx.trackName) val = getInterpolatedValue(layer, fx.trackName, time);
+                    filterStr += ` blur(${val}px)`;
+                }
+            });
+            if (filterStr && ctx.filter !== undefined) ctx.filter = filterStr.trim();
+        }
+
+        ctx.drawImage(offscreenCanvas, 0, 0);
         ctx.restore();
     }
+    // 合成モードのリセット
+    ctx.globalCompositeOperation = 'source-over';
     animationId = requestAnimationFrame(update);
 }
