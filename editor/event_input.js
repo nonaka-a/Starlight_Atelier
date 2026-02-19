@@ -322,11 +322,29 @@ window.event_onTimelineMouseDown = function (e) {
                 if (x >= 58 || fromRight > UI_LAYOUT.PARENT_RIGHT) {
                     event_pushHistory();
                     event_state = 'drag-layer-order';
-                    event_selectedLayerIndex = i;
+
+                    // 複数選択処理
+                    const isCmd = (e.ctrlKey || e.metaKey);
+                    if (e.shiftKey && event_selectedLayerIndex !== -1) {
+                        const start = Math.min(event_selectedLayerIndex, i);
+                        const end = Math.max(event_selectedLayerIndex, i);
+                        event_selectedLayerIndices = [];
+                        for (let j = start; j <= end; j++) event_selectedLayerIndices.push(j);
+                    } else if (isCmd) {
+                        if (event_selectedLayerIndices.includes(i)) {
+                            event_selectedLayerIndices = event_selectedLayerIndices.filter(idx => idx !== i);
+                        } else {
+                            event_selectedLayerIndices.push(i);
+                        }
+                    } else {
+                        event_selectedLayerIndex = i;
+                        event_selectedLayerIndices = [i];
+                    }
+
                     event_dragTarget = { layerIdx: i, originScreenY: currentScreenY };
                     event_dragStartPos = { x: e.clientX, y: e.clientY };
                     event_selectedKey = null;
-                    if (!e.shiftKey) event_selectedKeys = [];
+                    if (!e.shiftKey && !isCmd) event_selectedKeys = [];
                     event_draw();
                 }
             } else {
@@ -342,11 +360,38 @@ window.event_onTimelineMouseDown = function (e) {
                     event_pushHistory(); event_state = 'drag-layer-out'; event_dragTarget = { layerIdx: i };
                 } else if (x > inX && x < outX) {
                     hitSomething = true;
-                    event_pushHistory(); event_state = 'drag-layer-move'; event_dragTarget = { layerIdx: i, startIn: layer.inPoint, startOut: layer.outPoint };
+                    event_pushHistory();
+                    event_state = 'drag-layer-move';
+                    // 複数選択されているか確認
+                    const targets = (event_selectedLayerIndices.includes(i)) ? event_selectedLayerIndices : [i];
+                    event_dragTarget = {
+                        layerIdx: i,
+                        targets: targets.map(idx => ({
+                            layerIdx: idx,
+                            startIn: event_data.layers[idx].inPoint,
+                            startOut: event_data.layers[idx].outPoint,
+                            layer: event_data.layers[idx]
+                        }))
+                    };
                 } else {
                     hitSomething = true;
-                    event_selectedLayerIndex = i;
-                    if (!e.shiftKey) {
+                    const isCmd = (e.ctrlKey || e.metaKey);
+                    if (e.shiftKey && event_selectedLayerIndex !== -1) {
+                        const start = Math.min(event_selectedLayerIndex, i);
+                        const end = Math.max(event_selectedLayerIndex, i);
+                        event_selectedLayerIndices = [];
+                        for (let j = start; j <= end; j++) event_selectedLayerIndices.push(j);
+                    } else if (isCmd) {
+                        if (event_selectedLayerIndices.includes(i)) {
+                            event_selectedLayerIndices = event_selectedLayerIndices.filter(idx => idx !== i);
+                        } else {
+                            event_selectedLayerIndices.push(i);
+                        }
+                    } else {
+                        event_selectedLayerIndex = i;
+                        event_selectedLayerIndices = [i];
+                    }
+                    if (!e.shiftKey && !isCmd) {
                         event_selectedKey = null;
                         event_selectedKeys = [];
                     }
@@ -504,9 +549,40 @@ window.event_onTimelineMouseDown = function (e) {
                             event_pushHistory();
                             event_state = 'drag-layer-move';
                             // ★ドラッグ開始時のView座標(currentScreenY)を基準点として保存
-                            event_dragTarget = { layerIdx: i, startIn: layer.inPoint, startOut: layer.outPoint, startTrack: t, originScreenY: currentScreenY };
+                            const targets = (event_selectedLayerIndices.includes(i)) ? event_selectedLayerIndices : [i];
+                            event_dragTarget = {
+                                layerIdx: i,
+                                startIn: layer.inPoint,
+                                startOut: layer.outPoint,
+                                startTrack: t,
+                                originScreenY: currentScreenY,
+                                targets: targets.map(idx => ({
+                                    layerIdx: idx,
+                                    startIn: event_data.layers[idx].inPoint,
+                                    startOut: event_data.layers[idx].outPoint,
+                                    layer: event_data.layers[idx]
+                                }))
+                            };
                         }
-                        event_selectedLayerIndex = i;
+
+                        // 複数選択処理
+                        const isCmd = (e.ctrlKey || e.metaKey);
+                        if (e.shiftKey && event_selectedLayerIndex !== -1) {
+                            const start = Math.min(event_selectedLayerIndex, i);
+                            const end = Math.max(event_selectedLayerIndex, i);
+                            event_selectedLayerIndices = [];
+                            for (let j = start; j <= end; j++) event_selectedLayerIndices.push(j);
+                        } else if (isCmd) {
+                            if (event_selectedLayerIndices.includes(i)) {
+                                event_selectedLayerIndices = event_selectedLayerIndices.filter(idx => idx !== i);
+                            } else {
+                                event_selectedLayerIndices.push(i);
+                            }
+                        } else {
+                            event_selectedLayerIndex = i;
+                            event_selectedLayerIndices = [i];
+                        }
+
                         event_dragStartPos = { x: e.clientX, y: e.clientY };
                         event_draw();
                         return; // ヒットしたら終了
@@ -528,8 +604,9 @@ window.event_onTimelineMouseDown = function (e) {
         }
         event_draw();
     } else if (!hitSomething) {
-        if (!e.shiftKey) {
+        if (!e.shiftKey && !(e.ctrlKey || e.metaKey)) {
             event_selectedLayerIndex = -1;
+            event_selectedLayerIndices = [];
             event_selectedKey = null;
             event_selectedKeys = [];
             event_draw();
@@ -665,55 +742,68 @@ window.event_onGlobalMouseMove = function (e) {
             event_draw();
         }
     } else if (event_state === 'drag-preview') {
-        const dx = (e.clientX - event_dragStartPos.x) / event_previewScale;
-        const dy = (e.clientY - event_dragStartPos.y) / event_previewScale;
-        const layerIdx = event_dragTarget.layerIdx;
-        const layer = event_data.layers[layerIdx];
-        let moveX = dx; let moveY = dy;
-        if (layer.parent) {
-            const pIdx = event_data.layers.findIndex(l => l.id === layer.parent);
-            if (pIdx !== -1) {
-                const pWorld = event_getLayerWorldTransform(pIdx, event_currentTime);
-                const pRad = -pWorld.rotation * Math.PI / 180;
-                const pCos = Math.cos(pRad);
-                const pSin = Math.sin(pRad);
-                const lx = (dx * pCos - dy * pSin) / (pWorld.scale.x || 1);
-                const ly = (dx * pSin + dy * pCos) / (pWorld.scale.y || 1);
-                moveX = lx; moveY = ly;
+        const dx_screen = (e.clientX - event_dragStartPos.x) / event_previewScale;
+        const dy_screen = (e.clientY - event_dragStartPos.y) / event_previewScale;
+
+        const targets = event_dragTarget.targets || [{ layerIdx: event_dragTarget.layerIdx, startX: event_dragTarget.startX, startY: event_dragTarget.startY }];
+
+        targets.forEach(t => {
+            const layer = event_data.layers[t.layerIdx];
+            if (!layer) return;
+
+            let moveX = dx_screen;
+            let moveY = dy_screen;
+
+            if (layer.parent) {
+                const pIdx = event_data.layers.findIndex(l => l.id === layer.parent);
+                if (pIdx !== -1) {
+                    const pWorld = event_getLayerWorldTransform(pIdx, event_currentTime);
+                    const pRad = -pWorld.rotation * Math.PI / 180;
+                    const pCos = Math.cos(pRad);
+                    const pSin = Math.sin(pRad);
+                    const lx = (dx_screen * pCos - dy_screen * pSin) / (pWorld.scale.x || 1);
+                    const ly = (dx_screen * pSin + dy_screen * pCos) / (pWorld.scale.y || 1);
+                    moveX = lx; moveY = ly;
+                }
             }
-        }
-        const newX = event_dragTarget.startX + moveX;
-        const newY = event_dragTarget.startY + moveY;
-        event_updateKeyframe(layerIdx, 'position', event_currentTime, { x: newX, y: newY });
+            const newX = t.startX + moveX;
+            const newY = t.startY + moveY;
+            event_updateKeyframe(t.layerIdx, 'position', event_currentTime, { x: newX, y: newY });
+        });
         event_draw();
     } else if (event_state === 'drag-layer-in' || event_state === 'drag-layer-out' || event_state === 'drag-layer-move') {
         const dt = (e.clientX - event_dragStartPos.x) / event_pixelsPerSec;
-        const layer = event_data.layers[event_dragTarget.layerIdx];
 
         if (event_state === 'drag-layer-in') {
+            const layer = event_data.layers[event_dragTarget.layerIdx];
             layer.inPoint = Math.min(event_snapTime(layer.inPoint + dt), layer.outPoint);
         } else if (event_state === 'drag-layer-out') {
+            const layer = event_data.layers[event_dragTarget.layerIdx];
             layer.outPoint = Math.max(event_snapTime(layer.outPoint + dt), layer.inPoint);
         } else {
-            // move
-            layer.inPoint += dt;
-            layer.outPoint += dt;
-            if (layer.startTime !== undefined) {
-                layer.startTime += dt;
-            }
-            Object.values(layer.tracks).forEach(tr => tr.keys && tr.keys.forEach(k => k.time += dt));
+            // move (複数同時移動対応)
+            const targets = event_dragTarget.targets || [{ layerIdx: event_dragTarget.layerIdx }];
+            targets.forEach(t => {
+                const layer = event_data.layers[t.layerIdx] || t.layer;
+                if (!layer) return;
 
-            // 音声トラック間の移動 (Compact Mode時)
-            if (event_audioCompactMode && layer.type === 'audio' && event_dragTarget.startTrack !== undefined) {
-                // View座標同士の差分 (clickY - originScreenY) を使う
-                // ※ absoluteY - originY だと、スクロールしたときにずれる可能性があるため、View座標で統一
-                const dy = clickY - event_dragTarget.originScreenY;
-                const trackDiff = Math.round(dy / EVENT_TRACK_HEIGHT);
-                const newTrack = event_dragTarget.startTrack + trackDiff;
-                if (newTrack >= 0 && newTrack < 4) {
-                    layer.trackIdx = newTrack;
+                layer.inPoint += dt;
+                layer.outPoint += dt;
+                if (layer.startTime !== undefined) {
+                    layer.startTime += dt;
                 }
-            }
+                Object.values(layer.tracks).forEach(tr => tr.keys && tr.keys.forEach(k => k.time += dt));
+
+                // 音声トラック間の移動 (Compact Mode時) - 単体ドラッグ時のみ生かすか、要検討だが一旦単体のみ
+                if (targets.length === 1 && event_audioCompactMode && layer.type === 'audio' && event_dragTarget.startTrack !== undefined) {
+                    const dy = clickY - event_dragTarget.originScreenY;
+                    const trackDiff = Math.round(dy / EVENT_TRACK_HEIGHT);
+                    const newTrack = event_dragTarget.startTrack + trackDiff;
+                    if (newTrack >= 0 && newTrack < 4) {
+                        layer.trackIdx = newTrack;
+                    }
+                }
+            });
         }
         event_dragStartPos = { x: e.clientX, y: e.clientY };
 
@@ -897,18 +987,45 @@ window.event_onPreviewMouseDown = function (e) {
         const ly = (dx * sin + dy * cos) / (world.scale.y || 1);
 
         if (lx >= -hitW / 2 && lx <= hitW / 2 && ly >= -hitH / 2 && ly <= hitH / 2) {
-            const pos = event_getInterpolatedValue(i, "position", event_currentTime);
             event_pushHistory();
-            event_selectedLayerIndex = i;
+
+            // 複数選択処理
+            const isCmd = (e.ctrlKey || e.metaKey);
+            if (isCmd) {
+                if (event_selectedLayerIndices.includes(i)) {
+                    event_selectedLayerIndices = event_selectedLayerIndices.filter(idx => idx !== i);
+                    if (event_selectedLayerIndex === i) event_selectedLayerIndex = event_selectedLayerIndices[0] || -1;
+                } else {
+                    event_selectedLayerIndices.push(i);
+                    event_selectedLayerIndex = i;
+                }
+            } else if (!event_selectedLayerIndices.includes(i)) {
+                event_selectedLayerIndex = i;
+                event_selectedLayerIndices = [i];
+            } else {
+                // 既に選択に含まれている場合はメイン選択だけ更新
+                event_selectedLayerIndex = i;
+            }
+
             event_state = 'drag-preview';
             event_dragStartPos = { x: e.clientX, y: e.clientY };
-            event_dragTarget = { layerIdx: i, startX: pos.x, startY: pos.y };
+
+            // 全選択対象の開始位置を記録
+            event_dragTarget = {
+                layerIdx: i,
+                targets: event_selectedLayerIndices.map(idx => {
+                    const pos = event_getInterpolatedValue(idx, "position", event_currentTime);
+                    return { layerIdx: idx, startX: pos.x, startY: pos.y };
+                })
+            };
+
             event_draw();
             if (window.event_updateTextPropertyUI) window.event_updateTextPropertyUI();
             return;
         }
     }
     event_selectedLayerIndex = -1;
+    event_selectedLayerIndices = [];
     event_draw();
     if (window.event_updateTextPropertyUI) window.event_updateTextPropertyUI();
 };
@@ -919,7 +1036,7 @@ window.event_onKeyDown = function (e) {
 
     if ((e.ctrlKey || e.metaKey) && e.code === 'KeyD') {
         e.preventDefault();
-        if (event_selectedLayerIndex !== -1) event_duplicateLayer(event_selectedLayerIndex);
+        event_duplicateLayer(); // 引数なしで全選択対象を複製
         return;
     }
 
@@ -933,8 +1050,19 @@ window.event_onKeyDown = function (e) {
     else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyV') { event_pushHistory(); event_pasteKeyframe(); }
     else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'z')) { e.preventDefault(); event_undo(); }
     else if (e.code === 'Space') { e.preventDefault(); event_togglePlay(); }
-    else if (e.code === 'Delete' || e.code === 'Backspace') { event_pushHistory(); event_deleteSelectedKeyframe(); }
-    else if (e.code === 'KeyU' && event_selectedLayerIndex !== -1) { event_data.layers[event_selectedLayerIndex].expanded = !event_data.layers[event_selectedLayerIndex].expanded; event_draw(); }
+    else if (e.code === 'Delete' || e.code === 'Backspace') {
+        if (event_selectedKeys.length > 0) {
+            event_deleteSelectedKeyframe();
+        } else if (event_selectedLayerIndices.length > 0) {
+            event_deleteSelectedLayers();
+        }
+    }
+    else if (e.code === 'KeyU' && event_selectedLayerIndex !== -1) {
+        const targets = (event_selectedLayerIndices.length > 0) ? event_selectedLayerIndices : [event_selectedLayerIndex];
+        event_pushHistory();
+        targets.forEach(idx => { if (event_data.layers[idx]) event_data.layers[idx].expanded = !event_data.layers[idx].expanded; });
+        event_draw();
+    }
     else if (e.code === 'KeyJ') { event_jumpToPrevKeyframe(); }
     else if (e.code === 'KeyK') { event_jumpToNextKeyframe(); }
 };

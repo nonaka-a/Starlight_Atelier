@@ -321,9 +321,10 @@ window.event_draw = function () {
         }
         event_ctxPreview.filter = 'none';
 
-        if (idx === event_selectedLayerIndex) {
+        const isLayerSelected = (idx === event_selectedLayerIndex || event_selectedLayerIndices.includes(idx));
+        if (isLayerSelected) {
             event_applyLayerTransform(event_ctxPreview, idx, drawTime);
-            event_ctxPreview.strokeStyle = '#0ff';
+            event_ctxPreview.strokeStyle = idx === event_selectedLayerIndex ? '#0ff' : '#0aa';
             event_ctxPreview.lineWidth = 2; // シンプルに固定線幅で描画（スケーリングの影響を受けるが、簡易化のため）
             // event_applyLayerTransformで既にtransformされているので、
             // アンカー位置とサイズを使って枠線を描画する
@@ -356,11 +357,18 @@ window.event_draw = function () {
     event_data.layers.forEach((layer, layerIdx) => {
         if (event_audioCompactMode && layer.type === 'audio') return;
 
+        const isLayerSelected = (layerIdx === event_selectedLayerIndex || event_selectedLayerIndices.includes(layerIdx));
+        const isMainSelected = (layerIdx === event_selectedLayerIndex);
         const isVisible = (currentY + EVENT_TRACK_HEIGHT > EVENT_HEADER_HEIGHT && currentY < h);
         if (isVisible) {
-            ctx.fillStyle = (layerIdx === event_selectedLayerIndex) ? '#556' : '#3a3a3a';
+            ctx.fillStyle = isMainSelected ? '#556' : (isLayerSelected ? '#445' : '#3a3a3a');
             ctx.fillRect(0, currentY, w, EVENT_TRACK_HEIGHT);
-            if (layerIdx === event_selectedLayerIndex) { ctx.strokeStyle = '#88a'; ctx.lineWidth = 2; ctx.strokeRect(1, currentY + 1, EVENT_LEFT_PANEL_WIDTH - 2, EVENT_TRACK_HEIGHT - 2); ctx.lineWidth = 1; }
+            if (isLayerSelected) {
+                ctx.strokeStyle = isMainSelected ? '#88a' : '#668';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(1, currentY + 1, EVENT_LEFT_PANEL_WIDTH - 2, EVENT_TRACK_HEIGHT - 2);
+                ctx.lineWidth = 1;
+            }
             else { ctx.strokeStyle = '#222'; ctx.strokeRect(0, currentY, w, EVENT_TRACK_HEIGHT); }
 
             ctx.fillStyle = '#aaa'; ctx.font = '10px sans-serif'; ctx.fillText(layer.expanded ? "▼" : "▶", 5, currentY + 18);
@@ -439,7 +447,7 @@ window.event_draw = function () {
                     const asset = event_findAssetById(layer.assetId);
                     if (asset && asset.waveform) {
                         const startT = layer.startTime || 0;
-                        const wfX = EVENT_LEFT_PANEL_WIDTH + (layer.inPoint - startT - event_viewStartTime) * event_pixelsPerSec;
+                        const wfX = EVENT_LEFT_PANEL_WIDTH + (startT - event_viewStartTime) * event_pixelsPerSec;
                         ctx.save(); ctx.beginPath(); ctx.rect(barX, currentY + 4, barW, EVENT_TRACK_HEIGHT - 8); ctx.clip();
                         ctx.globalAlpha = 0.8;
                         if (event_isValidDrawable(asset.waveform)) {
@@ -560,16 +568,17 @@ window.event_draw = function () {
                 const barW = Math.max(0, outX - barX);
 
                 if (barW > 0) {
-                    const isSel = (layerIdx === event_selectedLayerIndex);
+                    const isLayerSelected = (layerIdx === event_selectedLayerIndex || event_selectedLayerIndices.includes(layerIdx));
+                    const isMainSelected = (layerIdx === event_selectedLayerIndex);
                     ctx.save(); ctx.beginPath(); ctx.rect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, h); ctx.clip();
-                    ctx.fillStyle = isSel ? 'rgba(100, 255, 100, 0.5)' : 'rgba(80, 200, 80, 0.4)';
+                    ctx.fillStyle = isMainSelected ? 'rgba(100, 255, 100, 0.7)' : (isLayerSelected ? 'rgba(100, 255, 100, 0.5)' : 'rgba(80, 200, 80, 0.4)');
                     ctx.fillRect(barX, trackY + 4, barW, EVENT_TRACK_HEIGHT - 8);
                     ctx.fillStyle = '#fff'; ctx.fillText(layer.name, barX + 5, trackY + 18);
 
                     const asset = event_findAssetById(layer.assetId);
                     if (asset && asset.waveform) {
                         const startT = layer.startTime || 0;
-                        const wfX = EVENT_LEFT_PANEL_WIDTH + (layer.inPoint - startT - event_viewStartTime) * event_pixelsPerSec;
+                        const wfX = EVENT_LEFT_PANEL_WIDTH + (startT - event_viewStartTime) * event_pixelsPerSec;
                         ctx.globalAlpha = 0.5;
                         ctx.save(); ctx.beginPath(); ctx.rect(barX, trackY + 4, barW, EVENT_TRACK_HEIGHT - 8); ctx.clip();
                         if (event_isValidDrawable(asset.waveform)) {

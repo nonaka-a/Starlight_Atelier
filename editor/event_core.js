@@ -162,6 +162,7 @@ window.event_undo = function () {
 
     // 選択状態のリセット（不正なインデックス参照を防ぐ）
     event_selectedLayerIndex = -1;
+    event_selectedLayerIndices = []; // ★追加
     event_selectedKey = null;
     event_selectedKeys = [];
 
@@ -202,6 +203,7 @@ let event_state = 'idle';
 let event_dragStartPos = { x: 0, y: 0 };
 let event_dragTarget = null;
 let event_selectedLayerIndex = -1;
+let event_selectedLayerIndices = []; // ★追加: 複数選択用
 let event_selectedKey = null;
 
 // --- 初期化 ---

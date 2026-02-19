@@ -126,37 +126,62 @@ window.event_pasteKeyframe = function () {
 };
 
 /**
- * 指定したインデックスのレイヤーを複製する
+ * 指定したインデックス（または現在選択されている全レイヤー）を複製する
  */
 window.event_duplicateLayer = function (layerIdx) {
-    if (layerIdx < 0 || layerIdx >= event_data.layers.length) return;
+    const indices = (layerIdx !== undefined) ? [layerIdx] : [...event_selectedLayerIndices];
+    if (indices.length === 0) return;
 
     event_pushHistory(); // 履歴保存
 
-    const original = event_data.layers[layerIdx];
+    // インデックスを降順にソートして、挿入時のズレを防ぐ
+    indices.sort((a, b) => b - a);
 
-    // ディープコピーを作成 (imgObj等の非JSON要素は消える)
-    const clone = JSON.parse(JSON.stringify(original));
+    const newSelectedIndices = [];
+    indices.forEach(idx => {
+        const original = event_data.layers[idx];
+        if (!original) return;
 
-    // 新しいIDと名前の設定
-    clone.id = 'layer_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-    clone.name = original.name + " コピー";
+        // ディープコピーを作成
+        const clone = JSON.parse(JSON.stringify(original));
+        clone.id = 'layer_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+        clone.name = original.name + " コピー";
+        if (original.imgObj) clone.imgObj = original.imgObj;
 
-    // 描画に必要なImageオブジェクトの参照を復元
-    if (original.imgObj) {
-        clone.imgObj = original.imgObj;
-    }
-
-    // 元のレイヤーの直上に挿入
-    event_data.layers.splice(layerIdx, 0, clone);
+        // 元のレイヤーの直上に挿入
+        event_data.layers.splice(idx, 0, clone);
+        newSelectedIndices.push(idx); // 挿入した位置を選択状態にする
+    });
 
     // 複製したレイヤーを選択状態にする
-    event_selectedLayerIndex = layerIdx;
+    event_selectedLayerIndices = newSelectedIndices;
+    event_selectedLayerIndex = newSelectedIndices[0];
     event_selectedKey = null;
     event_selectedKeys = [];
 
     event_draw();
-    console.log("Layer duplicated:", clone.name);
+    console.log(`Duplicated ${indices.length} layers`);
+};
+
+/**
+ * 選択されている全レイヤーを削除する
+ */
+window.event_deleteSelectedLayers = function () {
+    if (event_selectedLayerIndices.length === 0) return;
+    if (!confirm(`${event_selectedLayerIndices.length}個のレイヤーを削除しますか？`)) return;
+
+    event_pushHistory();
+    // インデックスを降順にソートして、削除時のズレを防ぐ
+    const sorted = [...event_selectedLayerIndices].sort((a, b) => b - a);
+    sorted.forEach(idx => {
+        event_data.layers.splice(idx, 1);
+    });
+
+    event_selectedLayerIndex = -1;
+    event_selectedLayerIndices = [];
+    event_selectedKey = null;
+    event_selectedKeys = [];
+    event_draw();
 };
 
 // コンポジション切り替え
