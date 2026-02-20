@@ -193,7 +193,7 @@ window.event_draw = function () {
     window.event_drawTimelineHeaderAndOverlays(ctx, w, h, drawTime, scrollY);
 };
 
-window.event_drawPreview = function(drawTime) {
+window.event_drawPreview = function (drawTime) {
     // --- プレビュー描画 ---
     event_calcPreviewScale();
     const scale = event_previewScale;
@@ -349,7 +349,7 @@ window.event_drawPreview = function(drawTime) {
 
 };
 
-window.event_drawTimelineBackground = function(ctx, w, h) {
+window.event_drawTimelineBackground = function (ctx, w, h) {
     const viewEndTime = event_viewStartTime + ((w - EVENT_LEFT_PANEL_WIDTH) / event_pixelsPerSec);
     const secStep = event_pixelsPerSec > 100 ? 0.5 : 1.0;
     // --- タイムライン描画 ---
@@ -367,7 +367,7 @@ window.event_drawTimelineBackground = function(ctx, w, h) {
 
 };
 
-window.event_drawTimelineLayers = function(ctx, w, h, currentY, drawTime) {
+window.event_drawTimelineLayers = function (ctx, w, h, currentY, drawTime) {
     // --- 通常レイヤー描画ループ ---
     event_data.layers.forEach((layer, layerIdx) => {
         if (event_audioCompactMode && layer.type === 'audio') return;
@@ -560,7 +560,7 @@ window.event_drawTimelineLayers = function(ctx, w, h, currentY, drawTime) {
     return currentY;
 };
 
-window.event_drawTimelineAudioCompact = function(ctx, w, h, currentY) {
+window.event_drawTimelineAudioCompact = function (ctx, w, h, currentY) {
     // --- 音声トラックエリア (結合モード時) ---
     if (event_audioCompactMode) {
         if (currentY > EVENT_HEADER_HEIGHT && currentY < h) {
@@ -569,9 +569,33 @@ window.event_drawTimelineAudioCompact = function(ctx, w, h, currentY) {
         for (let t = 0; t < 4; t++) {
             const trackY = currentY;
             if (trackY + EVENT_TRACK_HEIGHT > EVENT_HEADER_HEIGHT && trackY < h) {
-                ctx.fillStyle = '#222'; ctx.fillRect(0, trackY, w, EVENT_TRACK_HEIGHT);
-                ctx.fillStyle = '#333'; ctx.fillRect(0, trackY, EVENT_LEFT_PANEL_WIDTH, EVENT_TRACK_HEIGHT);
-                ctx.strokeStyle = '#444'; ctx.strokeRect(0, trackY, w, EVENT_TRACK_HEIGHT);
+                let isMainSelected = false;
+                let isTrackSelected = false;
+                for (let i = 0; i < event_data.layers.length; i++) {
+                    const l = event_data.layers[i];
+                    if (l.type === 'audio' && (l.trackIdx !== undefined ? l.trackIdx : 0) === t) {
+                        if (i === event_selectedLayerIndex) isMainSelected = true;
+                        if (event_selectedLayerIndices.includes(i)) isTrackSelected = true;
+                    }
+                }
+
+                ctx.fillStyle = isMainSelected ? '#334' : (isTrackSelected ? '#2a2a35' : '#222');
+                ctx.fillRect(EVENT_LEFT_PANEL_WIDTH, trackY, w - EVENT_LEFT_PANEL_WIDTH, EVENT_TRACK_HEIGHT);
+
+                ctx.fillStyle = isMainSelected ? '#556' : (isTrackSelected ? '#445' : '#333');
+                ctx.fillRect(0, trackY, EVENT_LEFT_PANEL_WIDTH, EVENT_TRACK_HEIGHT);
+
+                if (isTrackSelected) {
+                    ctx.strokeStyle = isMainSelected ? '#88a' : '#668';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(1, trackY + 1, EVENT_LEFT_PANEL_WIDTH - 2, EVENT_TRACK_HEIGHT - 2);
+                    ctx.lineWidth = 1;
+                } else {
+                    ctx.strokeStyle = '#444';
+                    ctx.strokeRect(0, trackY, EVENT_LEFT_PANEL_WIDTH, EVENT_TRACK_HEIGHT);
+                }
+
+                ctx.strokeStyle = '#444'; ctx.beginPath(); ctx.moveTo(EVENT_LEFT_PANEL_WIDTH, trackY); ctx.lineTo(w, trackY); ctx.stroke();
                 ctx.fillStyle = '#aaa'; ctx.fillText(`Audio ${t + 1}`, 10, trackY + 18);
             }
 
@@ -617,7 +641,7 @@ window.event_drawTimelineAudioCompact = function(ctx, w, h, currentY) {
     return currentY;
 };
 
-window.event_drawTimelineHeaderAndOverlays = function(ctx, w, h, drawTime, scrollY) {
+window.event_drawTimelineHeaderAndOverlays = function (ctx, w, h, drawTime, scrollY) {
     const viewEndTime = event_viewStartTime + ((w - EVENT_LEFT_PANEL_WIDTH) / event_pixelsPerSec);
     const secStep = event_pixelsPerSec > 100 ? 0.5 : 1.0;
     // --- 固定ヘッダー ---

@@ -528,6 +528,32 @@ window.event_onTimelineMouseDown = function (e) {
     if (event_audioCompactMode) {
         for (let t = 0; t < 4; t++) {
             if (clickY >= currentScreenY && clickY < currentScreenY + EVENT_TRACK_HEIGHT) {
+                if (x < EVENT_LEFT_PANEL_WIDTH) {
+                    hitSomething = true;
+                    // トラックtに属する全音声レイヤーを取得
+                    const audioIndices = [];
+                    for (let n = 0; n < event_data.layers.length; n++) {
+                        const l = event_data.layers[n];
+                        if (l.type === 'audio' && (l.trackIdx !== undefined ? l.trackIdx : 0) === t) {
+                            audioIndices.push(n);
+                        }
+                    }
+                    if (audioIndices.length > 0) {
+                        const isCmd = (e.ctrlKey || e.metaKey);
+                        if (e.shiftKey || isCmd) {
+                            audioIndices.forEach(idx => {
+                                if (!event_selectedLayerIndices.includes(idx)) event_selectedLayerIndices.push(idx);
+                            });
+                            event_selectedLayerIndex = audioIndices[audioIndices.length - 1];
+                        } else {
+                            event_selectedLayerIndices = [...audioIndices];
+                            event_selectedLayerIndex = audioIndices[audioIndices.length - 1];
+                        }
+                        event_draw();
+                    }
+                    return;
+                }
+
                 // このトラック(t)内のレイヤーを探す
                 for (let i = 0; i < event_data.layers.length; i++) {
                     const layer = event_data.layers[i];
