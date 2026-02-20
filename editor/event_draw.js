@@ -183,6 +183,17 @@ window.event_draw = function () {
     ctx.fillStyle = '#222';
     ctx.fillRect(0, 0, w, h);
 
+    window.event_drawPreview(drawTime);
+    window.event_drawTimelineBackground(ctx, w, h);
+    let currentY = EVENT_HEADER_HEIGHT - scrollY;
+    currentY = window.event_drawTimelineLayers(ctx, w, h, currentY, drawTime);
+    if (event_audioCompactMode) {
+        currentY = window.event_drawTimelineAudioCompact(ctx, w, h, currentY);
+    }
+    window.event_drawTimelineHeaderAndOverlays(ctx, w, h, drawTime, scrollY);
+};
+
+window.event_drawPreview = function(drawTime) {
     // --- プレビュー描画 ---
     event_calcPreviewScale();
     const scale = event_previewScale;
@@ -336,9 +347,12 @@ window.event_draw = function () {
     event_ctxPreview.globalCompositeOperation = 'source-over';
     event_ctxPreview.restore();
 
-    // --- タイムライン描画 ---
+};
+
+window.event_drawTimelineBackground = function(ctx, w, h) {
     const viewEndTime = event_viewStartTime + ((w - EVENT_LEFT_PANEL_WIDTH) / event_pixelsPerSec);
     const secStep = event_pixelsPerSec > 100 ? 0.5 : 1.0;
+    // --- タイムライン描画 ---
 
     ctx.save();
     ctx.beginPath(); ctx.rect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, h); ctx.clip();
@@ -351,8 +365,9 @@ window.event_draw = function () {
     }
     ctx.restore();
 
-    let currentY = EVENT_HEADER_HEIGHT - scrollY;
+};
 
+window.event_drawTimelineLayers = function(ctx, w, h, currentY, drawTime) {
     // --- 通常レイヤー描画ループ ---
     event_data.layers.forEach((layer, layerIdx) => {
         if (event_audioCompactMode && layer.type === 'audio') return;
@@ -542,6 +557,10 @@ window.event_draw = function () {
         }
     });
 
+    return currentY;
+};
+
+window.event_drawTimelineAudioCompact = function(ctx, w, h, currentY) {
     // --- 音声トラックエリア (結合モード時) ---
     if (event_audioCompactMode) {
         if (currentY > EVENT_HEADER_HEIGHT && currentY < h) {
@@ -595,6 +614,12 @@ window.event_draw = function () {
         }
     }
 
+    return currentY;
+};
+
+window.event_drawTimelineHeaderAndOverlays = function(ctx, w, h, drawTime, scrollY) {
+    const viewEndTime = event_viewStartTime + ((w - EVENT_LEFT_PANEL_WIDTH) / event_pixelsPerSec);
+    const secStep = event_pixelsPerSec > 100 ? 0.5 : 1.0;
     // --- 固定ヘッダー ---
     ctx.save();
     ctx.fillStyle = '#333'; ctx.fillRect(EVENT_LEFT_PANEL_WIDTH, 0, w - EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT);
@@ -645,3 +670,4 @@ window.event_draw = function () {
 
     if (window.event_updateTextPropertyUI) window.event_updateTextPropertyUI();
 };
+

@@ -267,19 +267,19 @@ window.event_onTimelineMouseDown = function (e) {
 
                 // --- 左端基準のボタン判定 ---
                 // 1. 展開矢印 (0-18px)
-                if (x < 18) {
+                if (x < UI_LAYOUT.EXPAND_LEFT) {
                     layer.expanded = !layer.expanded;
                     event_draw();
                     return;
                 }
                 // 2. 👀ボタン (18-38px)
-                if (x >= 18 && x < 38) {
+                if (x >= UI_LAYOUT.EXPAND_LEFT && x < UI_LAYOUT.EYE_LEFT) {
                     layer.visible = (layer.visible === undefined) ? false : !layer.visible;
                     event_draw();
                     return;
                 }
                 // 3. 🔐ボタン (38-58px)
-                if (x >= 38 && x < 58) {
+                if (x >= UI_LAYOUT.EYE_LEFT && x < UI_LAYOUT.LOCK_LEFT) {
                     layer.locked = !layer.locked;
                     event_draw();
                     return;
@@ -319,7 +319,7 @@ window.event_onTimelineMouseDown = function (e) {
                 }
 
                 // --- それ以外のレイヤー名部分などをクリック (順序入れ替え・選択) ---
-                if (x >= 58 || fromRight > UI_LAYOUT.PARENT_RIGHT) {
+                if (x >= UI_LAYOUT.LOCK_LEFT || fromRight > UI_LAYOUT.PARENT_RIGHT) {
                     event_pushHistory();
                     event_state = 'drag-layer-order';
 
@@ -414,7 +414,7 @@ window.event_onTimelineMouseDown = function (e) {
                         const fromRight = EVENT_LEFT_PANEL_WIDTH - x;
                         const curVal = event_getInterpolatedValue(i, prop, event_currentTime);
 
-                        if (prop.startsWith('fx_') && x >= 15 && x <= 27) {
+                        if (prop.startsWith('fx_') && x >= UI_LAYOUT.FX_DEL_LEFT && x <= UI_LAYOUT.FX_DEL_RIGHT) {
                             if (confirm(`エフェクト削除: ${track.label}?`)) {
                                 event_pushHistory();
                                 if (layer.effects) {
@@ -1075,7 +1075,10 @@ window.event_showInlineInput = function (x, y, initialValue, trackType, callback
     input.style.left = (rect.left + x) + 'px';
     input.style.top = (rect.top + y) + 'px';
     input.style.width = '80px'; input.style.zIndex = '3000';
+    let isFinished = false;
     const commit = () => {
+        if (isFinished) return;
+        isFinished = true;
         let val = input.value;
         if (trackType === 'rotation' && val.includes('+')) {
             const p = val.split('+'); val = parseFloat(p[0]) * 360 + parseFloat(p[1]);
@@ -1085,7 +1088,11 @@ window.event_showInlineInput = function (x, y, initialValue, trackType, callback
     };
     input.onkeydown = (e) => {
         if (e.key === 'Enter') commit();
-        else if (e.key === 'Escape') if (input.parentNode) input.parentNode.removeChild(input);
+        else if (e.key === 'Escape') {
+            if (isFinished) return;
+            isFinished = true;
+            if (input.parentNode) input.parentNode.removeChild(input);
+        }
     };
     input.onblur = commit;
     document.body.appendChild(input);
@@ -1198,7 +1205,12 @@ window.event_showEnumSelect = function (x, y, initialValue, options, callback) {
         if (o === initialValue) opt.selected = true;
         select.appendChild(opt);
     });
-    const removeSelect = () => { if (select.parentNode) select.parentNode.removeChild(select); };
+    let isFinished = false;
+    const removeSelect = () => {
+        if (isFinished) return;
+        isFinished = true;
+        if (select.parentNode) select.parentNode.removeChild(select);
+    };
     select.onchange = () => { callback(select.value); removeSelect(); };
     select.onblur = () => setTimeout(removeSelect, 150);
     document.body.appendChild(select); select.focus();
