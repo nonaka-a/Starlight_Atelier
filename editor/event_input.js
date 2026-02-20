@@ -798,29 +798,52 @@ window.event_onGlobalMouseMove = function (e) {
         });
         event_draw();
     } else if (event_state === 'drag-layer-in' || event_state === 'drag-layer-out' || event_state === 'drag-layer-move') {
-        const dt = (e.clientX - event_dragStartPos.x) / event_pixelsPerSec;
+        const raw_dt = (e.clientX - event_dragStartPos.x) / event_pixelsPerSec;
+        const fps = event_data.composition.fps || 30;
+        const frameDuration = 1 / fps;
 
-        if (event_state === 'drag-layer-in') {
-            const layer = event_data.layers[event_dragTarget.layerIdx];
-            layer.inPoint = Math.min(event_snapTime(layer.inPoint + dt), layer.outPoint);
-        } else if (event_state === 'drag-layer-out') {
-            const layer = event_data.layers[event_dragTarget.layerIdx];
-            layer.outPoint = Math.max(event_snapTime(layer.outPoint + dt), layer.inPoint);
-        } else {
-            // move (複数同時移動対応)
+        // フレーム単位のスナップ差分を計算
+        const snapped_dt = Math.round(raw_dt / frameDuration) * frameDuration;
+
+        if (Math.abs(snapped_dt) > 0.0001) {
+            if (event_state === 'drag-layer-in') {
+                const layer = event_data.layers[event_dragTarget.layerIdx];
+                const prev = layer.inPoint;
+                layer.inPoint = Math.min(event_snapTime(layer.inPoint + snapped_dt), layer.outPoint);
+                event_dragStartPos.x += (layer.inPoint - prev) * event_pixelsPerSec;
+            } else if (event_state === 'drag-layer-out') {
+                const layer = event_data.layers[event_dragTarget.layerIdx];
+                const prev = layer.outPoint;
+                layer.outPoint = Math.max(event_snapTime(layer.outPoint + snapped_dt), layer.inPoint);
+                event_dragStartPos.x += (layer.outPoint - prev) * event_pixelsPerSec;
+            } else {
+                // move (複数同時移動対応)
+                const targets = event_dragTarget.targets || [{ layerIdx: event_dragTarget.layerIdx }];
+                targets.forEach(t => {
+                    const layer = event_data.layers[t.layerIdx] || t.layer;
+                    if (!layer) return;
+
+                    layer.inPoint = event_snapTime(layer.inPoint + snapped_dt);
+                    layer.outPoint = event_snapTime(layer.outPoint + snapped_dt);
+                    if (layer.startTime !== undefined) {
+                        layer.startTime = event_snapTime(layer.startTime + snapped_dt);
+                    }
+                    Object.values(layer.tracks).forEach(tr => {
+                        if (tr.keys) {
+                            tr.keys.forEach(k => k.time = event_snapTime(k.time + snapped_dt));
+                        }
+                    });
+                });
+                event_dragStartPos.x += snapped_dt * event_pixelsPerSec;
+            }
+        }
+
+        // 音声トラック間の移動 (Compact Mode時) のY軸処理
+        if (event_state === 'drag-layer-move') {
             const targets = event_dragTarget.targets || [{ layerIdx: event_dragTarget.layerIdx }];
             targets.forEach(t => {
                 const layer = event_data.layers[t.layerIdx] || t.layer;
                 if (!layer) return;
-
-                layer.inPoint += dt;
-                layer.outPoint += dt;
-                if (layer.startTime !== undefined) {
-                    layer.startTime += dt;
-                }
-                Object.values(layer.tracks).forEach(tr => tr.keys && tr.keys.forEach(k => k.time += dt));
-
-                // 音声トラック間の移動 (Compact Mode時) - 単体ドラッグ時のみ生かすか、要検討だが一旦単体のみ
                 if (targets.length === 1 && event_audioCompactMode && layer.type === 'audio' && event_dragTarget.startTrack !== undefined) {
                     const dy = clickY - event_dragTarget.originScreenY;
                     const trackDiff = Math.round(dy / EVENT_TRACK_HEIGHT);
@@ -831,8 +854,8 @@ window.event_onGlobalMouseMove = function (e) {
                 }
             });
         }
-        event_dragStartPos = { x: e.clientX, y: e.clientY };
 
+        event_dragStartPos.y = e.clientY;
         event_draw();
     }
 };
