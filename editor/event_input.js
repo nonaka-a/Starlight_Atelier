@@ -1099,6 +1099,7 @@ window.event_onKeyDown = function (e) {
         event_draw();
     } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyC') event_copySelectedKeyframe();
     else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyV') { event_pushHistory(); event_pasteKeyframe(); }
+    else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyS') { e.preventDefault(); event_exportJSON(); }
     else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'z')) { e.preventDefault(); event_undo(); }
     else if (e.code === 'Space') { e.preventDefault(); event_togglePlay(); }
     else if (e.code === 'Delete' || e.code === 'Backspace') {
