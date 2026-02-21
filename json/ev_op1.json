@@ -47,7 +47,7 @@
           "parent": null,
           "expanded": false,
           "inPoint": 0,
-          "outPoint": 25,
+          "outPoint": 6.366666666666666,
           "tracks": {
             "position": {
               "label": "Position",
@@ -112,6 +112,107 @@
                 },
                 {
                   "time": 0.5,
+                  "value": 100,
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Linear"
+                }
+              ],
+              "min": 0,
+              "max": 100,
+              "step": 1,
+              "initialValue": 100
+            },
+            "letterSpacing": {
+              "label": "Tracking (px)",
+              "type": "number",
+              "keys": [],
+              "step": 1,
+              "initialValue": 0
+            }
+          },
+          "locked": false
+        },
+        {
+          "id": "layer_1771675957613_825",
+          "type": "text",
+          "name": "Text Layer コピー",
+          "blendMode": "source-over",
+          "text": "あれ？",
+          "fontSize": 43,
+          "fontFamily": "\"M PLUS Rounded 1c\", sans-serif",
+          "color": "#ffffff",
+          "strokeColor": "#000000",
+          "strokeWidth": 0,
+          "shadowOpacity": 100,
+          "parent": null,
+          "expanded": false,
+          "inPoint": 6.4,
+          "outPoint": 12.766666666666666,
+          "tracks": {
+            "position": {
+              "label": "Position",
+              "type": "vector2",
+              "keys": [
+                {
+                  "time": 6.4,
+                  "value": {
+                    "x": 500,
+                    "y": 539
+                  },
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Linear"
+                }
+              ],
+              "step": 1,
+              "initialValue": {
+                "x": 500,
+                "y": 300
+              }
+            },
+            "scale": {
+              "label": "Scale",
+              "type": "vector2",
+              "linked": true,
+              "keys": [],
+              "step": 1,
+              "initialValue": {
+                "x": 100,
+                "y": 100
+              }
+            },
+            "rotation": {
+              "label": "Rotation",
+              "type": "rotation",
+              "keys": [],
+              "min": -3600,
+              "max": 3600,
+              "step": 1,
+              "initialValue": 0
+            },
+            "opacity": {
+              "label": "Opacity",
+              "type": "number",
+              "keys": [],
+              "min": 0,
+              "max": 100,
+              "step": 1,
+              "initialValue": 100
+            },
+            "typewriter": {
+              "label": "Typewriter (%)",
+              "type": "number",
+              "keys": [
+                {
+                  "time": 6.4,
+                  "value": 0,
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Linear"
+                },
+                {
+                  "time": 6.633333333333333,
                   "value": 100,
                   "easeIn": false,
                   "easeOut": false,
@@ -205,7 +306,7 @@
               "initialValue": 100
             }
           },
-          "locked": false
+          "locked": true
         },
         {
           "id": "layer_1771599433364_563",
@@ -465,7 +566,7 @@
           "parent": "layer_1771601069230_965",
           "expanded": false,
           "inPoint": 0,
-          "outPoint": 25,
+          "outPoint": 6.366666666666666,
           "tracks": {
             "motion": {
               "label": "Motion",
@@ -478,6 +579,26 @@
               "label": "Position",
               "type": "vector2",
               "keys": [
+                {
+                  "time": 6.166666666666667,
+                  "value": {
+                    "x": 200.38167938931292,
+                    "y": 96.18320610687022
+                  },
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Linear"
+                },
+                {
+                  "time": 6.2,
+                  "value": {
+                    "x": 199.27262208801903,
+                    "y": 102.83754991463361
+                  },
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Linear"
+                },
                 {
                   "time": 9.8,
                   "value": {
@@ -498,12 +619,127 @@
             "scale": {
               "label": "Scale",
               "type": "vector2",
-              "linked": true,
-              "keys": [],
+              "linked": false,
+              "keys": [
+                {
+                  "time": 6.166666666666667,
+                  "value": {
+                    "x": 99.99999999999999,
+                    "y": 99.99999999999999
+                  },
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Linear"
+                },
+                {
+                  "time": 6.2,
+                  "value": {
+                    "x": 104.99999999999999,
+                    "y": 90.99999999999999
+                  },
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Linear"
+                }
+              ],
               "step": 1,
               "initialValue": {
                 "x": 99.99999999999999,
                 "y": 99.99999999999999
+              }
+            },
+            "rotation": {
+              "label": "Rotation",
+              "type": "rotation",
+              "keys": [],
+              "min": -3600,
+              "max": 3600,
+              "step": 1,
+              "initialValue": 0
+            },
+            "opacity": {
+              "label": "Opacity",
+              "type": "number",
+              "keys": [],
+              "min": 0,
+              "max": 100,
+              "step": 1,
+              "initialValue": 100
+            }
+          }
+        },
+        {
+          "id": "layer_1771675757645_149",
+          "name": "c05_maimai_4.png",
+          "source": "../image/event/OP/c05/c05_maimai_4.png",
+          "imgObj": {},
+          "blendMode": "source-over",
+          "parent": "layer_1771601069230_965",
+          "expanded": false,
+          "inPoint": 6.4,
+          "outPoint": 25,
+          "tracks": {
+            "position": {
+              "label": "Position",
+              "type": "vector2",
+              "keys": [
+                {
+                  "time": 6.4,
+                  "value": {
+                    "x": 198.52125693160815,
+                    "y": 76.52495378927912
+                  },
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Hold"
+                },
+                {
+                  "time": 6.5,
+                  "value": {
+                    "x": 198.52125693160815,
+                    "y": 79.85212569316081
+                  },
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Hold"
+                }
+              ],
+              "step": 1,
+              "initialValue": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            "scale": {
+              "label": "Scale",
+              "type": "vector2",
+              "linked": false,
+              "keys": [
+                {
+                  "time": 6.4,
+                  "value": {
+                    "x": 100,
+                    "y": 105
+                  },
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Hold"
+                },
+                {
+                  "time": 6.5,
+                  "value": {
+                    "x": 100,
+                    "y": 100
+                  },
+                  "easeIn": false,
+                  "easeOut": false,
+                  "interpolation": "Hold"
+                }
+              ],
+              "step": 1,
+              "initialValue": {
+                "x": 100,
+                "y": 100
               }
             },
             "rotation": {
@@ -533,7 +769,7 @@
           "imgObj": {},
           "blendMode": "source-over",
           "parent": null,
-          "expanded": true,
+          "expanded": false,
           "inPoint": 0,
           "outPoint": 25,
           "tracks": {
@@ -597,7 +833,8 @@
               "step": 1,
               "initialValue": 100
             }
-          }
+          },
+          "locked": true
         },
         {
           "id": "layer_audio_1771597215936",
@@ -892,6 +1129,13 @@
       "name": "c05_BG.jpg",
       "id": "img_17716010652200.7331408549134719",
       "src": "../image/event/OP/c05/c05_BG.jpg",
+      "imgObj": {}
+    },
+    {
+      "type": "image",
+      "name": "c05_maimai_4.png",
+      "id": "img_17716757127210.8928567978914479",
+      "src": "../image/event/OP/c05/c05_maimai_4.png",
       "imgObj": {}
     }
   ]
