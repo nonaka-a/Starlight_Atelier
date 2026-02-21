@@ -871,6 +871,7 @@ window.event_onGlobalMouseUp = function (e) {
         let curY = EVENT_HEADER_HEIGHT;
         let targetIdx = -1;
         for (let i = 0; i < event_data.layers.length; i++) {
+            if (event_audioCompactMode && event_data.layers[i].type === 'audio') continue;
             if (absoluteY >= curY && absoluteY < curY + EVENT_TRACK_HEIGHT && x < EVENT_LEFT_PANEL_WIDTH) { targetIdx = i; break; }
             curY += EVENT_TRACK_HEIGHT + (event_data.layers[i].expanded ? Object.keys(event_data.layers[i].tracks).length * EVENT_TRACK_HEIGHT : 0);
         }
@@ -886,6 +887,7 @@ window.event_onGlobalMouseUp = function (e) {
 
         let curY = EVENT_HEADER_HEIGHT;
         event_data.layers.forEach((iLayer, i) => {
+            if (event_audioCompactMode && iLayer.type === 'audio') return;
             curY += EVENT_TRACK_HEIGHT;
             if (iLayer.expanded) {
                 Object.keys(iLayer.tracks).forEach(prop => {
@@ -1170,6 +1172,16 @@ window.event_showParentSelect = function (x, y, childIdx) {
         { id: null, name: "なし" },
         ...event_data.layers.filter(l => l.id !== event_data.layers[childIdx].id).map(l => ({ id: l.id, name: l.name }))
     ];
+
+    // スクロール可能にし、最大高さを制限
+    menu.style.maxHeight = '300px';
+    menu.style.overflowY = 'auto';
+
+    // 画面下端からはみ出す場合は位置を調整
+    const estimatedHeight = Math.min(300, options.length * 28 + 10);
+    if (y + estimatedHeight > window.innerHeight - 20) {
+        menu.style.top = Math.max(10, window.innerHeight - estimatedHeight - 20) + 'px';
+    }
 
     options.forEach(opt => {
         const item = document.createElement('div');

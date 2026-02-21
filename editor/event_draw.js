@@ -692,6 +692,33 @@ window.event_drawTimelineHeaderAndOverlays = function (ctx, w, h, drawTime, scro
         ctx.setLineDash([]);
     }
 
+    if (event_state === 'drag-pickwhip' && typeof event_pickWhipSourceLayerIdx !== 'undefined' && event_pickWhipSourceLayerIdx !== -1) {
+        let curY = EVENT_HEADER_HEIGHT - scrollY;
+        let sourceY = -1;
+        for (let i = 0; i < event_data.layers.length; i++) {
+            if (event_audioCompactMode && event_data.layers[i].type === 'audio') continue;
+            if (i === event_pickWhipSourceLayerIdx) {
+                sourceY = curY + 15;
+                break;
+            }
+            curY += EVENT_TRACK_HEIGHT + (event_data.layers[i].expanded ? Object.keys(event_data.layers[i].tracks).length * EVENT_TRACK_HEIGHT : 0);
+        }
+        if (sourceY !== -1 && window.event_currentMouseX !== undefined) {
+            const rect = event_canvasTimeline.getBoundingClientRect();
+            const startX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PICK_RIGHT + 8;
+            const endX = window.event_currentMouseX - rect.left;
+            const endY = window.event_currentMouseY - rect.top;
+            ctx.save();
+            ctx.strokeStyle = '#0ff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(startX, sourceY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+            ctx.restore();
+        }
+    }
+
     if (window.event_updateTextPropertyUI) window.event_updateTextPropertyUI();
 };
 
